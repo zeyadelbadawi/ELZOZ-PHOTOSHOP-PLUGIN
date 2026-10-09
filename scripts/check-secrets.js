@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const roots = process.argv.slice(2).length ? process.argv.slice(2) : ["src", "dist", "plugin"];
+const roots = process.argv.slice(2).length ? process.argv.slice(2) : ["src", "dist", "plugin", "admin/src", "admin/dist", "supabase/functions"];
 const jwtPattern = /eyJ[A-Za-z0-9_-]{10,}\.([A-Za-z0-9_-]{10,})\.[A-Za-z0-9_-]{10,}/g;
 const otherPatterns = [
     { name: "Stripe secret key", re: /sk_(live|test)_[A-Za-z0-9]{10,}/ },

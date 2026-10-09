@@ -92,8 +92,8 @@ module.exports = (env, argv) => {
                 __ELZOZ_CONTACT_URL__: JSON.stringify(contactUrl),
                 __ELZOZ_DEV__: JSON.stringify(!isProd)
             }),
-            new CopyPlugin(
-                [
+            new CopyPlugin({
+                patterns: [
                     {
                         from: "plugin",
                         // The manifest is a template: network domains and dev-only permissions are build-specific.
@@ -106,9 +106,8 @@ module.exports = (env, argv) => {
                             return JSON.stringify(manifest, null, 2);
                         }
                     }
-                ],
-                { copyUnmodified: true }
-            )
+                ]
+            })
         ]
     };
 };
