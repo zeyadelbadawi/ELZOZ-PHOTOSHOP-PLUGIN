@@ -12,7 +12,9 @@
     "uxp:reload": "cd dist && uxp plugin reload",
     "uxp:debug": "cd dist && uxp plugin debug",
     "test:db": "bash scripts/test-db.sh",
-    "harness": "webpack --config tests/harness/webpack.harness.js"
+    "harness": "webpack --config tests/harness/webpack.harness.js",
+    "test-env": "bash scripts/test-env.sh",
+    "test:e2e": "bash -c \"source ${ELZOZ_TEST_HOME:-/tmp/elzoz-test}/env && vitest run tests/e2e\""
   },
   "author": "Elzoz",
   "license": "Apache-2.0",
@@ -21,6 +23,7 @@
     "@babel/plugin-proposal-object-rest-spread": "^7.8.3",
     "@babel/plugin-syntax-class-properties": "^7.10.4",
     "@babel/plugin-transform-react-jsx": "^7.8.3",
+    "ag-psd": "^31.0.3",
     "babel-loader": "^8.0.6",
     "clean-webpack-plugin": "^2.0.2",
     "copy-webpack-plugin": "^5.0.3",
