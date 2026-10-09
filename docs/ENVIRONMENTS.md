@@ -9,7 +9,10 @@
 | Organisation | "task's projects" (Vercel-managed, free plan) |
 | API URL | `https://qxclgvmqeztonhdntvni.supabase.co` |
 | Public key used by the plugin and dashboard | the **publishable** key `sb_publishable_TI82…` (Settings → API keys). Public by design |
-| Edge Function | `admin-users` (verify JWT: on) |
+| Edge Function | `admin-users` (verify JWT: on); secret `ELZOZ_ADMIN_ORIGINS=https://elzoadmin.vercel.app` |
+| Admin dashboard | `https://elzoadmin.vercel.app` (Vercel, root directory `admin`) |
+| Admin account | the owner's account, in `private.admins` |
+| Contact link in the plugin | WhatsApp (`ELZOZ_CONTACT_URL` in the local `.env`) |
 | Created | 2026-10-09 via the Supabase connector |
 
 Never store the secret / service_role key here or anywhere in the repository.
