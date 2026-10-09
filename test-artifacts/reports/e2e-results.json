@@ -1,0 +1,987 @@
+{
+  "generated": "2026-10-09T17:47:00.154Z",
+  "host": "SIMULATED Photoshop host in Chromium (not Adobe Photoshop, not UXP)",
+  "backend": "REAL local Postgres + PostgREST with the Elzoz migrations; Auth is a local stub",
+  "scenarios": [
+    {
+      "id": "A",
+      "title": "Successful design batch (8 rows, JPG + PSD, real credits)",
+      "checks": [
+        {
+          "name": "16 files written (8 JPG + 8 PSD)",
+          "ok": true,
+          "detail": 16
+        },
+        {
+          "name": "every JPG decodes (Pillow) at 1080x1350",
+          "ok": true,
+          "detail": {
+            "1_Aurora Laptop 14.jpg": [
+              "JPEG",
+              1080,
+              1350
+            ],
+            "2_Pulse Phone X.jpg": [
+              "JPEG",
+              1080,
+              1350
+            ],
+            "3_Echo Headphones.jpg": [
+              "JPEG",
+              1080,
+              1350
+            ],
+            "4_Orbit Watch.jpg": [
+              "JPEG",
+              1080,
+              1350
+            ],
+            "5_Lens Pro Camera.jpg": [
+              "JPEG",
+              1080,
+              1350
+            ],
+            "6_Glow Desk Lamp.jpg": [
+              "JPEG",
+              1080,
+              1350
+            ],
+            "7_سماعة لاسلكية.jpg": [
+              "JPEG",
+              1080,
+              1350
+            ],
+            "8_Comfort Desk Chair.jpg": [
+              "JPEG",
+              1080,
+              1350
+            ]
+          }
+        },
+        {
+          "name": "PSD row 1: text and Smart Objects carry row data (psd-tools)",
+          "ok": true,
+          "detail": {
+            "size": [
+              1080,
+              1350
+            ],
+            "layers": {
+              "Background@Root": "pixel",
+              "Media@Root": "group",
+              "Photo@Media": "laptop.jpg",
+              "Logo@Media": "elzoz-logo.png",
+              "Card@Root": "group",
+              "Badge@Card": "pixel",
+              "Text@Card": "group",
+              "Name@Text": "Aurora Laptop 14",
+              "Price@Text": "$1,299",
+              "Description@Text": "Thin, light, all-day battery.",
+              "Footer@Root": "group",
+              "Name@Footer": "Aurora Laptop 14"
+            }
+          }
+        },
+        {
+          "name": "PSD row 7 (Arabic) text intact",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "server balance 100 → 92 (8 charged)",
+          "ok": true,
+          "detail": {
+            "balance": "92",
+            "reserved": "0"
+          }
+        },
+        {
+          "name": "ledger: one grant + 8 charges",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "job completed on the server",
+          "ok": true,
+          "detail": [
+            {
+              "id": "bc61c520-573a-4e63-b0b6-cf2e6dd68852",
+              "status": "completed",
+              "planned_items": 8,
+              "reserved_total": "8",
+              "charged_total": "8"
+            }
+          ]
+        },
+        {
+          "name": "header chip shows the server balance",
+          "ok": true,
+          "detail": "92 credits"
+        },
+        {
+          "name": "recording SIMULATED-scenario-A-design-batch.mp4 plays (ffprobe + full decode)",
+          "ok": true,
+          "detail": "h264 320x720 9.8 s"
+        }
+      ],
+      "error": null,
+      "ms": 9970
+    },
+    {
+      "id": "B",
+      "title": "Missing asset found in Check, fixed before spending; corrupt file fails, retried",
+      "checks": [
+        {
+          "name": "preflight names the missing image row before any spend",
+          "ok": true,
+          "detail": "Image not found for \"Photo\" in 1 row(s); those rows will be skipped.Rows 4Fix"
+        },
+        {
+          "name": "warning gone after the file was added",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "3 of 4 charged; failed row not charged",
+          "ok": true,
+          "detail": {
+            "balance": "47",
+            "reserved": "0"
+          }
+        },
+        {
+          "name": "failed row recorded as failed on the server",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "retry charged exactly 1 more (total 4)",
+          "ok": true,
+          "detail": {
+            "balance": "46",
+            "reserved": "0"
+          }
+        },
+        {
+          "name": "4 JPGs, no partial file for the failed attempt",
+          "ok": true,
+          "detail": [
+            "elzoz_1.jpg",
+            "elzoz_2.jpg",
+            "elzoz_3.jpg",
+            "elzoz_4.jpg"
+          ]
+        },
+        {
+          "name": "recording SIMULATED-scenario-B-missing-asset-recovery.mp4 plays (ffprobe + full decode)",
+          "ok": true,
+          "detail": "h264 320x720 7.1 s"
+        }
+      ],
+      "error": null,
+      "ms": 7388
+    },
+    {
+      "id": "C",
+      "title": "Video: 3 reels, 2 s @ 24 fps, real MOV files",
+      "checks": [
+        {
+          "name": "preview time set to 1 s",
+          "ok": true,
+          "detail": "1"
+        },
+        {
+          "name": "3 MOV files",
+          "ok": true,
+          "detail": [
+            "elzoz_1.mov",
+            "elzoz_2.mov",
+            "elzoz_3.mov"
+          ]
+        },
+        {
+          "name": "elzoz_1.mov: ffprobe mjpeg 1080x1920, 48 frames, 24 fps, 2.0 s",
+          "ok": true,
+          "detail": {
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "codec": "mjpeg",
+            "width": 1080,
+            "height": 1920,
+            "fps": "24/1",
+            "frames": 48,
+            "durationSec": 2
+          }
+        },
+        {
+          "name": "elzoz_2.mov: ffprobe mjpeg 1080x1920, 48 frames, 24 fps, 2.0 s",
+          "ok": true,
+          "detail": {
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "codec": "mjpeg",
+            "width": 1080,
+            "height": 1920,
+            "fps": "24/1",
+            "frames": 48,
+            "durationSec": 2
+          }
+        },
+        {
+          "name": "elzoz_3.mov: ffprobe mjpeg 1080x1920, 48 frames, 24 fps, 2.0 s",
+          "ok": true,
+          "detail": {
+            "container": "mov,mp4,m4a,3gp,3g2,mj2",
+            "codec": "mjpeg",
+            "width": 1080,
+            "height": 1920,
+            "fps": "24/1",
+            "frames": 48,
+            "durationSec": 2
+          }
+        },
+        {
+          "name": "3 videos x 1 unit charged",
+          "ok": true,
+          "detail": {
+            "balance": "27",
+            "reserved": "0"
+          }
+        },
+        {
+          "name": "recording SIMULATED-scenario-C-video.mp4 plays (ffprobe + full decode)",
+          "ok": true,
+          "detail": "h264 320x720 18.7 s"
+        }
+      ],
+      "error": null,
+      "ms": 19005
+    },
+    {
+      "id": "D",
+      "title": "Billing failures: lost response, server outage at start, insufficient credits",
+      "checks": [
+        {
+          "name": "D1 lost response: job completed, exactly 3 charged (no double charge)",
+          "ok": true,
+          "detail": {
+            "balance": {
+              "balance": "7",
+              "reserved": "0"
+            },
+            "job": "completed"
+          }
+        },
+        {
+          "name": "D2 nothing rendered and nothing charged while the server is down",
+          "ok": true,
+          "detail": {
+            "files": 0,
+            "balance": {
+              "balance": "7",
+              "reserved": "0"
+            }
+          }
+        },
+        {
+          "name": "D2 results offer Try again (regression)",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "D2 Try again succeeds: 3 more charged",
+          "ok": true,
+          "detail": {
+            "balance": "4",
+            "reserved": "0"
+          }
+        },
+        {
+          "name": "D3 insufficient credits blocks the job with exact numbers",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "D3 Next is disabled",
+          "ok": true,
+          "detail": null
+        }
+      ],
+      "error": null,
+      "ms": 18609,
+      "faultsInjected": true
+    },
+    {
+      "id": "E",
+      "title": "Responsive layout, themes, Arabic RTL, error and empty states",
+      "checks": [
+        {
+          "name": "Arabic UI sets dir=rtl at 240 px",
+          "ok": true,
+          "detail": "rtl"
+        },
+        {
+          "name": "Arabic UI sets dir=rtl at 320 px",
+          "ok": true,
+          "detail": "rtl"
+        },
+        {
+          "name": "wrong password shows a clear error",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "recording SIMULATED-scenario-E-responsive-walkthrough.mp4 plays (ffprobe + full decode)",
+          "ok": true,
+          "detail": "h264 520x700 12.5 s"
+        }
+      ],
+      "error": null,
+      "ms": 44788,
+      "faultsInjected": false
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "A01-signin-320-dark.png",
+      "title": "Sign in (configured build)",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A02-data-empty-320-dark.png",
+      "title": "Data step, empty state",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A03-data-loaded-320-dark.png",
+      "title": "Spreadsheet loaded with preview (incl. Arabic row)",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A04-template-320-dark.png",
+      "title": "Template inspected: size, layer counts, duplicate-name notice",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A05-map-empty-320-dark.png",
+      "title": "Map before auto-map",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A06-map-mapped-320-dark.png",
+      "title": "Map after auto-map and folder choice",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A07-map-images-320-dark.png",
+      "title": "Map: image layer options",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A08-check-no-output-320-dark.png",
+      "title": "Check: output folder missing (blocking)",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A09-check-ready-320-dark.png",
+      "title": "Check: ready, warnings and settings",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A10-check-summary-320-dark.png",
+      "title": "Check: summary with credits needed and available",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A11-generate-320-dark.png",
+      "title": "Generate: start button shows the real price",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A12-generate-running-320-dark.png",
+      "title": "Generate: progress while running",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A13-results-320-dark.png",
+      "title": "Results: all done, credits charged by the server",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "A14-account-320-dark.png",
+      "title": "Account: server balance, ledger, recent jobs",
+      "scenario": "A",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "B01-check-missing-image-320-dark.png",
+      "title": "Check: missing image warning with Fix",
+      "scenario": "B",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "B02-map-folder-refreshed-320-dark.png",
+      "title": "Map after re-choosing the image folder",
+      "scenario": "B",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "B03-check-fixed-320-dark.png",
+      "title": "Check: all 4 rows ready",
+      "scenario": "B",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "B04-results-partial-320-dark.png",
+      "title": "Results: corrupt image failed, not charged",
+      "scenario": "B",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "B05-retry-success-320-dark.png",
+      "title": "Results after retrying only the failed row",
+      "scenario": "B",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "C01-video-mode-320-dark.png",
+      "title": "Video mode, data step",
+      "scenario": "C",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "C02-animate-320-dark.png",
+      "title": "Animate: format, fps, duration",
+      "scenario": "C",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "C03-animate-tracks-320-dark.png",
+      "title": "Animate: tracks with timing and easing",
+      "scenario": "C",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "C04-animate-preview-320-dark.png",
+      "title": "Animate: frame preview of row 1 at 1.0 s (simulated render)",
+      "scenario": "C",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "C05-video-check-320-dark.png",
+      "title": "Video check: frames, disk use, credits",
+      "scenario": "C",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "C06-video-rendering-320-dark.png",
+      "title": "Video rendering progress (frame counter)",
+      "scenario": "C",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "C07-video-results-320-dark.png",
+      "title": "Video results",
+      "scenario": "C",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "C08-video-frames-contact-sheet.png",
+      "title": "Frames 0/0.5/1/1.5 s decoded from the rendered MOV by ffmpeg",
+      "scenario": "C",
+      "width": null,
+      "theme": null,
+      "lang": null,
+      "layoutProblems": []
+    },
+    {
+      "file": "D01-results-after-lost-response-320-dark.png",
+      "title": "D1: results after a lost billing response (retried safely)",
+      "scenario": "D",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "D02-billing-unavailable-320-dark.png",
+      "title": "D2: server unavailable at start, nothing rendered or charged",
+      "scenario": "D",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "D03-try-again-success-320-dark.png",
+      "title": "D2: Try again after the outage",
+      "scenario": "D",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "D04-insufficient-credits-320-dark.png",
+      "title": "D3: blocked before rendering: not enough credits",
+      "scenario": "D",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-map-240-dark.png",
+      "title": "Map at 240 px",
+      "scenario": "E",
+      "width": 240,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-check-240-dark.png",
+      "title": "Check at 240 px",
+      "scenario": "E",
+      "width": 240,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-map-260-dark.png",
+      "title": "Map at 260 px",
+      "scenario": "E",
+      "width": 260,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-check-260-dark.png",
+      "title": "Check at 260 px",
+      "scenario": "E",
+      "width": 260,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-map-320-dark.png",
+      "title": "Map at 320 px",
+      "scenario": "E",
+      "width": 320,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-check-320-dark.png",
+      "title": "Check at 320 px",
+      "scenario": "E",
+      "width": 320,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-map-400-dark.png",
+      "title": "Map at 400 px",
+      "scenario": "E",
+      "width": 400,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-check-400-dark.png",
+      "title": "Check at 400 px",
+      "scenario": "E",
+      "width": 400,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-map-520-dark.png",
+      "title": "Map at 520 px",
+      "scenario": "E",
+      "width": 520,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-check-520-dark.png",
+      "title": "Check at 520 px",
+      "scenario": "E",
+      "width": 520,
+      "height": 700,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-signin-320-light.png",
+      "title": "Sign in, light theme",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "light",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-map-320-light.png",
+      "title": "Map, light theme",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "light",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-check-320-light.png",
+      "title": "Check, light theme",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "light",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-signin-240-ar.png",
+      "title": "Sign in, Arabic RTL, 240 px",
+      "scenario": "E",
+      "width": 240,
+      "height": 720,
+      "theme": "dark",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-data-240-ar.png",
+      "title": "Data, Arabic RTL, 240 px",
+      "scenario": "E",
+      "width": 240,
+      "height": 720,
+      "theme": "dark",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-map-240-ar.png",
+      "title": "Map, Arabic RTL, 240 px",
+      "scenario": "E",
+      "width": 240,
+      "height": 720,
+      "theme": "dark",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-signin-320-ar.png",
+      "title": "Sign in, Arabic RTL, 320 px",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-data-320-ar.png",
+      "title": "Data, Arabic RTL, 320 px",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-map-320-ar.png",
+      "title": "Map, Arabic RTL, 320 px",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-signin-error-320-dark.png",
+      "title": "Sign in error: wrong password",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-data-corrupt-320-dark.png",
+      "title": "Data: corrupt workbook error",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-data-headers-only-320-dark.png",
+      "title": "Data: headers but no rows",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-map-no-layers-320-dark.png",
+      "title": "Map: template without fillable layers",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "E-template-ps23-320-dark.png",
+      "title": "Template on simulated Photoshop 23.5 (compat notice)",
+      "scenario": "E",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    }
+  ],
+  "recordings": [
+    {
+      "file": "SIMULATED-scenario-A-design-batch.mp4",
+      "title": "Scenario A: design batch (simulated host, real credits)",
+      "codec": "h264",
+      "width": 320,
+      "height": 720,
+      "durationSec": 9.8,
+      "bytes": 167523,
+      "decodesCleanly": true,
+      "label": "SIMULATION — simulated Photoshop host in Chromium"
+    },
+    {
+      "file": "SIMULATED-scenario-B-missing-asset-recovery.mp4",
+      "title": "Scenario B: missing and corrupt asset recovery (simulated host)",
+      "codec": "h264",
+      "width": 320,
+      "height": 720,
+      "durationSec": 7.12,
+      "bytes": 144693,
+      "decodesCleanly": true,
+      "label": "SIMULATION — simulated Photoshop host in Chromium"
+    },
+    {
+      "file": "SIMULATED-scenario-C-video.mp4",
+      "title": "Scenario C: video mode (simulated host, real MOV output, real credits)",
+      "codec": "h264",
+      "width": 320,
+      "height": 720,
+      "durationSec": 18.68,
+      "bytes": 172176,
+      "decodesCleanly": true,
+      "label": "SIMULATION — simulated Photoshop host in Chromium"
+    },
+    {
+      "file": "SIMULATED-scenario-E-responsive-walkthrough.mp4",
+      "title": "Scenario E: responsive resize 520 → 240 px (simulated host)",
+      "codec": "h264",
+      "width": 520,
+      "height": 700,
+      "durationSec": 12.52,
+      "bytes": 484516,
+      "decodesCleanly": true,
+      "label": "SIMULATION — simulated Photoshop host in Chromium"
+    }
+  ],
+  "errors": [],
+  "expectedErrors": [
+    {
+      "scenario": "D",
+      "width": 320,
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "scenario": "D",
+      "width": 320,
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "scenario": "D",
+      "width": 320,
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "scenario": "D",
+      "width": 320,
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "scenario": "D",
+      "width": 320,
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    },
+    {
+      "scenario": "E",
+      "width": 320,
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    }
+  ],
+  "layout": [],
+  "summary": {
+    "scenarios": 5,
+    "failedScenarios": 0,
+    "checks": 33,
+    "failedChecks": 0,
+    "consoleOrPageErrors": 0,
+    "screenshotsWithLayoutProblems": 0
+  }
+}

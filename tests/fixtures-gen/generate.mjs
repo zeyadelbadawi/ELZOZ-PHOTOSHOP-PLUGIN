@@ -173,7 +173,7 @@ function writeTemplate(file, w, h, children, linkedFiles, composite) {
 }
 {
     const f = writeTemplate(path.join(dirs.psd, "no-mappable-layers.psd"), 800, 600, [{ name: "Background", imageData: solid(800, 600, [80, 80, 80]), left: 0, top: 0 }], [], solid(800, 600, [80, 80, 80]));
-    add(f, "psd", "Only a background pixel layer: Map step 'nothing to map' state", ["edge"]);
+    add(f, "psd", "Only a background pixel layer: no text layers; the pixel layer can still take an image (minimal-template state)", ["edge"]);
 }
 
 // ---------------------------------------------------------------- video configurations

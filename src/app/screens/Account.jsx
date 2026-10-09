@@ -49,9 +49,11 @@ export default function Account({ onClose }) {
                 </div>
             )}
             {websiteUrl && !session.dev && (
-                <Button variant="primary" onClick={() => services.openExternal(websiteUrl)}>
-                    {t("account.buy")}
-                </Button>
+                <div className="ez-mb3">
+                    <Button variant="primary" onClick={() => services.openExternal(websiteUrl)}>
+                        {t("account.buy")}
+                    </Button>
+                </div>
             )}
 
             {!session.dev && (

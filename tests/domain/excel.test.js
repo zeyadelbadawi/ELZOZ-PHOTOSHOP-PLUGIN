@@ -64,4 +64,16 @@ describe("readTable", () => {
         expect(sheetNames).toEqual(["A", "B"]);
         expect(readTable(workbook, { sheetName: "B" }).rows[0].values.y).toBe("2");
     });
+    it("turns an unreadable workbook into a clear, coded error (regression: raw 'Unsupported ZIP encryption')", () => {
+        const corrupt = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0x14, 0x00, 0x01, 0x00, 0x63, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        let err = null;
+        try {
+            readWorkbook(corrupt);
+        } catch (e) {
+            err = e;
+        }
+        expect(err && err.code).toBe("unreadable_workbook");
+        expect(err.message).toMatch(/can't be read as a spreadsheet/);
+    });
 });
+

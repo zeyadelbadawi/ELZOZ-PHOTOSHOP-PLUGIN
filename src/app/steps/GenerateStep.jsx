@@ -4,7 +4,7 @@ import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, ProgressBar, Section, Stat } from "../../ui/components.jsx";
 import { runDesignJob, summarize } from "../../engine/designJob.js";
 import { runVideoJob } from "../../engine/videoJob.js";
-import { computePlan, reportCsv, runProgress, subsetPlan } from "../state.js";
+import { computePlan, reportCsv, retryKeys, runProgress, subsetPlan } from "../state.js";
 
 const CONFIRM_ABOVE = 50;
 
@@ -127,7 +127,8 @@ export default function GenerateStep() {
     // ---------- results ----------
     const result = run.result;
     const s = summarize(result);
-    const failedKeys = result.items.filter((i) => i.status === "failed").map((i) => i.key);
+    const toRetry = retryKeys(result);
+    const anyFailed = result.items.some((i) => i.status === "failed");
     const tone = result.status === "completed" ? "success" : result.status === "failed" ? "error" : "warning";
     const charged = result.billing && typeof result.billing.charged === "number" ? result.billing.charged : null;
     return (
@@ -146,10 +147,10 @@ export default function GenerateStep() {
                 {t("gen.outputAt", { path: state.output ? state.output.path : "" })}
             </div>
             <div className="ez-row ez-mb2">
-                {failedKeys.length > 0 && (
+                {toRetry.length > 0 && (
                     <>
-                        <Button variant="primary" onClick={() => start(subsetPlan(run.plan, failedKeys))}>
-                            {t("gen.retry")}
+                        <Button variant="primary" onClick={() => start(subsetPlan(run.plan, toRetry))}>
+                            {anyFailed ? t("gen.retry") : t("gen.tryAgain")}
                         </Button>
                         <div className="ez-mr2" />
                     </>

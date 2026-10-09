@@ -3,7 +3,7 @@ import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, Field, KindIcon, NumberInput, Section, Select } from "../../ui/components.jsx";
 import { buildTimeline, EASINGS, FORMATS, FPS_OPTIONS, PRESETS } from "../../domain/video/timeline.js";
-import { computePlan, timelineSpec } from "../state.js";
+import { previewPlan, timelineSpec } from "../state.js";
 
 const secs = (ms) => Math.round(ms / 100) / 10;
 
@@ -22,7 +22,7 @@ export default function AnimateStep() {
         if (!tl.ok) return;
         setPreview((p) => ({ ...p, busy: true, error: null }));
         try {
-            const plan = computePlan(state);
+            const plan = previewPlan(state);
             const frame = Math.min(tl.timeline.frameCount - 1, Math.round((preview.at * tl.timeline.fps)));
             const url = await services.previewFrame({
                 template: template.entry ? { entry: template.entry } : { documentId: template.documentId },

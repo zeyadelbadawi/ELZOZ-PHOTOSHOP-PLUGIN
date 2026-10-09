@@ -30,6 +30,14 @@ export default function CheckStep() {
         }
     };
     const setSettings = (patch) => dispatch({ type: "settings", patch });
+    // Issues that point at an earlier step get a "Fix" button that goes there
+    // (e.g. a missing image: re-choose the folder in Map before spending credits).
+    const fixAction = (issue) =>
+        issue.fix && issue.fix.step && !["check", "generate", "account"].includes(issue.fix.step) ? (
+            <Button quiet onClick={() => dispatch({ type: "go", step: issue.fix.step === "video" ? "animate" : issue.fix.step })}>
+                {t("check.fix")}
+            </Button>
+        ) : null;
     const toggleFormat = (f, on) => setSettings({ formats: on ? [...new Set([...state.settings.formats, f])] : state.settings.formats.filter((x) => x !== f) });
 
     return (
@@ -66,13 +74,7 @@ export default function CheckStep() {
                         <Alert
                             key={`b${i}`}
                             tone="error"
-                            action={
-                                b.fix && b.fix.step && b.fix.step !== "check" && b.fix.step !== "generate" && b.fix.step !== "account" ? (
-                                    <Button quiet onClick={() => dispatch({ type: "go", step: b.fix.step === "video" ? "animate" : b.fix.step })}>
-                                        {t("check.fix")}
-                                    </Button>
-                                ) : null
-                            }
+                            action={fixAction(b)}
                         >
                             {b.message}
                         </Alert>
@@ -83,7 +85,7 @@ export default function CheckStep() {
             {plan.warnings.length > 0 && (
                 <Section title={t("check.warnings")}>
                     {plan.warnings.map((w, i) => (
-                        <Alert key={`w${i}`} tone={w.severity === "info" ? "info" : "warning"}>
+                        <Alert key={`w${i}`} tone={w.severity === "info" ? "info" : "warning"} action={fixAction(w)}>
                             {w.message}
                             {w.rows && w.rows.length > 0 && <div className="ez-muted">{t("check.rows", { rows: rowsText(w.rows) })}</div>}
                         </Alert>

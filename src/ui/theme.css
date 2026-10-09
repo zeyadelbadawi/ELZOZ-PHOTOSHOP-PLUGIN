@@ -252,6 +252,7 @@ body {
 .ez-mt2 { margin-top: var(--ez-s2); }
 .ez-mt3 { margin-top: var(--ez-s3); }
 .ez-mb2 { margin-bottom: var(--ez-s2); }
+.ez-mb3 { margin-bottom: var(--ez-s3); }
 
 /* ---------- fields ---------- */
 .ez-field {

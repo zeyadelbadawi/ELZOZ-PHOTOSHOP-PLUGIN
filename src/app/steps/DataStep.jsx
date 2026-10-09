@@ -49,7 +49,7 @@ export default function DataStep() {
             const picked = await services.pickSpreadsheet();
             if (picked) load(picked, picked.sheetNames[0], 1);
         } catch (e) {
-            setError(t("error.generic", { message: e.message }));
+            setError(e.code === "unreadable_workbook" ? t("data.unreadable") : t("error.generic", { message: e.message }));
         } finally {
             setBusy(false);
         }

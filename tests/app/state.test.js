@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePlan, initialState, reducer, reportCsv, runProgress, stepBlocker, stepsFor, subsetPlan } from "../../src/app/state.js";
+import { computePlan, initialState, previewPlan, reducer, reportCsv, retryKeys, runProgress, stepBlocker, stepsFor, subsetPlan } from "../../src/app/state.js";
 import { setTextMapping } from "../../src/domain/mapping.js";
 import { buildFolderIndex } from "../../src/domain/imageFiles.js";
 import { sampleLayers } from "../helpers/fixtures.js";
@@ -34,7 +34,7 @@ describe("app state", () => {
         const s = ready();
         expect(stepBlocker(s, "data")).toBeNull();
         expect(stepBlocker(s, "map")).toBeNull();
-        expect(stepBlocker(reducer(s, { type: "mapping", mapping: { text: {}, images: {} } }), "map")).toBe("map.none");
+        expect(stepBlocker(reducer(s, { type: "mapping", mapping: { text: {}, images: {} } }), "map")).toBe("map.needOne");
     });
 
     it("drops mappings to columns that disappear when the spreadsheet changes", () => {
@@ -68,6 +68,13 @@ describe("app state", () => {
         expect(s.run.done).toBe(1);
     });
 
+    it("preview plan has row items before an output folder is chosen (regression)", () => {
+        const noOutput = { ...ready("video"), output: null };
+        expect(computePlan(noOutput).items).toEqual([]);
+        expect(previewPlan(noOutput).items.length).toBeGreaterThan(0);
+        expect(previewPlan(noOutput).items[0].sourceRow).toBe(computePlan(ready("video")).items[0].sourceRow);
+    });
+
     it("builds a retry plan from failed items only", () => {
         const plan = { ok: true, items: [{ key: "a" }, { key: "b" }, { key: "c" }], units: 3, cost: 6 };
         expect(subsetPlan(plan, ["b"])).toMatchObject({ items: [{ key: "b" }], units: 1, cost: 2 });
@@ -92,5 +99,11 @@ describe("folder-backed image mapping in state", () => {
         let s = ready();
         s = reducer(s, { type: "folder", key: "f-5", folder: { name: "p", index: buildFolderIndex(["a.jpg"]) } });
         expect(computePlan(s).ok).toBe(true);
+    });
+    it("retries failed rows and rows that never started, not cancelled or succeeded ones (regression: billing outage at start)", () => {
+        const items = (statuses) => ({ items: statuses.map((status, i) => ({ key: `row-${i + 2}`, status })) });
+        expect(retryKeys(items(["succeeded", "failed", "not_started", "cancelled"]))).toEqual(["row-3", "row-4"]);
+        expect(retryKeys(items(["not_started", "not_started"]))).toEqual(["row-2", "row-3"]);
+        expect(retryKeys(items(["succeeded"]))).toEqual([]);
     });
 });

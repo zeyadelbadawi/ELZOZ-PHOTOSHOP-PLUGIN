@@ -131,6 +131,16 @@ export function computePlan(state, { balance = null, pricing = {} } = {}) {
     return runPreflight({ ...input, pricing: { unitPrice: (pricing.design && pricing.design.price) ?? 1 } });
 }
 
+/**
+ * Plan used by the Animate preview. Output settings do not affect how row 1
+ * looks, so a missing output folder must not empty the plan (it did: the
+ * preview then showed the bare template while claiming to show row 1).
+ */
+export function previewPlan(state) {
+    const output = state.output || { name: "preview", existingFileNames: [] };
+    return computePlan({ ...state, output });
+}
+
 /** Can the user move past this step? Returns null or a reason key. */
 export function stepBlocker(state, step) {
     switch (step) {
@@ -141,7 +151,7 @@ export function stepBlocker(state, step) {
         case "template":
             return state.template ? null : "template.empty";
         case "map":
-            return mappedCount(state.mapping) > 0 ? null : "map.none";
+            return mappedCount(state.mapping) > 0 ? null : "map.needOne";
         case "animate":
             return buildTimeline(timelineSpec(state)).ok ? null : "check.blocking";
         default:
@@ -155,6 +165,15 @@ export function subsetPlan(plan, keys) {
     const items = plan.items.filter((i) => set.has(i.key));
     const perItem = plan.units ? plan.cost / plan.units : 0;
     return { ...plan, items, units: items.length, cost: items.length * perItem };
+}
+
+/**
+ * Items a retry should run: rows that failed, plus rows that never started
+ * because the job stopped (e.g. the server could not reserve credits).
+ * Rows the user cancelled are not retried automatically.
+ */
+export function retryKeys(result) {
+    return result.items.filter((i) => i.status === "failed" || i.status === "not_started").map((i) => i.key);
 }
 
 export function reportCsv(result) {

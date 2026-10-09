@@ -101,7 +101,7 @@
     {
       "file": "templates/no-mappable-layers.psd",
       "kind": "psd",
-      "purpose": "Only a background pixel layer: Map step 'nothing to map' state",
+      "purpose": "Only a background pixel layer: no text layers; the pixel layer can still take an image (minimal-template state)",
       "scenarios": [
         "edge"
       ]

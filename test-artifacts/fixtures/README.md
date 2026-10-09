@@ -17,7 +17,7 @@ Scenario keys: **A** successful batch · **B** missing assets · **C** video · 
 | `templates/product-card-1080x1350.psd` | psd | Design template 4:5: nested groups (Card/Text), 3 text layers, 2 Smart Objects, pixel Badge (pixel placement target), Background, duplicate layer name 'Name' in Footer | A, B, D, E |
 | `templates/reel-1080x1920.psd` | psd | Video template 9:16 (Reel/Story): Photo and Logo Smart Objects, Name and Price text | C |
 | `templates/square-1080x1080.psd` | psd | Square 1:1 template (aspect-mismatch case for Reel video; valid for Square) | C, edge |
-| `templates/no-mappable-layers.psd` | psd | Only a background pixel layer: Map step 'nothing to map' state | edge |
+| `templates/no-mappable-layers.psd` | psd | Only a background pixel layer: no text layers; the pixel layer can still take an image (minimal-template state) | edge |
 | `video/video-configs.json` | json | Video configurations: 3 valid (durations 2-6 s, 24/25/30 fps, 9:16 and 1:1, all presets) and 6 invalid cases with the expected error code | C, video |
 
 ## Images

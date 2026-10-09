@@ -7,7 +7,16 @@ export const MAX_ROWS = 5000;
 
 export function readWorkbook(bytes) {
     const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-    const workbook = XLSX.read(data, { type: "array", cellDates: false });
+    let workbook;
+    try {
+        workbook = XLSX.read(data, { type: "array", cellDates: false });
+    } catch (e) {
+        // Library messages ("Unsupported ZIP encryption", "End of data reached") mean nothing to users.
+        const err = new Error("This file can't be read as a spreadsheet. It may be damaged or password-protected. Save it again as .xlsx or .csv and retry.");
+        err.code = "unreadable_workbook";
+        err.cause = e;
+        throw err;
+    }
     return { workbook, sheetNames: workbook.SheetNames.slice() };
 }
 
