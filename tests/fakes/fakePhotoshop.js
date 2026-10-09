@@ -41,7 +41,7 @@ class FakeFile {
         return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
     }
     async write(data, { append = false } = {}) {
-        const add = new Uint8Array(data);
+        const add = typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data); // UXP writes strings as UTF-8 text
         const prev = append && this.bytes ? this.bytes : new Uint8Array(0);
         const next = new Uint8Array(prev.length + add.length);
         next.set(prev);
@@ -75,9 +75,10 @@ export class FakeFolder {
         }
     }
     async getEntries() {
-        return [...this.files.values()];
+        return [...this.files.values(), ...(this.folders ? this.folders.values() : [])];
     }
     async getEntry(name) {
+        if (this.folders && this.folders.has(name)) return this.folders.get(name);
         const f = this.files.get(name);
         if (!f) throw new Error(`Could not find an entry of '${name}'`);
         return f;

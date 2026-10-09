@@ -45,6 +45,12 @@ npm run harness && node tests/harness/walkthrough.js   # browser preview + flow 
 
 Load in Photoshop with the **UXP Developer Tool**: *Add Plugin* → `dist/manifest.json` → *Load*. Without a Supabase configuration, a development build offers **developer mode** (nothing is charged); production builds never include it.
 
+## Testing
+
+- `bash scripts/qa-all.sh` runs everything automated: unit and simulator tests, credits DB over HTTP, browser scenarios with screenshots and recordings, the production build with a secret scan, and the audit. Results and artifacts: `test-artifacts/INDEX.md`.
+- Testing in real Photoshop: `npm run qa:kit`, then `docs/PHOTOSHOP_TESTING.md` (in-plugin self-test, about 10 minutes per version).
+- The browser runs use a **simulated** Photoshop host. They verify Elzoz's logic and UI flow, not Photoshop itself.
+
 ## Backend
 
 See `docs/SECURITY.md` for the deployment and secrets checklist. In short: create a Supabase project, enable `pg_cron`, run `supabase db push`, configure Auth (email confirmation, CAPTCHA), and put only the URL and anon key in `.env`.

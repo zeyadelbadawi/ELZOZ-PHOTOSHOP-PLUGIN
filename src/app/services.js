@@ -4,6 +4,7 @@ import { createPhotoshopPort } from "../ps/port.js";
 import { createAuthClient } from "../account/auth.js";
 import { createBilling, createCreditsClient } from "../account/credits.js";
 import { createDevBilling } from "../account/devBilling.js";
+import { runSelfTest } from "../dev/selfTest.js";
 import { supabaseConfig } from "../config/supabase-config.js";
 import { readWorkbook, readTable } from "../domain/excel.js";
 import { buildFolderIndex } from "../domain/imageFiles.js";
@@ -42,6 +43,14 @@ export function createServices({ photoshop, uxp }) {
         caps: port.caps,
         configured,
         devAvailable: typeof __ELZOZ_DEV__ !== "undefined" && __ELZOZ_DEV__,
+        // Developer builds only: the Photoshop self-test on a QA kit folder (see docs/PHOTOSHOP_TESTING.md).
+        selfTest:
+            typeof __ELZOZ_DEV__ !== "undefined" && __ELZOZ_DEV__
+                ? async (onStep) => {
+                      const kit = await fs.getFolder();
+                      return kit ? runSelfTest({ photoshop, uxp, port, kit, onStep }) : null;
+                  }
+                : null,
         auth,
         credits,
 

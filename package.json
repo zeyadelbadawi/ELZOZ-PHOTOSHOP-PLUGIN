@@ -16,7 +16,9 @@
     "test-env": "bash scripts/test-env.sh",
     "test:e2e": "bash -c \"source ${ELZOZ_TEST_HOME:-/tmp/elzoz-test}/env && vitest run tests/e2e\"",
     "fixtures": "python3 tests/fixtures-gen/images.py test-artifacts/fixtures/images && node tests/fixtures-gen/generate.mjs && python3 tests/fixtures-gen/verify_psd.py test-artifacts/fixtures/templates",
-    "test:ui-e2e": "bash -c \"source ${ELZOZ_TEST_HOME:-/tmp/elzoz-test}/env && PLAYWRIGHT_MODULE=${PLAYWRIGHT_MODULE:-playwright} node tests/harness/e2e-run.js\""
+    "test:ui-e2e": "bash -c \"source ${ELZOZ_TEST_HOME:-/tmp/elzoz-test}/env && PLAYWRIGHT_MODULE=${PLAYWRIGHT_MODULE:-playwright} node tests/harness/e2e-run.js\"",
+    "qa:kit": "bash scripts/qa-kit.sh",
+    "qa": "bash scripts/qa-all.sh"
   },
   "author": "Elzoz",
   "license": "Apache-2.0",

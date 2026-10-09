@@ -3,6 +3,7 @@ import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, Section, Stat } from "../../ui/components.jsx";
 import { websiteUrl } from "../../config/supabase-config.js";
+import SelfTestPanel from "../../dev/SelfTestPanel.jsx";
 
 const fmtDate = (s, lang) => {
     try {
@@ -97,6 +98,8 @@ export default function Account({ onClose }) {
                     </Section>
                 </>
             )}
+
+            {typeof __ELZOZ_DEV__ !== "undefined" && __ELZOZ_DEV__ && services.selfTest && <SelfTestPanel run={services.selfTest} />}
 
             <div className="ez-row ez-mt3">
                 <Button quiet onClick={() => setLang(lang === "ar" ? "en" : "ar")}>

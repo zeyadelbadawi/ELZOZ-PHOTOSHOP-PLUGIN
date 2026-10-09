@@ -1,0 +1,6 @@
+backend|pass
+vitest|pass
+e2e|pass
+build|pass
+audit|info
+qa-kit|pass

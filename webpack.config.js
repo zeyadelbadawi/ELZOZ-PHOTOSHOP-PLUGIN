@@ -32,7 +32,9 @@ function assertPublicKey(key) {
 
 module.exports = (env, argv) => {
     const isProd = argv.mode === "production";
-    const fileEnv = readEnvFile(path.resolve(__dirname, ".env"));
+    // `--env noServer` (QA kit): ignore .env and the environment; no server is configured.
+    const fileEnv = env && env.noServer ? {} : readEnvFile(path.resolve(__dirname, ".env"));
+    if (env && env.noServer) for (const k of ["ELZOZ_SUPABASE_URL", "ELZOZ_SUPABASE_ANON_KEY", "ELZOZ_WEBSITE_URL"]) delete process.env[k];
     const supabaseUrl = process.env.ELZOZ_SUPABASE_URL || fileEnv.ELZOZ_SUPABASE_URL || "";
     const supabaseAnonKey = process.env.ELZOZ_SUPABASE_ANON_KEY || fileEnv.ELZOZ_SUPABASE_ANON_KEY || "";
     const websiteUrl = process.env.ELZOZ_WEBSITE_URL || fileEnv.ELZOZ_WEBSITE_URL || "";
