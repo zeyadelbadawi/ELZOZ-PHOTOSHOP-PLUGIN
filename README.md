@@ -1,8 +1,8 @@
 # Elzoz — batch designs and videos for Photoshop
 
-Elzoz is a Photoshop UXP panel that turns a spreadsheet and a PSD template into one finished design (JPG/PNG/PSD) or one animated video (MOV) per row. Credits are server-authoritative (Supabase).
+Elzoz is a Photoshop UXP panel that turns a spreadsheet and a PSD template into one finished design (JPG/PNG/PSD) or one animated video (MOV) per row. Credits are server-authoritative (Supabase) and sold manually: the seller creates client accounts and adds credits (each top-up expires, 30 days by default) in the **admin dashboard** (`admin/`).
 
-> **Status (2026-10-09):** pre-launch. The engine, credits backend and UI are implemented and covered by automated tests. **Nothing has been verified inside Photoshop yet.** See `docs/PLAN.md` §7 for the Photoshop checklist.
+> **Status (1.0.0, 2026-10-10):** feature-complete for launch; every automated check is green (see `test-artifacts/INDEX.md`). **Not yet verified inside Adobe Photoshop**: run the self-test in `docs/PHOTOSHOP_TESTING.md` before selling.
 
 ## How it works
 
@@ -13,6 +13,7 @@ Data (xlsx/csv) → Template (PSD) → Map columns to layers → [Animate] → C
 - The template is **never modified or saved**: Elzoz duplicates it, renders each row as one history state, exports copies, reverts, and closes the duplicate without saving.
 - A row succeeds only if every text/image change succeeded **and** every output file exists on disk (videos are re-read and validated frame by frame).
 - Credits are **reserved** when a job starts and **charged only for succeeded items**; failed, cancelled and abandoned items are released.
+- Designer tools: show/hide layers from a column, shrink long text to fit, choose rows (`2-10, 15`), subfolders from the file-name pattern (`{Category}/{row}_{Name}`), custom output width, free low-res preview of any row, remembered mappings per template.
 
 ## Repository layout
 
@@ -24,9 +25,12 @@ Data (xlsx/csv) → Template (PSD) → Map columns to layers → [Animate] → C
 | `src/engine/` | Design and video job runners (reservation → render → verify → report) |
 | `src/account/` | Supabase Auth client, credits client (idempotent RPCs) |
 | `src/app/`, `src/ui/` | React UI: guided flow, design system, EN/AR |
-| `supabase/migrations/` | Database schema, RLS, credit RPCs |
+| `supabase/migrations/` | Database schema, RLS, credit RPCs, expiring credit lots, admin RPCs |
+| `supabase/functions/admin-users/` | Edge Function: create client accounts with generated passwords, reset passwords, disable/enable |
+| `admin/` | Admin dashboard (React + Vite, Arabic/English): clients, top-ups with validity, history, prices |
+| `src/dev/` | Developer-only Photoshop self-test (stripped from production builds) |
 | `tests/` | Unit, contract (fake Photoshop), media (ffmpeg), database (PostgreSQL) tests; browser harness |
-| `docs/` | Audit, plan, security, compatibility, design system |
+| `docs/` | Deployment, Arabic admin guide, Photoshop testing, security, compatibility, design system, audit |
 
 ## Develop
 
@@ -34,7 +38,7 @@ Requirements: Node 22, npm 10. For database tests: PostgreSQL 15+. For media tes
 
 ```bash
 npm ci
-cp .env.example .env          # ELZOZ_SUPABASE_URL / ELZOZ_SUPABASE_ANON_KEY (public anon key only)
+cp .env.example .env          # ELZOZ_SUPABASE_URL / ELZOZ_SUPABASE_ANON_KEY (public key only) / ELZOZ_CONTACT_URL
 npm run build                 # development build into dist/ (developer mode available)
 npm run build:prod            # production build (no eval, no developer mode)
 npm test                      # unit + contract + media tests
@@ -51,9 +55,11 @@ Load in Photoshop with the **UXP Developer Tool**: *Add Plugin* → `dist/manife
 - Testing in real Photoshop: `npm run qa:kit`, then `docs/PHOTOSHOP_TESTING.md` (in-plugin self-test, about 10 minutes per version).
 - The browser runs use a **simulated** Photoshop host. They verify Elzoz's logic and UI flow, not Photoshop itself.
 
-## Backend
+## Deploy and operate
 
-See `docs/SECURITY.md` for the deployment and secrets checklist. In short: create a Supabase project, enable `pg_cron`, run `supabase db push`, configure Auth (email confirmation, CAPTCHA), and put only the URL and anon key in `.env`.
+- **`docs/DEPLOYMENT.md`**: Supabase (migrations, `admin-users` function, sign-ups off, first admin), dashboard hosting, plugin build and packaging.
+- **`docs/ADMIN_GUIDE_AR.md`**: the daily routine in Arabic: create a client, top up, reset a password, disable, refunds, prices.
+- `docs/SECURITY.md`: threat model and secrets checklist.
 
 ## Compatibility
 

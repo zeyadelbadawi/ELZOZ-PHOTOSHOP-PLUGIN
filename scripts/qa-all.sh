@@ -23,7 +23,11 @@ bash scripts/test-env.sh start && record backend pass || { record backend fail; 
 # shellcheck disable=SC1091
 source "${ELZOZ_TEST_HOME:-/tmp/elzoz-test}/env"
 
-step "Vitest: unit, simulator, DB security, HTTP billing"
+step "Admin dashboard dependencies"
+if npm --prefix admin ci --silent >/dev/null 2>&1; then record admin-deps pass; else record admin-deps fail; fi
+# Optional: set ELZOZ_DENO to a deno binary to also run the Edge Function through Deno.
+
+step "Vitest: unit, simulator, DB security, HTTP billing, admin function"
 if npx vitest run --reporter=default --reporter=json --outputFile="$REPORTS/vitest-results.json"; then record vitest pass; else record vitest fail; fi
 
 step "Browser end-to-end scenarios A-E"
@@ -34,8 +38,13 @@ step "Production build + secret scan"
 if npm run --silent build:prod >/dev/null && node scripts/check-secrets.js; then record build pass; else record build fail; fi
 echo "bundle: $(wc -c < dist/index.js) bytes" | tee "$REPORTS/bundle-size.txt"
 
+step "Admin dashboard production build"
+if (cd admin && VITE_SUPABASE_URL=https://example.supabase.co VITE_SUPABASE_ANON_KEY=public-placeholder npx vite build --logLevel error) && node scripts/check-secrets.js admin/dist >/dev/null; then record admin-build pass; else record admin-build fail; fi
+du -sh admin/dist | tee -a "$REPORTS/bundle-size.txt"
+
 step "Dependency audit (production dependencies)"
-npm audit --omit=dev --json > "$REPORTS/npm-audit.json" 2>/dev/null
+npm audit --json > "$REPORTS/npm-audit.json" 2>/dev/null
+npm --prefix admin audit --json > "$REPORTS/npm-audit-admin.json" 2>/dev/null
 node -e 'const a=require(process.argv[1]);const v=(a.metadata||{}).vulnerabilities||{};console.log(JSON.stringify(v))' "$REPORTS/npm-audit.json" | tee "$REPORTS/npm-audit-summary.txt" || true
 echo "audit|info" >> "$REPORTS/.qa-steps"
 

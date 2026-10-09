@@ -1,56 +1,41 @@
 # 3. Automated test report
 
-Last full run: `bash scripts/qa-all.sh` on 2026-10-09. **Result: all green.**
+Last full run: 2026-10-10 (`bash scripts/qa-all.sh`, with `ELZOZ_DENO` set). **Result: all green.**
 
-| Suite | Tests | Result | Runs on |
-|---|---|---|---|
-| Vitest: unit, simulator, DB, HTTP billing | 164 | 164 passed, 0 skipped | Node + local Postgres + PostgREST |
-| Browser e2e, scenarios A–E | 33 checks | 33 passed; 0 console/page errors; 0 layout overflow findings across 55 screenshots | Chromium + **simulated** Photoshop host + real local credits backend |
-| Production build + secret scan | – | passed (573,308 bytes; anon-key-only guard; no dev billing or self-test code in the prod bundle) | webpack |
-| npm audit (production deps) | – | 1 high finding: `xlsx` 0.18.5 (see report 11) | npm |
+| Suite | Result | Runs on |
+|---|---|---|
+| Vitest: unit, simulator, DB, HTTP billing, admin function | **226 / 226 passed** | Node + local Postgres 16 + PostgREST 12; one test runs the Edge Function under Deno 2.5 |
+| Browser e2e, scenarios A–G | **57 / 57 checks**; 0 console/page errors; 0 layout overflow findings in 75 screenshots | Chromium + **simulated** Photoshop host + real local credits backend + the admin dashboard |
+| Production builds + secret scan | passed: plugin 620,127 bytes, dashboard 188 KB; no secret keys, no dev billing or self-test code in production | webpack / Vite |
+| npm audit | **0 vulnerabilities** (plugin incl. dev dependencies; dashboard) | npm |
 
-Machine-readable results: `vitest-results.json`, `e2e-results.json`, `npm-audit.json`, `bundle-size.txt`.
+Machine-readable: `vitest-results.json`, `e2e-results.json`, `npm-audit.json`, `npm-audit-admin.json`, `bundle-size.txt`.
 
 ## Vitest by file
 
-| File | Tests | What it covers |
+| File | Tests | Covers |
 |---|---|---|
-| tests/domain/excel.test.js | 10 | Spreadsheet parsing: headers, duplicates, blank rows, limits, CSV, clear error for unreadable files |
-| tests/domain/naming-images-mapping.test.js | 14 | File naming and sanitizing, image resolution (case, missing extension, ambiguity, path traversal), auto-map |
-| tests/domain/preflight.test.js | 9 | Blocking issues versus warnings, skipped rows, cost |
-| tests/domain/timeline.test.js | 17 | Video timeline, presets, easing, limits, pricing units |
-| tests/app/state.test.js | 12 | App state, step blockers, retry plan, preview plan |
-| tests/account/account.test.js | 10 | Auth client (token storage and refresh), credits client (idempotency keys, retries) |
-| tests/ps/compat-export.test.js | 9 | Capability detection, export with on-disk verification and partial-file cleanup |
-| tests/engine/designJob.test.js | 15 | Design runner on the fake host: non-destructive working copy, failures, cancel, billing reports |
-| tests/engine/videoJob.test.js | 8 | Video runner: frames, MOV, cleanup, billing |
-| tests/media/mov.test.js | 5 | MOV muxer output decoded by ffmpeg |
-| tests/db/credits.test.js | 30 | RLS, RPC authorisation, atomic reservation, idempotency, rate limits, refunds, expiry, ledger append-only (mutation-checked) |
-| tests/e2e/billing-http.test.js | 6 | The same rules over real HTTP (PostgREST + JWT): anonymous, forged and direct-write requests rejected; failed rows not charged; lost-response retry; concurrency; cross-user isolation |
-| tests/sim/fixtures-engine.test.js | 8 | Real engine on the real fixture PSDs, spreadsheets and images (simulated host); PSD outputs checked with psd-tools; 1000-row performance |
-| tests/sim/simulator-contract.test.js | 7 | The simulator checked against Pillow and psd-tools, plus 3 mutation checks |
-| tests/sim/selftest.test.js | 4 | The in-plugin Photoshop self-test, plus its failure reporting |
+| tests/db/credits.test.js | 30 | RLS, RPC authorisation, reservation, idempotency, rate limits, refunds, job expiry, append-only ledger |
+| tests/db/lots-admin.test.js | 24 | **Expiring credits** (30-day default, earliest-expiry spending, leftovers expire, reserved credits never expire mid-job, scheduled sweep, refund lots, invariant balance = Σ lots); **admin RPCs** (non-admins refused for all 8, idempotent top-ups with audit actor, removals never below reservations, list/search/detail, disable, prices, stats, refunds) |
+| tests/admin/admin-users.test.js | 11 | Edge Function over HTTP: anonymous/non-admin refused, create client with generated password + initial credits, duplicate email, input validation, password reset, disable/enable (sign-in and job start blocked), CORS; key env (new + legacy); **through Deno with only the new Supabase key variables** |
+| tests/e2e/billing-http.test.js | 6 | Credits over real HTTP (PostgREST + JWT) |
+| tests/domain/designer-features.test.js | 14 | Row selection (incl. Arabic digits), show/hide words (EN/AR), subfolders from the pattern, text-fit maths, preflight with all options |
+| tests/engine/designer-features-engine.test.js | 7 | Show/hide per row with Photoshop's default non-undoable visibility (+ mutation check), subfolders (designs and video), output size, shrink-to-fit with 30% floor |
+| tests/domain/* (others) | 50 | Spreadsheets, naming, images, mapping, preflight, video timeline |
+| tests/app/state.test.js, i18n.test.js | 15 + 3 | App state, retry plan, preview plan, mapping memory; Arabic/English key parity for plugin and dashboard |
+| tests/account/account.test.js | 10 | Auth client (incl. disabled-account message), credits client (`my_credits` with expiry) |
+| tests/engine (design, video) | 23 | Non-destructive runners on the behavioural fake |
+| tests/media, tests/ps | 14 | MOV muxer (ffmpeg-decoded), compatibility, export verification |
+| tests/sim/* | 19 | Real fixtures through the simulator (psd-tools verified), simulator contract + 3 mutation checks, in-plugin self-test incl. the new *features* step |
 
-## Simulator self-validation (mutation checks)
-
-Each deliberately broken simulator is caught by the output verification the tests rely on. In all three cases the engine itself reports success, which is exactly why outputs are verified independently:
-
-| Mutant | Caught by |
-|---|---|
-| Replace Contents silently does nothing | psd-tools: Smart Object file ≠ row image |
-| Text edits dropped | psd-tools: text ≠ row value |
-| Stale session token (every row gets row 1's photo) | psd-tools: Smart Object file ≠ row image |
-
-## E2E scenarios (Chromium, simulated host, real credits DB)
+## Browser scenarios
 
 | Scenario | Checks | Key results |
 |---|---|---|
-| A: successful batch | 9 | 8 rows → 16 files; every JPG decodes at 1080×1350 (Pillow); PSD text and Smart Objects match each row, Arabic included (psd-tools); balance 100 → 92 on the server; 8 ledger charges; job `completed` |
-| B: missing assets | 7 | Missing image flagged in Check before any spend; fixed through *Fix → Map → re-choose folder*; corrupt image fails at render and is **not charged** (3 of 4); retrying only that row charges exactly 1 more; no partial file left behind |
-| C: video | 7 | 3 MOVs: ffprobe reports mjpeg 1080×1920, 48 frames, 24 fps, 2.000 s each; preview shows row 1 at 1.0 s; 3 credits charged |
-| D: billing failures | 6 | Lost response to a report: safe retry, exactly 3 charged, job completed. Server down at start (5 × 503): nothing rendered, nothing charged, **Try again** succeeds. Insufficient credits: blocked with exact numbers and Next disabled |
-| E: responsive / theme / RTL / errors | 4 + 33 screenshots | 240/260/320/400/520 px, light and dark, Arabic RTL (`dir=rtl`), wrong password, corrupt workbook, headers-only sheet, minimal template, PS 23.5 compatibility notice |
-
-## Performance (simulated host)
-
-Parsing and preflighting 1000 rows takes 120 ms, and the engine loop over 1000 rows takes 281 ms, **excluding** Photoshop's rendering time, which only a run in Photoshop can measure.
+| A: design batch | 9 | 16 files, Pillow/psd-tools verified, server balance 100 → 92 |
+| B: missing assets | 7 | Fix before spending; corrupt image not charged; retry charges 1 |
+| C: video | 7 | 3 MOVs (ffprobe: mjpeg 1080×1920, 48 frames, 24 fps); preview shows row 1 |
+| D: billing failures | 6 | Lost response → no double charge; outage at start → nothing charged, Try again works; insufficient credits blocked |
+| E: responsive / themes / RTL / errors | 4 | 240–520 px, light/dark, Arabic RTL, error states |
+| **F: selling cycle** | 15 | Admin creates client (generated password) → client signs in to the plugin, sees credits + expiry, generates (charged 3) → admin top-up 100/60 days → oldest pack expires (plugin shows only valid credits; dashboard history shows the expiry) → password reset (old refused) → disable (plugin shows a clear message) → enable; dashboard fits a 390 px phone; a client can't open the dashboard |
+| **G: designer features** | 9 | Show/hide Badge by column (psd-tools: visible exactly where the sheet has a badge), shrink-to-fit, rows 2–5 only (4 charged), subfolders NEW/HOT/SALE, 540×675 outputs, free 512×640 preview (0 charged), mapping restored for the same template |

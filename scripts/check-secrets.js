@@ -7,7 +7,8 @@ const roots = process.argv.slice(2).length ? process.argv.slice(2) : ["src", "di
 const jwtPattern = /eyJ[A-Za-z0-9_-]{10,}\.([A-Za-z0-9_-]{10,})\.[A-Za-z0-9_-]{10,}/g;
 const otherPatterns = [
     { name: "Stripe secret key", re: /sk_(live|test)_[A-Za-z0-9]{10,}/ },
-    { name: "Supabase service role reference", re: /SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*['"][^'"]+['"]/ }
+    { name: "Supabase service role reference", re: /SUPABASE_SERVICE_ROLE_KEY\s*[:=]\s*['"][^'"]+['"]/ },
+    { name: "Supabase secret API key", re: /sb_secret_[A-Za-z0-9_-]{10,}/ }
 ];
 
 function* walk(dir) {

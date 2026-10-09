@@ -123,6 +123,8 @@ function layoutProblems(page) {
 }
 
 const btn = (page, text) => page.locator(`sp-button:has-text("${text}")`).first();
+/** The input of the form field with this label (robust to fields being added or reordered). */
+const field = (page, label) => page.locator(".ez-field", { has: page.locator(".ez-label", { hasText: label }) }).locator("input").first();
 async function click(page, text) {
     await btn(page, text).click();
     await page.waitForTimeout(150);
@@ -236,7 +238,7 @@ scenario("A", "Successful design batch (8 rows, JPG + PSD, real credits)", async
     await shot(p, "A08-check-no-output-320-dark", "Check: output folder missing (blocking)");
     await chooseOutput(p, "Elzoz output A");
     await p.locator('label:has-text("PSD") input').check();
-    await p.locator(".ez-input").last().fill("{row}_{Name}");
+    await field(p, "File names").fill("{row}_{Name}");
     await shot(p, "A09-check-ready-320-dark", "Check: ready, warnings and settings");
     await shot(p, "A10-check-summary-320-dark", "Check: summary with credits needed and available", { scroll: 2000 });
     await click(p, "Next");
@@ -696,10 +698,9 @@ scenario("G", "Designer features: show/hide by column, shrink-to-fit, row select
     await click(p, "Next");
     await chooseOutput(p, "Elzoz output G");
     await p.locator('label:has-text("PSD") input').check();
-    const inputs = p.locator(".ez-content .ez-input");
-    await inputs.nth(1).fill("{Badge}/{row}_{Name}"); // file names (nth(0) is JPEG quality)
-    await inputs.nth(2).fill("2-5");
-    await inputs.nth(3).fill("540");
+    await field(p, "File names").fill("{Badge}/{row}_{Name}");
+    await field(p, "Rows to generate").fill("2-5");
+    await field(p, "Output width").fill("540");
     await p.waitForTimeout(200);
     await shot(p, "G02-check-rows-folders-size-320-dark", "Check: subfolders, rows 2-5, 540 px output", { scroll: 200 });
     const info = await p.locator(".ez-alert").filter({ hasText: "Generating 4 of 8 rows" }).count();

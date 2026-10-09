@@ -1,8 +1,8 @@
-# Screenshots (55)
+# Screenshots (75)
 
 All images and recordings come from the **SIMULATED Photoshop host in Chromium** (banner at the top of each). They show Elzoz's UI and flow, not Adobe Photoshop or UXP rendering.
 
-Run: 2026-10-09T19:18:03.884Z. Layout check = automatic test for elements overflowing the panel.
+Run: 2026-10-09T20:11:55.234Z. Layout check = automatic test for elements overflowing the panel.
 
 | File | Scenario | Width | Theme | Lang | What it shows | Layout check |
 |---|---|---|---|---|---|---|
@@ -61,3 +61,23 @@ Run: 2026-10-09T19:18:03.884Z. Layout check = automatic test for elements overfl
 | [E-data-headers-only-320-dark.png](E-data-headers-only-320-dark.png) | E | 320 | dark | en | Data: headers but no rows | ok |
 | [E-map-no-layers-320-dark.png](E-map-no-layers-320-dark.png) | E | 320 | dark | en | Map: template without fillable layers | ok |
 | [E-template-ps23-320-dark.png](E-template-ps23-320-dark.png) | E | 320 | dark | en | Template on simulated Photoshop 23.5 (compat notice) | ok |
+| [F01-admin-signin-ar.png](F01-admin-signin-ar.png) | F | 1280 | system-light | ar | Admin dashboard: sign in (Arabic, default) | ok |
+| [F02-admin-clients-ar.png](F02-admin-clients-ar.png) | F | 1280 | system-light | ar | Clients list | ok |
+| [F03-admin-new-client-ar.png](F03-admin-new-client-ar.png) | F | 1280 | system-light | ar | New client: credits, validity, payment note, generated password | ok |
+| [F04-admin-credentials-ar.png](F04-admin-credentials-ar.png) | F | 1280 | system-light | ar | Credentials + ready-to-send WhatsApp message | ok |
+| [F05-admin-client-detail-ar.png](F05-admin-client-detail-ar.png) | F | 1280 | system-light | ar | Client detail: balance, packs with expiry, history | ok |
+| [F06-plugin-account-expiry-320-dark.png](F06-plugin-account-expiry-320-dark.png) | F | 320 | dark | en | Plugin account: credits and their expiry date | ok |
+| [F07-admin-after-topup-ar.png](F07-admin-after-topup-ar.png) | F | 1280 | system-light | ar | After a 100-credit, 60-day top-up: two packs with different expiry | ok |
+| [F08-plugin-after-expiry-320-dark.png](F08-plugin-after-expiry-320-dark.png) | F | 320 | dark | en | Plugin after the first pack expired | ok |
+| [F09-admin-expiry-history-ar.png](F09-admin-expiry-history-ar.png) | F | 1280 | system-light | ar | History with charges, top-up and the expiry entry | ok |
+| [F10-admin-disabled-ar.png](F10-admin-disabled-ar.png) | F | 1280 | system-light | ar | Account disabled | ok |
+| [F11-plugin-disabled-320-dark.png](F11-plugin-disabled-320-dark.png) | F | 320 | dark | en | Plugin: disabled account message with WhatsApp contact | ok |
+| [F12-admin-overview-en.png](F12-admin-overview-en.png) | F | 1280 | system-light | ar | Overview (English) | ok |
+| [F13-admin-settings-en.png](F13-admin-settings-en.png) | F | 1280 | system-light | ar | Settings: prices per design and per 5 s of video | ok |
+| [F14-admin-clients-mobile-ar.png](F14-admin-clients-mobile-ar.png) | F | 390 | system-light | ar | Clients list on a phone (390 px, Arabic) | ok |
+| [F15-admin-client-mobile-ar.png](F15-admin-client-mobile-ar.png) | F | 390 | system-light | ar | Client detail on a phone (390 px, Arabic) | ok |
+| [G01-map-show-hide-320-dark.png](G01-map-show-hide-320-dark.png) | G | 320 | dark | en | Map: show/hide a layer from a column + shrink-to-fit | ok |
+| [G02-check-rows-folders-size-320-dark.png](G02-check-rows-folders-size-320-dark.png) | G | 320 | dark | en | Check: subfolders, rows 2-5, 540 px output | ok |
+| [G03-check-free-preview-320-dark.png](G03-check-free-preview-320-dark.png) | G | 320 | dark | en | Check: free low-resolution preview of row 3 | ok |
+| [G04-results-subfolders-320-dark.png](G04-results-subfolders-320-dark.png) | G | 320 | dark | en | Results: files in subfolders per Badge value | ok |
+| [G05-map-restored-320-dark.png](G05-map-restored-320-dark.png) | G | 320 | dark | en | Map: last mapping restored for this template | ok |

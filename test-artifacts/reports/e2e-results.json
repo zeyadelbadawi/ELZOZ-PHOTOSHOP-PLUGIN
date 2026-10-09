@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-09T19:18:03.884Z",
+  "generated": "2026-10-09T20:11:55.234Z",
   "host": "SIMULATED Photoshop host in Chromium (not Adobe Photoshop, not UXP)",
   "backend": "REAL local Postgres + PostgREST with the Elzoz migrations; Auth is a local stub",
   "scenarios": [
@@ -92,7 +92,8 @@
           "ok": true,
           "detail": {
             "balance": "92",
-            "reserved": "0"
+            "reserved": "0",
+            "disabled": false
           }
         },
         {
@@ -105,7 +106,7 @@
           "ok": true,
           "detail": [
             {
-              "id": "d3a75cd9-c7a3-4a2f-8854-639bd55a7d55",
+              "id": "a09b52dc-9814-4bcb-b85e-6e86158e3a77",
               "status": "completed",
               "planned_items": 8,
               "reserved_total": "8",
@@ -121,11 +122,11 @@
         {
           "name": "recording SIMULATED-scenario-A-design-batch.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x720 10.5 s"
+          "detail": "h264 320x720 9.8 s"
         }
       ],
       "error": null,
-      "ms": 10879
+      "ms": 10101
     },
     {
       "id": "B",
@@ -146,7 +147,8 @@
           "ok": true,
           "detail": {
             "balance": "47",
-            "reserved": "0"
+            "reserved": "0",
+            "disabled": false
           }
         },
         {
@@ -159,7 +161,8 @@
           "ok": true,
           "detail": {
             "balance": "46",
-            "reserved": "0"
+            "reserved": "0",
+            "disabled": false
           }
         },
         {
@@ -179,7 +182,7 @@
         }
       ],
       "error": null,
-      "ms": 7112
+      "ms": 7309
     },
     {
       "id": "C",
@@ -243,17 +246,18 @@
           "ok": true,
           "detail": {
             "balance": "27",
-            "reserved": "0"
+            "reserved": "0",
+            "disabled": false
           }
         },
         {
           "name": "recording SIMULATED-scenario-C-video.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x720 18.9 s"
+          "detail": "h264 320x720 18.5 s"
         }
       ],
       "error": null,
-      "ms": 19134
+      "ms": 18455
     },
     {
       "id": "D",
@@ -265,7 +269,8 @@
           "detail": {
             "balance": {
               "balance": "7",
-              "reserved": "0"
+              "reserved": "0",
+              "disabled": false
             },
             "job": "completed"
           }
@@ -277,7 +282,8 @@
             "files": 0,
             "balance": {
               "balance": "7",
-              "reserved": "0"
+              "reserved": "0",
+              "disabled": false
             }
           }
         },
@@ -291,7 +297,8 @@
           "ok": true,
           "detail": {
             "balance": "4",
-            "reserved": "0"
+            "reserved": "0",
+            "disabled": false
           }
         },
         {
@@ -306,7 +313,7 @@
         }
       ],
       "error": null,
-      "ms": 18547,
+      "ms": 18583,
       "faultsInjected": true
     },
     {
@@ -335,8 +342,204 @@
         }
       ],
       "error": null,
-      "ms": 44060,
+      "ms": 45222,
       "faultsInjected": false
+    },
+    {
+      "id": "F",
+      "title": "Selling cycle: admin dashboard creates a client, client works in the plugin, top-up, expiry, password reset, disable",
+      "checks": [
+        {
+          "name": "dashboard shows a generated password once",
+          "ok": true,
+          "detail": "Vzf5-8DtS-9THE"
+        },
+        {
+          "name": "client detail shows 50 available",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "plugin header shows 50 credits",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "plugin shows the expiry of the 50 credits",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "client job charged 3 of 50",
+          "ok": true,
+          "detail": {
+            "balance": "47",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "refresh keeps the client page open (URL hash)",
+          "ok": true,
+          "detail": "http://127.0.0.1:54340/admin/#/clients/4ce094fa-7b24-45b6-a576-2b97cec8db21"
+        },
+        {
+          "name": "dashboard sees the 3 charges",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "top-up recorded once as a 100-credit pack valid 60 days",
+          "ok": true,
+          "detail": [
+            {
+              "amount": "50",
+              "remaining": "47",
+              "expires_at": "2026-11-08T20:13:36.681Z"
+            },
+            {
+              "amount": "100",
+              "remaining": "100",
+              "expires_at": "2026-12-08T20:13:43.697Z"
+            }
+          ]
+        },
+        {
+          "name": "after expiry the plugin shows only the 100 valid credits",
+          "ok": true,
+          "detail": {
+            "expired": 47
+          }
+        },
+        {
+          "name": "dashboard history shows the expiry",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "reset: old password refused, new password works",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "disabled client sees a clear message in the plugin",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "recording SIMULATED-scenario-F-admin-dashboard.mp4 plays (ffprobe + full decode)",
+          "ok": true,
+          "detail": "h264 1280x800 13.0 s"
+        },
+        {
+          "name": "dashboard fits a 390 px phone without horizontal scrolling",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "a client can't sign in to the dashboard",
+          "ok": true,
+          "detail": null
+        }
+      ],
+      "error": null,
+      "ms": 16230,
+      "faultsInjected": false
+    },
+    {
+      "id": "G",
+      "title": "Designer features: show/hide by column, shrink-to-fit, row selection, subfolders, output size, free preview, remembered mapping",
+      "checks": [
+        {
+          "name": "Check says only 4 of 8 rows will be generated (and charged)",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "free preview is low resolution (≤ 640 px) and costs nothing",
+          "ok": true,
+          "detail": [
+            512,
+            640
+          ]
+        },
+        {
+          "name": "preview charged nothing",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "outputs sorted into subfolders by the Badge column",
+          "ok": true,
+          "detail": [
+            "4_Orbit Watch.jpg",
+            "4_Orbit Watch.psd",
+            "NEW/1_Aurora Laptop 14.jpg",
+            "NEW/1_Aurora Laptop 14.psd",
+            "HOT/2_Pulse Phone X.jpg",
+            "HOT/2_Pulse Phone X.psd",
+            "SALE/3_Echo Headphones.jpg",
+            "SALE/3_Echo Headphones.psd"
+          ]
+        },
+        {
+          "name": "every JPG is 540×675",
+          "ok": true,
+          "detail": {
+            "/4_Orbit Watch.jpg": [
+              "JPEG",
+              540,
+              675
+            ],
+            "HOT/2_Pulse Phone X.jpg": [
+              "JPEG",
+              540,
+              675
+            ],
+            "NEW/1_Aurora Laptop 14.jpg": [
+              "JPEG",
+              540,
+              675
+            ],
+            "SALE/3_Echo Headphones.jpg": [
+              "JPEG",
+              540,
+              675
+            ]
+          }
+        },
+        {
+          "name": "Badge layer visible only where the sheet has a badge (psd-tools)",
+          "ok": true,
+          "detail": {
+            "4_Orbit Watch.psd": false,
+            "SALE/3_Echo Headphones.psd": true,
+            "NEW/1_Aurora Laptop 14.psd": true,
+            "HOT/2_Pulse Phone X.psd": true
+          }
+        },
+        {
+          "name": "4 rows charged",
+          "ok": true,
+          "detail": {
+            "balance": "46",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "mapping restored for the same template",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "recording SIMULATED-scenario-G-designer-features.mp4 plays (ffprobe + full decode)",
+          "ok": true,
+          "detail": "h264 320x760 8.5 s"
+        }
+      ],
+      "error": null,
+      "ms": 8736
     }
   ],
   "screenshots": [
@@ -888,6 +1091,204 @@
       "theme": "dark",
       "lang": "en",
       "layoutProblems": []
+    },
+    {
+      "file": "F01-admin-signin-ar.png",
+      "title": "Admin dashboard: sign in (Arabic, default)",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F02-admin-clients-ar.png",
+      "title": "Clients list",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F03-admin-new-client-ar.png",
+      "title": "New client: credits, validity, payment note, generated password",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F04-admin-credentials-ar.png",
+      "title": "Credentials + ready-to-send WhatsApp message",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F05-admin-client-detail-ar.png",
+      "title": "Client detail: balance, packs with expiry, history",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F06-plugin-account-expiry-320-dark.png",
+      "title": "Plugin account: credits and their expiry date",
+      "scenario": "F",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "F07-admin-after-topup-ar.png",
+      "title": "After a 100-credit, 60-day top-up: two packs with different expiry",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F08-plugin-after-expiry-320-dark.png",
+      "title": "Plugin after the first pack expired",
+      "scenario": "F",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "F09-admin-expiry-history-ar.png",
+      "title": "History with charges, top-up and the expiry entry",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F10-admin-disabled-ar.png",
+      "title": "Account disabled",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F11-plugin-disabled-320-dark.png",
+      "title": "Plugin: disabled account message with WhatsApp contact",
+      "scenario": "F",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "F12-admin-overview-en.png",
+      "title": "Overview (English)",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F13-admin-settings-en.png",
+      "title": "Settings: prices per design and per 5 s of video",
+      "scenario": "F",
+      "width": 1280,
+      "height": 800,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F14-admin-clients-mobile-ar.png",
+      "title": "Clients list on a phone (390 px, Arabic)",
+      "scenario": "F",
+      "width": 390,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "F15-admin-client-mobile-ar.png",
+      "title": "Client detail on a phone (390 px, Arabic)",
+      "scenario": "F",
+      "width": 390,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "G01-map-show-hide-320-dark.png",
+      "title": "Map: show/hide a layer from a column + shrink-to-fit",
+      "scenario": "G",
+      "width": 320,
+      "height": 760,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "G02-check-rows-folders-size-320-dark.png",
+      "title": "Check: subfolders, rows 2-5, 540 px output",
+      "scenario": "G",
+      "width": 320,
+      "height": 760,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "G03-check-free-preview-320-dark.png",
+      "title": "Check: free low-resolution preview of row 3",
+      "scenario": "G",
+      "width": 320,
+      "height": 760,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "G04-results-subfolders-320-dark.png",
+      "title": "Results: files in subfolders per Badge value",
+      "scenario": "G",
+      "width": 320,
+      "height": 760,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "G05-map-restored-320-dark.png",
+      "title": "Map: last mapping restored for this template",
+      "scenario": "G",
+      "width": 320,
+      "height": 760,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
     }
   ],
   "recordings": [
@@ -897,8 +1298,8 @@
       "codec": "h264",
       "width": 320,
       "height": 720,
-      "durationSec": 10.52,
-      "bytes": 170527,
+      "durationSec": 9.8,
+      "bytes": 193181,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -908,8 +1309,8 @@
       "codec": "h264",
       "width": 320,
       "height": 720,
-      "durationSec": 6.96,
-      "bytes": 145897,
+      "durationSec": 7,
+      "bytes": 174966,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -919,8 +1320,8 @@
       "codec": "h264",
       "width": 320,
       "height": 720,
-      "durationSec": 18.88,
-      "bytes": 176184,
+      "durationSec": 18.52,
+      "bytes": 194932,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -931,7 +1332,29 @@
       "width": 520,
       "height": 700,
       "durationSec": 12.64,
-      "bytes": 488239,
+      "bytes": 549078,
+      "decodesCleanly": true,
+      "label": "SIMULATION — simulated Photoshop host in Chromium"
+    },
+    {
+      "file": "SIMULATED-scenario-F-admin-dashboard.mp4",
+      "title": "Scenario F: admin dashboard selling cycle (real DB; Auth admin API stubbed)",
+      "codec": "h264",
+      "width": 1280,
+      "height": 800,
+      "durationSec": 13.04,
+      "bytes": 410677,
+      "decodesCleanly": true,
+      "label": "SIMULATION — simulated Photoshop host in Chromium"
+    },
+    {
+      "file": "SIMULATED-scenario-G-designer-features.mp4",
+      "title": "Scenario G: designer features (simulated host)",
+      "codec": "h264",
+      "width": 320,
+      "height": 760,
+      "durationSec": 8.48,
+      "bytes": 235177,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     }
@@ -973,13 +1396,19 @@
       "width": 320,
       "kind": "console",
       "message": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    },
+    {
+      "scenario": "F",
+      "width": 320,
+      "kind": "console",
+      "message": "Failed to load resource: the server responded with a status of 400 (Bad Request)"
     }
   ],
   "layout": [],
   "summary": {
-    "scenarios": 5,
+    "scenarios": 7,
     "failedScenarios": 0,
-    "checks": 33,
+    "checks": 57,
     "failedChecks": 0,
     "consoleOrPageErrors": 0,
     "screenshotsWithLayoutProblems": 0

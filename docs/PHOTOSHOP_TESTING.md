@@ -19,12 +19,12 @@ No Elzoz account, Supabase project or credits are needed. The kit is a developer
 2. Start Photoshop, then UDT. In UDT, click **Add Plugin** and select `plugin/manifest.json`. Then use **••• → Load** on the Elzoz row.
 3. In Photoshop, open **Plugins → Elzoz**. The panel says the build has no server. Click **Continue in developer mode**.
 4. Click the **DEV** chip in the top-right corner of the panel to open Account. Click **Run self-test**, then choose the `kit/` folder.
-5. Wait for all 9 steps to finish (typically under a minute).
+5. Wait for all 10 steps to finish (typically under a minute).
 6. Send back:
    - `kit/selftest-<date>/elzoz-selftest-report.json` (always send this, pass or fail)
    - a screenshot of the panel showing the step list
    - UDT's log if anything failed (*UDT → Elzoz row → ••• → Debug → Console*)
-7. Do the 4 visual checks printed in the report under `manualChecks`, and note anything odd. These checks are things only a human can judge, for example whether the text sits nicely.
+7. Do the 6 visual checks printed in the report under `manualChecks`, and note anything odd. These checks are things only a human can judge, for example whether the text sits nicely.
 
 ### What the self-test does
 
@@ -38,6 +38,7 @@ The self-test calls the same code paths as a real job (`src/dev/selfTest.js`):
 | inspect | Template opens and its layer tree matches the expected 12 layers (groups, text, Smart Objects, pixel layers) |
 | design | 3 rows (an extension-less image name and an Arabic row included) are rendered to JPG, PNG and PSD by the real engine |
 | outputs | Each file exists and is non-empty; the JPG and PNG files are 1080×1350; the PSD has a valid header |
+| features | Rows 2–3 and 5 only, Badge shown/hidden from the Badge column, Description shrink-to-fit, files in `NEW/` and `HOT/` subfolders, 540 px output width |
 | integrity-after | Template file is byte-identical, and no extra documents are left open |
 | video | One 2 s, 24 fps Reel is rendered (slide-up text, Ken Burns photo). The writer re-reads the MOV and verifies its codec, size, frame count and duration |
 | integrity-video | No documents are left open after the video |

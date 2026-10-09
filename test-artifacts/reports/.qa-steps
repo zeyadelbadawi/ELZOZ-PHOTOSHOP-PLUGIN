@@ -1,6 +1,8 @@
 backend|pass
+admin-deps|pass
 vitest|pass
-e2e|pass
+e2e|fail
 build|pass
+admin-build|pass
 audit|info
 qa-kit|pass

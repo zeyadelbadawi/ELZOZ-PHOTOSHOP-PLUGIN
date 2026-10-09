@@ -17,6 +17,8 @@ function readEnvFile(file) {
 // Refuse to bundle anything that is not the public anon key.
 function assertPublicKey(key) {
     if (!key) return;
+    // New Supabase API keys are opaque: sb_publishable_... (public) or sb_secret_... (never ship).
+    if (/^sb_secret_/.test(key)) throw new Error("Refusing to build: ELZOZ_SUPABASE_ANON_KEY is a SECRET key (sb_secret_...). Use the publishable key.");
     const payload = key.split(".")[1];
     if (!payload) return;
     let role;

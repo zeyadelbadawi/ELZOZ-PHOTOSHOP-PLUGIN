@@ -14,12 +14,15 @@
 | JPG/PNG/PSD export via `saveAs` (copy) | Writing and on-disk verification logic | Real files, quality settings |
 | Video frames + MOV | MOV container verified with ffmpeg; frame logic in simulator | Frame rendering speed; MOV written through UXP file I/O |
 | UI | Chromium at 5 widths, 2 themes, RTL | UXP CSS support, Spectrum widgets, RTL in UXP |
+| Show/hide by column | Engine + visibility restore (Photoshop's default non-undoable visibility modelled) | `Layer.visible` writes on groups and pixel layers |
+| Shrink-to-fit | Maths + engine with simulated text metrics | Real point-text bounds after `textItem.contents`; `Layer.scale` on text |
+| Output size, subfolders | Engine + file system logic | `Document.resizeImage` before rows; UXP `createFolder` in the output folder |
 | `secureStorage`, `crypto.getRandomValues` | Code paths tested in Node | Availability per Photoshop/UXP version |
 
 ## Ready for you to run
 
 - **QA kit:** `npm run qa:kit` → `dist-qa/elzoz-photoshop-qa-kit.zip`
-- **In-plugin self-test** (developer builds only): 9 steps on the real engine (designs, outputs, template integrity, open documents, video). It writes `elzoz-selftest-report.json`. It is itself tested on the simulator, including its failure reporting (`tests/sim/selftest.test.js`).
+- **In-plugin self-test** (developer builds only): 10 steps on the real engine (designs, outputs, the new designer features, template integrity, open documents, video). It writes `elzoz-selftest-report.json`. It is itself tested on the simulator, including its failure reporting (`tests/sim/selftest.test.js`).
 - **Guide:** `docs/PHOTOSHOP_TESTING.md` (about 10 minutes per version). Record results in `docs/COMPATIBILITY.md` → Results log.
 
 Until a version passes the self-test and the `docs/PLAN.md` §7 checklist, no Photoshop version should be called supported.

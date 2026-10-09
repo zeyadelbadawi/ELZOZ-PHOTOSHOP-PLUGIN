@@ -2,7 +2,11 @@
 
 Scope: accounts, sessions, credit balances, billing of design and video jobs.
 Implementation: `supabase/migrations/`, `src/account/`, `src/engine/*Job.js`.
-Tests: `tests/db/credits.test.js` (30 tests, run against PostgreSQL 16), `tests/account/` (client).
+Tests: `tests/db/` (54 tests on PostgreSQL 16, incl. expiry and admin RPCs), `tests/admin/` (Edge Function over HTTP and through Deno), `tests/account/` (client).
+
+**Sales model:** there is no self sign-up and no online payment. Clients pay the seller directly
+(e.g. via WhatsApp); the seller creates the account and adds credits in the admin dashboard.
+Every top-up expires (default 30 days); leftovers expire automatically.
 
 > This system is designed to make abuse expensive and visible. It is **not**
 > unhackable: rendering happens on the customer's computer, so some risks
@@ -15,16 +19,21 @@ Tests: `tests/db/credits.test.js` (30 tests, run against PostgreSQL 16), `tests/
 | Photoshop plugin | **Untrusted** (runs on the customer's machine and can be modified) | Supabase URL + anon key (public), user's access token (memory), refresh token (UXP `secureStorage`) |
 | Supabase Auth | Trusted | Users, password hashes (bcrypt, managed by Supabase), sessions, refresh-token rotation |
 | Postgres + RLS + `SECURITY DEFINER` RPCs | Trusted, **the authority** | Balances, reservations, jobs, append-only ledger, pricing |
-| Payment webhook (future Edge Function) | Trusted | Payment provider secret, `service_role` key (server-side only) |
+| Admin dashboard (`admin/`, static web app) | Untrusted code, **trusted user** | Anon key (public) and the admin's own session only. Every action is authorised server-side |
+| `admin-users` Edge Function | Trusted | `service_role` key (Supabase-provided secret). Creates users / sets passwords / bans, only after `am_i_admin()` passes with the caller's own token |
 
 ## 2. Controls
 
 | Area | Control | Where |
 |---|---|---|
-| Authentication | Supabase Auth; no custom hashing; email confirmation; reset via Supabase | `src/account/auth.js` |
+| Authentication | Supabase Auth; no custom hashing; accounts and passwords created by the admin (generated 12-character passwords, ~70 bits); banned users get a clear message | `src/account/auth.js`, `supabase/functions/admin-users` |
 | Session handling | Access token in memory only; refresh token in `secureStorage`; single-flight refresh (rotation-safe); local sign-out on rejected refresh | `auth.js` |
 | Authorization | No INSERT/UPDATE/DELETE grants to `anon`/`authenticated` on any table; SELECT own rows only (RLS); `private` schema not exposed | migration §privileges |
-| Mutations | Only `start_job`, `report_item`, `finish_job` for users; `grant_credits`, `refund_charge`, `expire_stale_jobs` for `service_role` only | migration §RPCs |
+| Mutations | Only `start_job`, `report_item`, `finish_job`, `my_credits` for users; `grant_credits`, `refund_charge`, `expire_stale_jobs` for `service_role` only | migration §RPCs |
+| Admin actions | `admin_*` RPCs check `private.admins` first (`not_admin` otherwise) and record `admin:<email>` as the actor in the ledger; top-ups are idempotent per form submission | `20261010000001`, `tests/db/lots-admin.test.js` |
+| Expiry | Credits live in lots with `expires_at`; spending uses the earliest-expiring lot; leftovers are written off as `expiry` ledger entries; credits reserved by a running job are never expired from under it; invariant balance = Σ lot.remaining is tested | same |
+| Disabled accounts | `credit_accounts.disabled` blocks new jobs immediately (even with a still-valid token); the Edge Function also bans sign-in (`ban_duration`) | tests |
+| No self sign-up | Supabase Auth "Allow new users to sign up" OFF; the plugin has no sign-up or reset-email flow | deployment checklist |
 | Definer safety | Every `SECURITY DEFINER` function sets `search_path = ''` and fully qualifies objects; EXECUTE revoked from `public` | migration |
 | Atomicity | Each RPC is one transaction; account row locked `FOR UPDATE`; lock order account → job → item everywhere | migration |
 | Double spend | Available = balance − reserved, checked under the account lock; `reserved <= balance` constraint | test "two concurrent jobs" |
@@ -69,24 +78,31 @@ Tests: `tests/db/credits.test.js` (30 tests, run against PostgreSQL 16), `tests/
 | T11 | SQL injection via RPC parameters | Low | Typed parameters, no dynamic SQL | — |
 | T12 | Definer function hijack via `search_path` | Low | `search_path = ''` on all definer functions | — |
 | T13 | Spreadsheet/file path abuse (`../`) | Low | Image cells must be plain file names inside a user-granted folder | — |
-| T14 | Malicious spreadsheet (SheetJS advisories) | Low | Local files only; upgrade SheetJS from its official CDN (npm 0.18.5 is unmaintained) | Tracked in roadmap |
+| T14 | Malicious spreadsheet (SheetJS advisories) | Low | SheetJS 0.20.3 (fixes the 0.18.5 prototype-pollution and ReDoS advisories); local files only | `@e965/xlsx` is a provenance-signed rebuild of the official tag; swap for the official CDN tarball when convenient |
+| T15 | Admin account takeover | Low–medium | Admin list in `private.admins` (SQL only); dashboard is `noindex`; CORS limited to the dashboard origin; use a long unique password and enable MFA for the admin account | An attacker with the admin password can mint credits. Ledger shows every admin action with the admin's email |
+| T16 | Someone signs up with the public anon key | Medium if sign-ups are on | Sign-ups OFF in Supabase Auth; a self-made account has 0 credits and can't grant any | Misconfiguration: covered by the checklist |
+| T17 | Client shares their account | Medium | Credits are per account and expire; disable the account from the dashboard | Business risk, not technical |
 
 ## 5. Deployment and secrets checklist
+
+See `docs/DEPLOYMENT.md` for the full step-by-step. Security-relevant items:
 
 **Supabase project (staging first, then production)**
 - [ ] Create separate **staging** and **production** projects.
 - [ ] `supabase link` and `supabase db push` (applies `supabase/migrations`).
 - [ ] Enable `pg_cron` (Database → Extensions) *before* applying `20261009000002`, or re-run it after.
-- [ ] Auth → Email: confirm email ON; minimum password length ≥ 10; leaked-password protection ON (if available on your plan).
-- [ ] Auth → Rate limits reviewed; CAPTCHA (hCaptcha or Turnstile) on sign-up and password sign-in.
-- [ ] Auth → URL configuration: site URL and redirect URLs for confirmation and reset pages.
+- [ ] Auth → **Allow new users to sign up: OFF** (accounts are created from the admin dashboard).
+- [ ] Auth → minimum password length ≥ 8 (generated passwords are 14 characters).
+- [ ] Auth → Rate limits reviewed; CAPTCHA on password sign-in if abuse appears.
+- [ ] Admin account: long unique password, MFA enabled; added to `private.admins` by SQL.
+- [ ] `supabase functions deploy admin-users`; `supabase secrets set ELZOZ_ADMIN_ORIGINS=https://<dashboard host>`.
 - [ ] Verify with the anon key that `PATCH /rest/v1/credit_accounts` returns 401/403 (smoke test).
 - [ ] Set up a monitoring query or dashboard: failed-item ratio per user per week.
 
 **Secrets**
-- [ ] Plugin build: only `ELZOZ_SUPABASE_URL` and `ELZOZ_SUPABASE_ANON_KEY` (from `.env`, git-ignored).
+- [ ] Plugin build: only `ELZOZ_SUPABASE_URL`, `ELZOZ_SUPABASE_ANON_KEY` and `ELZOZ_CONTACT_URL` (from `.env`, git-ignored).
 - [ ] `service_role` key: only in Supabase Edge Function secrets / your password manager. Never in chat, the repo, or the plugin.
-- [ ] Payment provider secret and webhook signing secret: Edge Function secrets only.
+- [ ] Admin dashboard build: only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 - [ ] Rotate keys immediately if any of the above appears in a commit, log or screenshot.
 
 **Release**

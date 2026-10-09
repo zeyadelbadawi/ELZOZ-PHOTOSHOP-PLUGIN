@@ -5,12 +5,22 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { generatePassword } from "../../supabase/functions/admin-users/core.mjs";
+import { generatePassword, pickKey } from "../../supabase/functions/admin-users/core.mjs";
 
 const hasBackend = !!(process.env.ELZOZ_TEST_DATABASE_URL && process.env.ELZOZ_TEST_POSTGREST_URL && process.env.ELZOZ_TEST_JWT_SECRET);
 const PORT = 54350;
 const BASE = `http://127.0.0.1:${PORT}`;
 const RUN = Date.now().toString(36);
+
+describe("pickKey (new and legacy Supabase key env)", () => {
+    it("prefers the new JSON dictionary, falls back to the legacy key", () => {
+        expect(pickKey('{"default":"sb_secret_new"}', "legacy-jwt")).toBe("sb_secret_new");
+        expect(pickKey(undefined, "legacy-jwt")).toBe("legacy-jwt");
+        expect(pickKey("not json", "legacy-jwt")).toBe("legacy-jwt");
+        expect(pickKey('{"other":"k2"}', undefined)).toBe("k2");
+        expect(pickKey(undefined, undefined)).toBeUndefined();
+    });
+});
 
 describe("generatePassword", () => {
     it("makes readable 3x4 passwords without look-alike characters", () => {
@@ -143,8 +153,20 @@ const DENO = process.env.ELZOZ_DENO;
             const p = b64(JSON.stringify({ ...claims, exp: Math.floor(Date.now() / 1000) + 3600 }));
             return `${h}.${p}.${crypto.createHmac("sha256", process.env.ELZOZ_TEST_JWT_SECRET).update(`${h}.${p}`).digest("base64url")}`;
         };
+        // Only the NEW key variables (JSON dictionaries), as on a project without legacy keys.
+        const env = { ...process.env };
+        delete env.SUPABASE_ANON_KEY;
+        delete env.SUPABASE_SERVICE_ROLE_KEY;
         deno = spawn(DENO, ["run", "--allow-net", "--allow-env", path.resolve("supabase/functions/admin-users/index.ts")], {
-            env: { ...process.env, DENO_DIR: "/tmp/deno/cache", HOME: "/tmp/deno", SUPABASE_URL: `http://127.0.0.1:${DPORT}`, SUPABASE_ANON_KEY: sign({ role: "anon" }), SUPABASE_SERVICE_ROLE_KEY: sign({ role: "service_role" }), ELZOZ_ADMIN_ORIGINS: "https://admin.example" },
+            env: {
+                ...env,
+                DENO_DIR: "/tmp/deno/cache",
+                HOME: "/tmp/deno",
+                SUPABASE_URL: `http://127.0.0.1:${DPORT}`,
+                SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: sign({ role: "anon" }) }),
+                SUPABASE_SECRET_KEYS: JSON.stringify({ default: sign({ role: "service_role" }) }),
+                ELZOZ_ADMIN_ORIGINS: "https://admin.example"
+            },
             stdio: "pipe"
         });
         await new Promise((resolve) => {

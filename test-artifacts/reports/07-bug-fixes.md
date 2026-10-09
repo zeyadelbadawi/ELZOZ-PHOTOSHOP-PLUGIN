@@ -12,6 +12,17 @@ Every product fix has a regression test. "Found by" names the test that exposed 
 | 6 | A corrupt or encrypted workbook showed the raw library error "Unsupported ZIP encryption" | Meaningless error | `readWorkbook` throws a coded `unreadable_workbook` error with a clear, translated message | `excel.test.js` › turns an unreadable workbook into a clear, coded error | Screenshot review (E-data-corrupt) |
 | 7 | Account: "Buy credits" touched the "Credit history" heading | Cosmetic | Spacing (`ez-mb3`) | Screenshot A14 | Screenshot review |
 
+## Found while building the sales model and designer features (2026-10-10)
+
+| # | Defect | Fix | Regression test |
+|---|---|---|---|
+| 8 | Admin function: "valid for 0 days" silently became 30 days (`0 || 30`) | Defaults apply only to missing values; 0 is rejected | `admin-users.test.js` › rejects … bad input |
+| 9 | Dashboard lost the open client page on refresh / back button | Page kept in the URL hash | e2e F › refresh keeps the client page open |
+| 10 | Row selection "3 – 5" (spaces around the dash) was rejected | Dashes are normalised before splitting | `designer-features.test.js` |
+| 11 | Plugin had no label for the new "expiry" history entries; dashboard showed internal "lot N expired" notes and English job statuses in Arabic | Labels added (EN/AR), internal notes hidden | `i18n.test.js` (key parity), screenshots F09/F12 |
+| 12 | A new Supabase project may expose only the new API-key variables (`SUPABASE_SECRET_KEYS`…); the function read only the legacy ones | Both supported (`pickKey`); build and secret scan also reject `sb_secret_…` keys | `admin-users.test.js` › pickKey, Deno run with new keys only |
+| 13 | Simulator: Image Size wasn't a history state, so a row reset undid an output resize (real Photoshop records it) | Fake fixed to match Photoshop | `designer-features-engine.test.js` › output size |
+
 ## Test-infrastructure fixes (not product bugs)
 
 - Simulator PSD writer: Smart Object IDs must be GUIDs, and placed layers need a size (ag-psd requirements).

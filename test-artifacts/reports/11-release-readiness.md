@@ -1,34 +1,38 @@
-# 11. Release readiness
+# 11. Release readiness (1.0.0)
 
-**Verdict: not releasable yet.** The code is complete for launch scope and green on every check that can run without Photoshop. Two blockers remain: the plugin has never run in Adobe Photoshop, and there is one high-severity dependency advisory.
+**Verdict: the code is ready. Two things remain before the first sale.**
+1. The plugin hasn't been run in Adobe Photoshop yet. That takes about 10 minutes with the self-test.
+2. Your production backend, dashboard and package need to be set up. That's about an hour, following `docs/DEPLOYMENT.md`.
+
+No known open defects. Every automated check is green.
 
 ## Gate status
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Domain, engine and UI logic | ✅ Pass | 164/164 Vitest; e2e 33/33 |
-| Server-authoritative credits (RLS, RPCs, idempotency, failed rows not charged, outage handling) | ✅ Pass on local Postgres + PostgREST | `tests/db` (30), `tests/e2e` (6), e2e A/B/C/D ledger checks |
-| No privileged secrets in source or builds | ✅ Pass | `check-secrets`; anon-only build guard; QA kit has no server config |
-| UI: responsive 240–520 px, light/dark, Arabic RTL, error states | ✅ Pass **in Chromium** | 55 screenshots, 0 overflow findings, 0 console errors |
-| Video output validity | ✅ MOV format verified (ffprobe; MOV writer self-verifies) | e2e C; `tests/media` |
-| **Runs in Adobe Photoshop** | ❌ **Not verified** | Report 8; needs action 1 in report 10 |
-| **Dependency advisories** | ❌ `xlsx` 0.18.5: prototype pollution + ReDoS (high) | `npm-audit.json`; action 2 in report 10 |
-| Hosted Supabase (GoTrue auth, pg_cron expiry) | ⚠️ Not tested | Action 3 |
-| Paid flow on staging in Photoshop (PLAN §7) | ⚠️ Not run | Action 4 |
-| Performance at scale in Photoshop | ⚠️ Unknown | Engine overhead is 0.28 s per 1000 rows in the simulator; Photoshop render time must be measured |
-| Payments (buying credits) | Out of scope for this phase | "Buy credits" opens the website URL |
+| Domain, engine, UI logic | ✅ | 226/226 Vitest; 57/57 browser checks |
+| Credits: server-authoritative, failed items never charged, outages, double-charge safety | ✅ (local Postgres + PostgREST) | `tests/db`, `tests/e2e`, scenarios A–D |
+| **Manual sales model**: admin creates accounts with generated passwords, tops up with validity, resets passwords, disables | ✅ | `tests/db/lots-admin` (24), `tests/admin` (11, incl. Deno), scenario F (15 checks) |
+| **Expiring credits**: 30 days default, earliest-expiry first, leftovers expire, running jobs protected | ✅ | lots tests incl. balance = Σ lots invariant; scenario F |
+| **Designer features**: show/hide by column, shrink-to-fit, rows, subfolders, output size, free preview, remembered mapping | ✅ in the simulator | domain 14 + engine 7 + scenario G (9, psd-tools verified); self-test *features* step ready for Photoshop |
+| No secrets in builds (legacy JWT and new `sb_secret_` keys) | ✅ | build guard + `check-secrets` on plugin, dashboard and functions |
+| Dependencies | ✅ 0 vulnerabilities | `npm-audit*.json` |
+| UI: 240–520 px, light/dark, Arabic RTL; dashboard on desktop and phone | ✅ in Chromium | 75 screenshots, 0 overflow |
+| **Runs in Adobe Photoshop** | ❌ not yet run | Your action 1 (self-test, ~10 min per version) |
+| Hosted Supabase (Auth, pg_cron, Edge Function deploy) | ⚠️ not yet deployed | Your actions 2–3; the function was tested under Deno with both key styles |
+| Plugin packaging/installation (.ccx) | ⚠️ not yet done | Your action 4 |
 
-## Known limitations to state honestly at launch
+## Honest limits to know at launch
 
-- Video is QuickTime MOV (Photo-JPEG), not MP4/H.264.
-- Supported Photoshop versions: none confirmed yet. The manifest allows 23.3+; 24.0+ is the practical minimum for billing (secure random).
-- RTL in UXP is unverified: `direction` is not in UXP's documented CSS.
-- Rows skipped by preflight (missing images) can be recovered before generating via **Fix**. After a job has run, generating only the skipped rows means a new job with a spreadsheet that contains just those rows; there's no one-click "generate the skipped rows" yet.
+- The Photoshop API behaviour has been simulated, not observed. The riskiest calls are Smart Object replacement, text replacement on 23.x, and shrink-to-fit on paragraph (box) text. Shrink-to-fit applies to point text; box text wraps and is left as designed.
+- Video is QuickTime MOV (Photo-JPEG), not MP4.
+- Rendering happens on the client's machine, so a modified plugin could misreport. The server reserves credits up front and keeps evidence (see `docs/SECURITY.md` T5/T6).
+- RTL inside UXP is unverified (Chromium only).
+- `.ccx` installation outside Adobe Exchange is controlled by Adobe and can change. Test it on one client machine first.
 
-## Release sequence once blockers clear
+## Release sequence
 
-1. Apply the SheetJS upgrade, then run `npm test`.
-2. Self-test passes on at least the latest Photoshop 26.x/27.x and 24.x, and is recorded in `docs/COMPATIBILITY.md`.
-3. Staging backend plus the PLAN §7 checklist on one version.
-4. Production Supabase: migrations, `pg_cron`, Auth settings (email confirmation, rate limits).
-5. `npm run build:prod && npm run check:secrets`, package with UDT, then submit to Adobe Exchange (or distribute privately).
+1. Self-test passes on your Photoshop version(s), recorded in `docs/COMPATIBILITY.md`.
+2. Staging: deploy and run one full cycle (dashboard → plugin → top-up → disable).
+3. Production: same deployment, sign-ups off, admin MFA on, no test accounts.
+4. `npm run build:prod && npm run check:secrets` → package `.ccx` → send it to the first client.

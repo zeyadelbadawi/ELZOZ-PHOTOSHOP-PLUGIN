@@ -32,3 +32,13 @@ jobs:
           ELZOZ_TEST_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/postgres
       - run: npm run build:prod
       - run: npm run check:secrets
+      - name: Admin dashboard build
+        run: |
+          npm --prefix admin ci
+          cd admin && VITE_SUPABASE_URL=https://example.supabase.co VITE_SUPABASE_ANON_KEY=public-placeholder npx vite build
+      - run: node scripts/check-secrets.js admin/dist
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Edge Function type check
+        run: deno check supabase/functions/admin-users/index.ts

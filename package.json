@@ -1,6 +1,6 @@
 {
   "name": "elzoz-photoshop-plugin",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "scripts": {
     "watch": "webpack --mode development --watch",
     "build": "webpack --mode development",

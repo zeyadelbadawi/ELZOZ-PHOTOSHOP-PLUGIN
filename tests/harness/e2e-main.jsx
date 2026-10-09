@@ -81,7 +81,7 @@ const secureStore = {
 
 Object.assign(host.uxp, {
     shell: { openExternal: (u) => console.log("openExternal", u) },
-    versions: { ...host.uxp.versions, plugin: "0.2.0-e2e" }
+    versions: { ...host.uxp.versions, plugin: "1.0.0-e2e" }
 });
 host.uxp.storage.secureStorage = secureStore;
 Object.assign(host.uxp.storage.localFileSystem, {

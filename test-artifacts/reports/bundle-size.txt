@@ -1,1 +1,2 @@
-bundle: 573308 bytes
+bundle: 620127 bytes
+188K	admin/dist

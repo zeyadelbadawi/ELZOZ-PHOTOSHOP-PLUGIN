@@ -26,6 +26,23 @@ export function generatePassword(getRandomValues = (a) => crypto.getRandomValues
     return `${out.slice(0, 4).join("")}-${out.slice(4, 8).join("")}-${out.slice(8).join("")}`;
 }
 
+/**
+ * Supabase API key from the new JSON dictionary env ({"default": "sb_..."}),
+ * falling back to the legacy single-key env.
+ */
+export function pickKey(dictJson, legacy) {
+    if (dictJson) {
+        try {
+            const d = JSON.parse(dictJson);
+            const v = d && (d.default || Object.values(d)[0]);
+            if (v) return String(v);
+        } catch (e) {
+            /* not JSON: ignore */
+        }
+    }
+    return legacy || undefined;
+}
+
 class HttpError extends Error {
     constructor(status, code, message) {
         super(message || code);
