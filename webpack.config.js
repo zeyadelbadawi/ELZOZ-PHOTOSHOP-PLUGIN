@@ -1,52 +1,94 @@
+const fs = require("fs");
 const path = require("path");
-const CleanWebpackPlugin = require("clean-webpack-plugin");
+const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 
-module.exports = {
-    entry: './src/index.jsx',
-    output: {
-        path: path.resolve(__dirname, 'dist'),
-        filename: 'index.js',
-        //libraryTarget: "commonjs2"
-    },
-    devtool: 'eval-cheap-source-map', // won't work on XD due to lack of eval
-    externals: {
-        uxp: 'commonjs2 uxp',
-        photoshop: 'commonjs2 photoshop',
-        os: 'commonjs2 os'
-    },
-    resolve: {
-        extensions: [".js", ".jsx"]
-    },
-    module: {
-        rules: [
-            {
-                test: /\.jsx?$/,
-                exclude: /node_modules/,
-                loader: "babel-loader",
-                options: {
-                    plugins: [
-                        "@babel/transform-react-jsx",
-                        "@babel/proposal-object-rest-spread",
-                        "@babel/plugin-syntax-class-properties",
-                    ]
+// Minimal .env reader (no dependency). Real environment variables win.
+function readEnvFile(file) {
+    if (!fs.existsSync(file)) return {};
+    const out = {};
+    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+        const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+        if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, "");
+    }
+    return out;
+}
+
+// Refuse to bundle anything that is not the public anon key.
+function assertPublicKey(key) {
+    if (!key) return;
+    const payload = key.split(".")[1];
+    if (!payload) return;
+    let role;
+    try {
+        role = JSON.parse(Buffer.from(payload, "base64").toString("utf8")).role;
+    } catch (e) {
+        return;
+    }
+    if (role && role !== "anon") {
+        throw new Error(`Refusing to build: ELZOZ_SUPABASE_ANON_KEY has role "${role}". Only the anon key may ship in the plugin.`);
+    }
+}
+
+module.exports = (env, argv) => {
+    const isProd = argv.mode === "production";
+    const fileEnv = readEnvFile(path.resolve(__dirname, ".env"));
+    const supabaseUrl = process.env.ELZOZ_SUPABASE_URL || fileEnv.ELZOZ_SUPABASE_URL || "";
+    const supabaseAnonKey = process.env.ELZOZ_SUPABASE_ANON_KEY || fileEnv.ELZOZ_SUPABASE_ANON_KEY || "";
+    assertPublicKey(supabaseAnonKey);
+
+    return {
+        entry: "./src/index.jsx",
+        output: {
+            path: path.resolve(__dirname, "dist"),
+            filename: "index.js"
+        },
+        // eval-based source maps need allowCodeGenerationFromStrings; production uses none.
+        devtool: isProd ? false : "eval-cheap-source-map",
+        externals: {
+            uxp: "commonjs2 uxp",
+            photoshop: "commonjs2 photoshop",
+            os: "commonjs2 os"
+        },
+        // Plugin bundles load from local disk; web download-size hints don't apply.
+        performance: { hints: false },
+        resolve: {
+            extensions: [".js", ".jsx"]
+        },
+        module: {
+            rules: [
+                {
+                    test: /\.jsx?$/,
+                    exclude: /node_modules/,
+                    loader: "babel-loader",
+                    options: {
+                        plugins: [
+                            "@babel/transform-react-jsx",
+                            "@babel/proposal-object-rest-spread",
+                            "@babel/plugin-syntax-class-properties"
+                        ]
+                    }
+                },
+                {
+                    test: /\.png$/,
+                    exclude: /node_modules/,
+                    loader: "file-loader"
+                },
+                {
+                    test: /\.css$/,
+                    use: ["style-loader", "css-loader"]
                 }
-            },
-            {
-                test: /\.png$/,
-                exclude: /node_modules/,
-                loader: 'file-loader'
-            },
-            {
-                test: /\.css$/,
-                use: ["style-loader", "css-loader"]
-            }
+            ]
+        },
+        plugins: [
+            new webpack.DefinePlugin({
+                __ELZOZ_SUPABASE_URL__: JSON.stringify(supabaseUrl),
+                __ELZOZ_SUPABASE_ANON_KEY__: JSON.stringify(supabaseAnonKey),
+                __ELZOZ_DEV__: JSON.stringify(!isProd)
+            }),
+            new CopyPlugin(["plugin"], {
+                copyUnmodified: true
+            })
         ]
-    },
-    plugins: [
-        //new CleanWebpackPlugin(),
-        new CopyPlugin(['plugin'], {
-            copyUnmodified: true
-        })
-    ]
+    };
 };
