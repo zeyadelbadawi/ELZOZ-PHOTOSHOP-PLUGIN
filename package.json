@@ -10,7 +10,8 @@
     "check:secrets": "node scripts/check-secrets.js",
     "uxp:load": "cd dist && uxp plugin load",
     "uxp:reload": "cd dist && uxp plugin reload",
-    "uxp:debug": "cd dist && uxp plugin debug"
+    "uxp:debug": "cd dist && uxp plugin debug",
+    "test:db": "bash scripts/test-db.sh"
   },
   "author": "Elzoz",
   "license": "Apache-2.0",
@@ -25,6 +26,7 @@
     "css-loader": "^6.8.1",
     "file-loader": "^5.1.0",
     "nodemon": "^2.0.7",
+    "pg": "^8.23.1",
     "style-loader": "^1.1.3",
     "vitest": "^3.2.7",
     "webpack": "^5.88.1",
