@@ -1,5 +1,7 @@
 # Elzoz Photoshop Plugin — Technical & Product Audit
 
+> **Update 2026-10-09:** The product owner made final decisions (pre-launch, secure server-side credits, real Video Mode, widest practical Photoshop support, full redesign). The roadmap, architecture, credits, video, and compatibility sections are superseded by [`docs/PLAN.md`](../PLAN.md). The findings, bug register, and feature matrix below remain the baseline record of the code as received.
+
 **Audit date:** 2026-10-09
 **Input:** `Test-lw40mk_2.zip` (236 files: 59 source files ≈ 14.4k lines, 74 status/plan documents, a prebuilt `dist/`, no Git history)
 **Method:** Full read of every live source file, import-graph analysis, a clean `npm ci` + `webpack` build, `npm audit`, and verification of Photoshop/UXP API claims against Adobe's official docs source (`github.com/AdobeDocs/uxp-photoshop`).
