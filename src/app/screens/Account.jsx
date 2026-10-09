@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, Section, Stat } from "../../ui/components.jsx";
-import { websiteUrl } from "../../config/supabase-config.js";
+import { contactUrl } from "../../config/supabase-config.js";
 import SelfTestPanel from "../../dev/SelfTestPanel.jsx";
 
 const fmtDate = (s, lang) => {
@@ -12,6 +12,15 @@ const fmtDate = (s, lang) => {
         return s;
     }
 };
+
+const fmtDay = (s, lang) => {
+    try {
+        return new Date(s).toLocaleDateString(lang === "ar" ? "ar" : "en", { year: "numeric", month: "short", day: "numeric" });
+    } catch (e) {
+        return s;
+    }
+};
+const daysLeft = (s) => Math.max(0, Math.ceil((new Date(s) - Date.now()) / 86400000));
 
 export default function Account({ onClose }) {
     const { services, session, account, refreshAccount, signOut } = useApp();
@@ -49,10 +58,24 @@ export default function Account({ onClose }) {
                     <Stat label={t("account.reserved")} value={account.reserved} />
                 </div>
             )}
-            {websiteUrl && !session.dev && (
+            {account && account.disabled && <Alert tone="error">{t("account.disabledNote")}</Alert>}
+            {account && account.lots.length > 0 && (
+                <Section title={t("account.expiry")}>
+                    <Card>
+                        {account.lots.map((l, i) => (
+                            <div key={i} className="ez-row ez-mb1">
+                                <div className="ez-grow">{t("account.lotLine", { n: l.remaining, date: fmtDay(l.expiresAt, lang) })}</div>
+                                <div className={`ez-small ${daysLeft(l.expiresAt) <= 3 ? "ez-text-warning" : "ez-muted"}`}>{t("account.daysLeft", { n: daysLeft(l.expiresAt) })}</div>
+                            </div>
+                        ))}
+                    </Card>
+                </Section>
+            )}
+            {account && account.lots.length === 0 && !session.dev && <Alert tone="info">{t("account.noCredits")}</Alert>}
+            {contactUrl && !session.dev && (
                 <div className="ez-mb3">
-                    <Button variant="primary" onClick={() => services.openExternal(websiteUrl)}>
-                        {t("account.buy")}
+                    <Button variant="primary" onClick={() => services.openExternal(contactUrl)}>
+                        {t("account.topUp")}
                     </Button>
                 </div>
             )}

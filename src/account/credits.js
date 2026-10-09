@@ -17,7 +17,8 @@ const USER_MESSAGES = {
     too_many_active_jobs: "You already have 3 jobs running. Finish or cancel one first.",
     job_expired: "This job's credit reservation expired. Start the job again.",
     job_not_active: "This job is already finished.",
-    not_authenticated: "Please sign in again."
+    not_authenticated: "Please sign in again.",
+    account_disabled: "This account is disabled. Contact us to reactivate it."
 };
 
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -71,10 +72,12 @@ export function createCreditsClient({ url, anonKey, auth, fetchImpl = globalThis
     const rpc = (fn, args) => request("POST", `/rpc/${fn}`, { ...args, p_idempotency_key: newKey() });
 
     return {
+        /** Balance with expired credits already removed, plus each pack's expiry (soonest first). */
         async getAccount() {
-            const rows = await request("GET", "/credit_accounts?select=balance,reserved");
-            const a = rows && rows[0];
-            return a ? { balance: Number(a.balance), reserved: Number(a.reserved), available: Number(a.balance) - Number(a.reserved) } : null;
+            const a = await request("POST", "/rpc/my_credits", {});
+            if (!a) return null;
+            const lots = (a.lots || []).map((l) => ({ remaining: Number(l.remaining), expiresAt: l.expires_at }));
+            return { balance: Number(a.balance), reserved: Number(a.reserved), available: Number(a.available), disabled: !!a.disabled, lots, nextExpiry: lots[0] || null };
         },
         async getPricing() {
             const rows = await request("GET", "/pricing_rules?select=unit,price,hd_long_edge,hd_multiplier");

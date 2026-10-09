@@ -41,6 +41,12 @@ for (const d of [SHOTS, RECS, OUTS, REPORTS]) fs.mkdirSync(d, { recursive: true 
 // ---------- build + server ----------
 console.log("building e2e harness…");
 execFileSync("npx", ["webpack", "--config", "tests/harness/webpack.e2e.js"], { cwd: ROOT, env: { ...process.env, ELZOZ_E2E_ANON_KEY: ANON, ELZOZ_E2E_ORIGIN: ORIGIN }, stdio: "ignore" });
+console.log("building admin dashboard…");
+execFileSync("npx", ["vite", "build", "--logLevel", "error"], {
+    cwd: path.join(ROOT, "admin"),
+    env: { ...process.env, VITE_SUPABASE_URL: ORIGIN, VITE_SUPABASE_ANON_KEY: ANON, ELZOZ_ADMIN_BASE: "/admin/", ELZOZ_ADMIN_OUT: "dist-e2e" },
+    stdio: "ignore"
+});
 process.env.ELZOZ_E2E_PORT = String(PORT);
 const { server } = require("./e2e-server.js");
 
@@ -506,6 +512,167 @@ scenario("E", "Responsive layout, themes, Arabic RTL, error and empty states", a
         }
         await finishRecording(p, "SIMULATED-scenario-E-responsive-walkthrough", "Scenario E: responsive resize 520 → 240 px (simulated host)");
     }
+});
+
+scenario("F", "Selling cycle: admin dashboard creates a client, client works in the plugin, top-up, expiry, password reset, disable", async () => {
+    const adminEmail = `owner-${RUN}@e2e.test`;
+    const client = `client-${RUN}@e2e.test`;
+    await post("/__e2e/users", { email: adminEmail, password: "owner pass 123", admin: true });
+
+    // --- dashboard (desktop, Arabic by default)
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, recordVideo: { dir: path.join(RECS, ".raw"), size: { width: 1280, height: 800 } } });
+    const adm = await ctx.newPage();
+    adm.on("dialog", (d) => d.accept());
+    adm.on("pageerror", (e) => report.errors.push({ scenario: "F", kind: "pageerror", message: e.message }));
+    adm.on("console", (m) => m.type() === "error" && !current.faultsInjected && report.errors.push({ scenario: "F", kind: "console", message: m.text() }));
+    adm.meta = { width: 1280, height: 800, theme: "system-light", lang: "ar" };
+    adm.ctx = ctx;
+    const ashot = async (id, title) => {
+        await adm.waitForTimeout(250);
+        await adm.screenshot({ path: path.join(SHOTS, `${id}.png`), fullPage: true });
+        report.screenshots.push({ file: `${id}.png`, title, scenario: "F", ...adm.meta, layoutProblems: [] });
+    };
+    await adm.goto(`${ORIGIN}/admin/`);
+    await adm.waitForSelector("form");
+    await ashot("F01-admin-signin-ar", "Admin dashboard: sign in (Arabic, default)");
+    await adm.fill("input[type=email]", adminEmail);
+    await adm.fill("input[type=password]", "owner pass 123");
+    await adm.click("button.btn-primary");
+    await adm.waitForSelector("text=العملاء");
+    await ashot("F02-admin-clients-ar", "Clients list");
+    await adm.click("text=عميل جديد");
+    await adm.fill("[data-testid=new-client-form] input[type=email]", client);
+    await adm.fill("[data-testid=new-client-form] input[type=number] >> nth=0", "50");
+    await adm.fill("[data-testid=new-client-form] input[type=number] >> nth=1", "30");
+    await adm.fill("[data-testid=new-client-form] input:not([type]) >> nth=0", "فودافون كاش 1234");
+    await ashot("F03-admin-new-client-ar", "New client: credits, validity, payment note, generated password");
+    await adm.click("[data-testid=new-client-form] button.btn-primary");
+    await adm.waitForSelector("[data-testid=credentials]");
+    const password = (await adm.textContent("[data-testid=new-password]")).trim();
+    check("dashboard shows a generated password once", /^\S{4}-\S{4}-\S{4}$/.test(password), password);
+    await ashot("F04-admin-credentials-ar", "Credentials + ready-to-send WhatsApp message");
+    await adm.click("[data-testid=credentials] button.btn:not(.btn-primary)");
+    await adm.waitForSelector("[data-testid=client-detail]");
+    check("client detail shows 50 available", (await adm.textContent("[data-testid=available]")).trim() === "50");
+    await ashot("F05-admin-client-detail-ar", "Client detail: balance, packs with expiry, history");
+
+    // --- the client in the plugin
+    const p = await open({ width: 320 });
+    await p.locator("input[type=text]").first().fill(client);
+    await p.locator("input[type=password]").fill(password);
+    await click(p, "Sign in");
+    await p.waitForSelector(".ez-stepper");
+    await p.waitForTimeout(400);
+    check("plugin header shows 50 credits", /50/.test(await p.locator(".ez-chip").textContent()));
+    await p.locator(".ez-chip").click();
+    await p.waitForTimeout(500);
+    await shot(p, "F06-plugin-account-expiry-320-dark", "Plugin account: credits and their expiry date");
+    check("plugin shows the expiry of the 50 credits", /50 credits · expire/.test(await p.locator(".ez-content").textContent()));
+    await click(p, "Close");
+    await setupDesign(p, { sheet: "products.csv" });
+    await click(p, "Next");
+    await chooseOutput(p, "Elzoz output F");
+    await click(p, "Next");
+    await btn(p, "Generate 3").click();
+    await waitForResults(p);
+    let acct = await account(client);
+    check("client job charged 3 of 50", Number(acct.balance.balance) === 47, acct.balance);
+
+    // --- top-up from the dashboard
+    await adm.reload(); // the page is in the URL, so a refresh stays on this client
+    await adm.waitForSelector("[data-testid=client-detail]");
+    check("refresh keeps the client page open (URL hash)", /#\/clients\/[0-9a-f-]{36}$/.test(adm.url()), adm.url());
+    // Search from the list still finds the client.
+    await adm.click("text=العملاء >> nth=0");
+    await adm.fill("input[type=search]", client.slice(0, 12));
+    await adm.waitForTimeout(600);
+    await adm.click(`text=${client}`);
+    await adm.waitForSelector("[data-testid=client-detail]");
+    check("dashboard sees the 3 charges", (await adm.textContent("[data-testid=available]")).trim() === "47");
+    const topUp = adm.locator("form.card").first();
+    await topUp.locator("input").nth(0).fill("100");
+    await topUp.locator("input").nth(1).fill("60");
+    await topUp.locator("input").nth(2).fill("تجديد الاشتراك");
+    await topUp.locator("button").click();
+    await adm.waitForFunction(() => document.querySelector("[data-testid=available]").textContent.trim() === "147");
+    await ashot("F07-admin-after-topup-ar", "After a 100-credit, 60-day top-up: two packs with different expiry");
+    acct = await account(client);
+    check("top-up recorded once as a 100-credit pack valid 60 days", acct.lots.length === 2 && Number(acct.lots[1].amount) === 100 && Math.round((new Date(acct.lots[1].expires_at) - Date.now()) / 86400000) === 60, acct.lots);
+
+    // --- the first pack expires
+    const exp = await post("/__e2e/expire-oldest-lot", { email: client });
+    await p.locator(".ez-chip").click();
+    await p.waitForTimeout(600);
+    check("after expiry the plugin shows only the 100 valid credits", /100/.test(await p.locator(".ez-chip").textContent()) && !/47 credits/.test(await p.locator(".ez-content").textContent()), exp);
+    await shot(p, "F08-plugin-after-expiry-320-dark", "Plugin after the first pack expired");
+    await adm.reload();
+    await adm.waitForSelector("[data-testid=client-detail]");
+    const ledgerText = await adm.textContent("[data-testid=ledger]");
+    check("dashboard history shows the expiry", /انتهاء صلاحية/.test(ledgerText));
+    await ashot("F09-admin-expiry-history-ar", "History with charges, top-up and the expiry entry");
+
+    // --- password reset and disable
+    await adm.click("text=تغيير كلمة المرور");
+    await adm.waitForSelector("[data-testid=credentials]");
+    const newPassword = (await adm.textContent("[data-testid=new-password]")).trim();
+    const oldLogin = await post("/auth/v1/token?grant_type=password", { email: client, password });
+    const newLogin = await post("/auth/v1/token?grant_type=password", { email: client, password: newPassword });
+    check("reset: old password refused, new password works", !oldLogin.access_token && !!newLogin.access_token);
+    await adm.click("[data-testid=credentials] button.btn:not(.btn-primary)");
+    await adm.click("text=إيقاف الحساب");
+    await adm.waitForSelector("text=تفعيل الحساب");
+    await ashot("F10-admin-disabled-ar", "Account disabled");
+    const q = await open({ width: 320 });
+    await q.locator("input[type=text]").first().fill(client);
+    await q.locator("input[type=password]").fill(newPassword);
+    current.faultsInjected = true; // the refused sign-in (400) is expected
+    await click(q, "Sign in");
+    await q.waitForSelector(".ez-alert-error");
+    current.faultsInjected = false;
+    check("disabled client sees a clear message in the plugin", /disabled/.test(await q.locator(".ez-alert-error").textContent()));
+    await shot(q, "F11-plugin-disabled-320-dark", "Plugin: disabled account message with WhatsApp contact");
+    await q.ctx.close();
+    await adm.click("text=تفعيل الحساب");
+    await adm.waitForSelector("text=إيقاف الحساب");
+
+    // --- overview, English, mobile
+    await adm.click("text=English");
+    await adm.click("text=Overview");
+    await adm.waitForSelector(".stat");
+    await ashot("F12-admin-overview-en", "Overview (English)");
+    await adm.click("text=Settings");
+    await adm.waitForSelector("text=Prices");
+    await ashot("F13-admin-settings-en", "Settings: prices per design and per 5 s of video");
+    await finishRecording(adm, "SIMULATED-scenario-F-admin-dashboard", "Scenario F: admin dashboard selling cycle (real DB; Auth admin API stubbed)");
+    await p.ctx.close();
+
+    const m = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    const mob = await m.newPage();
+    await mob.goto(`${ORIGIN}/admin/`);
+    await mob.fill("input[type=email]", adminEmail);
+    await mob.fill("input[type=password]", "owner pass 123");
+    await mob.click("button.btn-primary");
+    await mob.waitForSelector("table");
+    await mob.screenshot({ path: path.join(SHOTS, "F14-admin-clients-mobile-ar.png"), fullPage: true });
+    report.screenshots.push({ file: "F14-admin-clients-mobile-ar.png", title: "Clients list on a phone (390 px, Arabic)", scenario: "F", width: 390, theme: "system-light", lang: "ar", layoutProblems: [] });
+    const overflow = await mob.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+    check("dashboard fits a 390 px phone without horizontal scrolling", !overflow);
+    await mob.click(`text=${client}`);
+    await mob.waitForSelector("[data-testid=client-detail]");
+    await mob.screenshot({ path: path.join(SHOTS, "F15-admin-client-mobile-ar.png"), fullPage: true });
+    report.screenshots.push({ file: "F15-admin-client-mobile-ar.png", title: "Client detail on a phone (390 px, Arabic)", scenario: "F", width: 390, theme: "system-light", lang: "ar", layoutProblems: [] });
+    await m.close();
+
+    // --- a non-admin can't use the dashboard
+    const n = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const np = await n.newPage();
+    await np.goto(`${ORIGIN}/admin/`);
+    await np.fill("input[type=email]", client);
+    await np.fill("input[type=password]", newPassword);
+    await np.click("button.btn-primary");
+    await np.waitForSelector(".alert-error");
+    check("a client can't sign in to the dashboard", /ليس أدمن/.test(await np.textContent(".alert-error")));
+    await n.close();
 });
 
 const btnText = (hasChange, a, b) => (hasChange ? a : b);

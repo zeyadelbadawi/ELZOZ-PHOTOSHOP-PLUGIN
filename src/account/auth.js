@@ -54,6 +54,7 @@ export function createAuthClient({ url, anonKey, fetchImpl = globalThis.fetch, s
             const raw = String(data.error_code || data.error || data.code || "");
             const msg = String(data.error_description || data.msg || data.message || "");
             if (res.status === 429) throw new AuthError("rate_limited", "Too many attempts. Wait a minute and try again.");
+            if (/user_banned|banned/i.test(raw + msg + String(data.error_code || ""))) throw new AuthError("account_disabled", "This account is disabled. Contact us to reactivate it.");
             if (/email_not_confirmed/i.test(raw + msg)) throw new AuthError("email_not_confirmed", "Confirm your email address first (check your inbox).");
             if (raw === "invalid_grant" || /invalid_credentials|Invalid login credentials/i.test(raw + msg)) {
                 throw new AuthError("invalid_credentials", "Email or password is incorrect.");
@@ -130,9 +131,6 @@ export function createAuthClient({ url, anonKey, fetchImpl = globalThis.fetch, s
         async getAccessToken({ forceRefresh = false } = {}) {
             if (!forceRefresh && session && session.expiresAt - SKEW_SECONDS * 1000 > now()) return session.accessToken;
             return (await refresh()).accessToken;
-        },
-        async requestPasswordReset(email) {
-            await call("/recover", { email: String(email).trim() });
         },
         async signOut() {
             const token = session && session.accessToken;

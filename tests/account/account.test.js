@@ -45,6 +45,8 @@ describe("auth client", () => {
         await expect(auth({ error: "invalid_grant", error_description: "Invalid login credentials" }).signIn("a", "b")).rejects.toMatchObject({ code: "invalid_credentials" });
         await expect(auth({ error_code: "email_not_confirmed", msg: "Email not confirmed" }).signIn("a", "b")).rejects.toMatchObject({ code: "email_not_confirmed" });
         await expect(auth({}, 429).signIn("a", "b")).rejects.toMatchObject({ code: "rate_limited" });
+        // Supabase Auth's answer for an account the seller disabled (ban_duration)
+        await expect(auth({ code: 400, error_code: "user_banned", msg: "User is banned" }).signIn("a", "b")).rejects.toMatchObject({ code: "account_disabled", message: expect.stringMatching(/disabled/) });
     });
 
     it("refreshes an expiring token once even when asked concurrently (rotation-safe)", async () => {
@@ -121,9 +123,26 @@ describe("credits client", () => {
         expect(fetchImpl.mock.calls[1][1].headers.Authorization).toBe("Bearer fresh");
     });
 
-    it("reads the balance from the server", async () => {
-        const credits = createCreditsClient({ url: URL_, anonKey: ANON, auth, fetchImpl: async () => json(200, [{ balance: "10", reserved: "3" }]) });
-        expect(await credits.getAccount()).toEqual({ balance: 10, reserved: 3, available: 7 });
+    it("reads balance and credit expiry from my_credits (expired credits already removed server-side)", async () => {
+        const calls = [];
+        const credits = createCreditsClient({
+            url: URL_,
+            anonKey: ANON,
+            auth,
+            fetchImpl: async (u, init) => {
+                calls.push([u, init.method]);
+                return json(200, { balance: 10, reserved: 3, available: 7, disabled: false, lots: [{ remaining: 4, expires_at: "2026-11-01T00:00:00Z" }, { remaining: 6, expires_at: "2026-12-01T00:00:00Z" }] });
+            }
+        });
+        expect(await credits.getAccount()).toEqual({
+            balance: 10,
+            reserved: 3,
+            available: 7,
+            disabled: false,
+            lots: [{ remaining: 4, expiresAt: "2026-11-01T00:00:00Z" }, { remaining: 6, expiresAt: "2026-12-01T00:00:00Z" }],
+            nextExpiry: { remaining: 4, expiresAt: "2026-11-01T00:00:00Z" }
+        });
+        expect(calls).toEqual([[`${URL_}/rest/v1/rpc/my_credits`, "POST"]]);
     });
 });
 

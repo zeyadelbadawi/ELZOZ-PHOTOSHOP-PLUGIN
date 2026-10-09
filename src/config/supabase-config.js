@@ -8,8 +8,9 @@ export const supabaseConfig = {
     anonKey: __ELZOZ_SUPABASE_ANON_KEY__
 };
 
-// Public website for sign-up, password pages and buying credits (optional).
-export const websiteUrl = __ELZOZ_WEBSITE_URL__;
+// Where clients contact the seller for an account, a top-up or a new password
+// (accounts are created by the seller in the admin dashboard; there is no self sign-up).
+export const contactUrl = __ELZOZ_CONTACT_URL__;
 
 export function validateSupabaseConfig() {
     if (!supabaseConfig.url || !supabaseConfig.anonKey) {

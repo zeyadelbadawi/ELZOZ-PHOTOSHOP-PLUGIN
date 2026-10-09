@@ -14,3 +14,6 @@ test-artifacts/outputs/e2e/scenario-c/*
 !test-artifacts/outputs/e2e/scenario-c/elzoz_1.mov
 test-artifacts/reports/e2e-results-*.json
 dist-qa/
+admin/node_modules/
+admin/dist/
+admin/dist-e2e/

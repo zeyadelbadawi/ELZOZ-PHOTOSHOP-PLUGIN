@@ -249,6 +249,8 @@ body {
 .ez-mr2 { margin-right: var(--ez-s2); }
 .ez-ml2 { margin-left: var(--ez-s2); }
 .ez-mt1 { margin-top: var(--ez-s1); }
+.ez-mb1 { margin-bottom: var(--ez-s1); }
+.ez-text-warning { color: var(--ez-warning); }
 .ez-mt2 { margin-top: var(--ez-s2); }
 .ez-mt3 { margin-top: var(--ez-s3); }
 .ez-mb2 { margin-bottom: var(--ez-s2); }

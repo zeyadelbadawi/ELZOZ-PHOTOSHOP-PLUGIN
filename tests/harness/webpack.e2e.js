@@ -27,7 +27,7 @@ module.exports = {
         new webpack.DefinePlugin({
             __ELZOZ_SUPABASE_URL__: JSON.stringify(origin),
             __ELZOZ_SUPABASE_ANON_KEY__: JSON.stringify(process.env.ELZOZ_E2E_ANON_KEY),
-            __ELZOZ_WEBSITE_URL__: JSON.stringify("https://example.test/elzoz"),
+            __ELZOZ_CONTACT_URL__: JSON.stringify("https://wa.me/201000000000"),
             __ELZOZ_DEV__: "false"
         }),
         {

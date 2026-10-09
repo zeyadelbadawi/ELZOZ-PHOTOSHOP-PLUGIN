@@ -34,10 +34,12 @@ module.exports = (env, argv) => {
     const isProd = argv.mode === "production";
     // `--env noServer` (QA kit): ignore .env and the environment; no server is configured.
     const fileEnv = env && env.noServer ? {} : readEnvFile(path.resolve(__dirname, ".env"));
-    if (env && env.noServer) for (const k of ["ELZOZ_SUPABASE_URL", "ELZOZ_SUPABASE_ANON_KEY", "ELZOZ_WEBSITE_URL"]) delete process.env[k];
+    if (env && env.noServer) for (const k of ["ELZOZ_SUPABASE_URL", "ELZOZ_SUPABASE_ANON_KEY", "ELZOZ_CONTACT_URL"]) delete process.env[k];
     const supabaseUrl = process.env.ELZOZ_SUPABASE_URL || fileEnv.ELZOZ_SUPABASE_URL || "";
     const supabaseAnonKey = process.env.ELZOZ_SUPABASE_ANON_KEY || fileEnv.ELZOZ_SUPABASE_ANON_KEY || "";
-    const websiteUrl = process.env.ELZOZ_WEBSITE_URL || fileEnv.ELZOZ_WEBSITE_URL || "";
+    // Where clients ask for an account, a top-up or a new password (e.g. https://wa.me/201xxxxxxxxx).
+    const contactUrl = process.env.ELZOZ_CONTACT_URL || fileEnv.ELZOZ_CONTACT_URL || "";
+    if (contactUrl && !/^https:\/\//.test(contactUrl)) throw new Error("ELZOZ_CONTACT_URL must start with https:// (e.g. https://wa.me/201xxxxxxxxx).");
     assertPublicKey(supabaseAnonKey);
 
     return {
@@ -87,7 +89,7 @@ module.exports = (env, argv) => {
             new webpack.DefinePlugin({
                 __ELZOZ_SUPABASE_URL__: JSON.stringify(supabaseUrl),
                 __ELZOZ_SUPABASE_ANON_KEY__: JSON.stringify(supabaseAnonKey),
-                __ELZOZ_WEBSITE_URL__: JSON.stringify(websiteUrl),
+                __ELZOZ_CONTACT_URL__: JSON.stringify(contactUrl),
                 __ELZOZ_DEV__: JSON.stringify(!isProd)
             }),
             new CopyPlugin(

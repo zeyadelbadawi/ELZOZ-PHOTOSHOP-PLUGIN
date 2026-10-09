@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Field, TextInput } from "../../ui/components.jsx";
-import { websiteUrl } from "../../config/supabase-config.js";
+import { contactUrl } from "../../config/supabase-config.js";
 
 export default function SignIn() {
     const { services, signIn, enterDevMode, session } = useApp();
@@ -11,30 +11,15 @@ export default function SignIn() {
     const [password, setPassword] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(session.error);
-    const [notice, setNotice] = useState(null);
 
     const submit = async () => {
         setBusy(true);
         setError(null);
-        setNotice(null);
         try {
             await signIn(email, password);
         } catch (e) {
             setError(e.message);
             setBusy(false);
-        }
-    };
-
-    const reset = async () => {
-        if (!email) {
-            setError(t("signin.email"));
-            return;
-        }
-        try {
-            await services.auth.requestPasswordReset(email);
-            setNotice(t("signin.resetSent", { email }));
-        } catch (e) {
-            setError(e.message);
         }
     };
 
@@ -67,7 +52,6 @@ export default function SignIn() {
                 ) : (
                     <>
                         {error && <Alert tone="error">{error}</Alert>}
-                        {notice && <Alert tone="success">{notice}</Alert>}
                         <Field label={t("signin.email")}>
                             <TextInput value={email} onChange={setEmail} placeholder="name@company.com" />
                         </Field>
@@ -77,20 +61,16 @@ export default function SignIn() {
                         <Button variant="cta" onClick={submit} disabled={busy || !email || !password}>
                             {busy ? t("signin.working") : t("signin.submit")}
                         </Button>
-                        <div className="ez-mt3">
-                            <Button quiet onClick={reset}>
-                                {t("signin.forgot")}
-                            </Button>
-                        </div>
-                        <div className="ez-small ez-muted ez-mt3">
-                            {websiteUrl ? (
-                                <span className="ez-link" onClick={() => services.openExternal(websiteUrl)}>
-                                    {t("signin.noAccount")}
-                                </span>
-                            ) : (
-                                t("signin.noAccount")
-                            )}
-                        </div>
+                        {/* Accounts, top-ups and new passwords come from the seller (admin dashboard). */}
+                        <div className="ez-small ez-muted ez-mt3">{t("signin.noAccount")}</div>
+                        <div className="ez-small ez-muted ez-mt1">{t("signin.forgot")}</div>
+                        {contactUrl && (
+                            <div className="ez-mt2">
+                                <Button quiet onClick={() => services.openExternal(contactUrl)}>
+                                    {t("signin.contact")}
+                                </Button>
+                            </div>
+                        )}
                     </>
                 )}
             </div>

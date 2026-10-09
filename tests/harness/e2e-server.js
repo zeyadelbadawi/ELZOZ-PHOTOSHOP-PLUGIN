@@ -225,6 +225,12 @@ async function control(req, res, url) {
         }));
         return send(res, 200, out);
     }
+    if (url.pathname === "/__e2e/expire-oldest-lot" && req.method === "POST") {
+        // Time travel for tests: make the user's soonest-expiring open lot expire now.
+        const u = users.get(String(body.email).toLowerCase());
+        const r = await db((c) => c.query("update public.credit_lots set expires_at = now() - interval '1 second' where id = (select id from public.credit_lots where user_id = $1 and remaining > 0 order by expires_at, id limit 1) returning remaining", [u.id]));
+        return send(res, 200, { expired: r.rows[0] ? Number(r.rows[0].remaining) : 0 });
+    }
     if (url.pathname === "/__e2e/fault" && req.method === "POST") {
         faults.push({ match: body.match, mode: body.mode, status: body.status || 503, remaining: body.count || 1 });
         return send(res, 200, { ok: true });
