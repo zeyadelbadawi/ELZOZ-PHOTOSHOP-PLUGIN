@@ -63,7 +63,7 @@ export default function MapStep() {
                 <div className="ez-grow">
                     <div className="ez-title">{t("map.title")}</div>
                 </div>
-                <Button quiet onClick={() => set(autoMap(mapping, data.table.headers, template.layers))}>
+                <Button quiet onClick={() => set(autoMap(mapping, data.table.headers, template.layers, data.table.rows))}>
                     {t("map.auto")}
                 </Button>
             </div>

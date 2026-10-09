@@ -61,6 +61,15 @@ describe("mapping", () => {
         expect(Object.keys(m.text).sort()).toEqual(["3", "4", "6"]);
         expect(m.images[5]).toMatchObject({ column: "Photo", fit: "fit", ignoreCase: true });
     });
+    it("does not auto-map an image layer to a column of plain text when rows are given (regression)", () => {
+        const withBadge = [...headers, { key: "Badge", label: "Badge" }];
+        const badgeLayers = [...layers, { id: 77, name: "Badge", kind: "pixel", path: ["Badge"] }];
+        const rows = [{ values: { Photo: "a.jpg", Badge: "NEW" } }, { values: { Photo: "phone", Badge: "" } }];
+        const m = autoMap(createMapping(), withBadge, badgeLayers, rows);
+        expect(m.images[77]).toBeUndefined();
+        expect(m.images[5]).toMatchObject({ column: "Photo" });
+        expect(autoMap(createMapping(), withBadge, badgeLayers).images[77]).toMatchObject({ column: "Badge" });
+    });
     it("lets one column feed several layers and removes immutably", () => {
         let m = setTextMapping(createMapping(), 3, "Name");
         m = setTextMapping(m, 6, "Name");

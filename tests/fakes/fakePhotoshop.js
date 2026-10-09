@@ -4,6 +4,8 @@
 // batchPlay file arguments are session tokens) so contract tests can check
 // call order and invariants. It is NOT evidence that Photoshop behaves this way.
 
+import { imageInfo } from "./imageInfo.js";
+
 let nextId = 1000;
 
 /** A structurally valid JPEG (SOI, COM with payload, SOF0 with size, EOI). Not decodable pixels. */
@@ -29,8 +31,9 @@ class FakeFile {
         this.isFolder = false;
         this.nativePath = `${folder.nativePath}/${name}`;
         this.size = 0;
-        this.bytes = null;
-        this.image = meta.image || null; // {width, height} for image fixtures
+        this.bytes = meta.bytes || null;
+        // {width, height}: given explicitly, or read from real image bytes (null = not decodable)
+        this.image = meta.image || (meta.bytes ? imageInfo(meta.bytes) : null);
     }
     async read() {
         if (!this.folder.files.has(this.name)) throw new Error("not found");
@@ -67,7 +70,7 @@ export class FakeFolder {
         this.failWrites = false;
         for (const [fname, meta] of Object.entries(files)) {
             const f = new FakeFile(this, fname, meta);
-            f.size = meta.size ?? 1000;
+            f.size = meta.bytes ? meta.bytes.length : meta.size ?? 1000;
             this.files.set(fname, f);
         }
     }
@@ -109,6 +112,12 @@ class FakeLayer {
         this.locked = false;
         this.b = { ...(spec.bounds || { left: 0, top: 0, right: 100, bottom: 100 }) };
         this.content = spec.content ?? null;
+        this.embedded = spec.embedded ?? null;
+        this.pixels = spec.pixels ?? null;
+        this.fontSize = spec.fontSize ?? null;
+        this.color = spec.color ?? null;
+        // Text scales with its box: remember the designed box height.
+        this.baseHeight = spec.baseHeight ?? this.b.bottom - this.b.top;
         this.layers = spec.layers ? spec.layers.map((s) => new FakeLayer(doc, s)) : null;
         if (spec.kind === "text") {
             const layer = this;
@@ -125,6 +134,9 @@ class FakeLayer {
                 };
             }
         }
+    }
+    scaleFactor() {
+        return this.baseHeight > 0 ? (this.b.bottom - this.b.top) / this.baseHeight : 1;
     }
     get boundsNoEffects() {
         return { ...this.b };
@@ -150,6 +162,11 @@ class FakeLayer {
             opacity: this.opacity,
             bounds: { ...this.b },
             content: this.content,
+            embedded: this.embedded,
+            pixels: this.pixels,
+            fontSize: this.fontSize,
+            color: this.color,
+            baseHeight: this.baseHeight,
             text: this._text,
             layers: this.layers ? this.layers.map((l) => l.toSpec(keepIds)) : undefined
         };
@@ -181,7 +198,14 @@ class FakeDocument {
                 env.jpgCount = (env.jpgCount || 0) + (fmt === "jpg" ? 1 : 0);
                 if (fmt === "jpg" && env.failJpgAt && env.jpgCount === env.failJpgAt) throw new Error("Photoshop could not save the JPEG");
                 entry.snapshot = doc.serialize(); // what the file "contains"
-                if (fmt === "jpg") {
+                if ((fmt === "jpg" || fmt === "png") && env.render) {
+                    entry.bytes = await env.render(doc, fmt);
+                    if (env.wrongFrameSize) entry.bytes = fakeJpeg(doc.width + 2, doc.height, "");
+                    entry.size = env.zeroByteFormats.includes(fmt) ? 0 : entry.bytes.length;
+                } else if (fmt === "psd" && env.writePsd) {
+                    entry.bytes = env.writePsd(doc);
+                    entry.size = env.zeroByteFormats.includes(fmt) ? 0 : entry.bytes.length;
+                } else if (fmt === "jpg") {
                     entry.bytes = fakeJpeg(env.wrongFrameSize ? doc.width + 2 : doc.width, doc.height, entry.snapshot);
                     entry.size = entry.bytes.length;
                 } else {
@@ -275,9 +299,12 @@ class FakeDocument {
  * @param {object} cfg
  * @param {string} cfg.version         Photoshop version string
  * @param {object} cfg.templates       { nativePath: {title, layers:[spec]} }
+ * @param {Function} [cfg.loadTemplate] async (entry) -> spec, e.g. from a real PSD via psdTemplate.js
  */
 export function createFakeHost(cfg = {}) {
     const env = {
+        render: cfg.render || null, // async (doc, "jpg"|"png") -> Uint8Array (browser canvas renderer)
+        writePsd: cfg.writePsd || null, // (doc) -> Uint8Array (ag-psd writer)
         calls: [],
         modalDepth: 0,
         domText: cfg.domText ?? true,
@@ -293,14 +320,15 @@ export function createFakeHost(cfg = {}) {
         documents: [],
         async open(entry) {
             if (!env.modalDepth) throw new Error("test: open outside modal");
-            const spec = cfg.templates[entry.nativePath];
-            if (!spec) throw new Error("no such template");
+            const spec = (cfg.templates && cfg.templates[entry.nativePath]) || (cfg.loadTemplate && (await cfg.loadTemplate(entry)));
+            if (!spec) throw new Error("Could not open the document because the file is not a valid Photoshop document.");
             const doc = new FakeDocument(env, { ...spec, path: entry.nativePath, layers: spec.layers });
             app.documents.push(doc);
             env.calls.push({ op: "open", doc: doc.id });
             return doc;
         }
     };
+    Object.defineProperty(app, "activeDocument", { get: () => app.documents[app.documents.length - 1] || null });
     env.app = app;
 
     let progressCalls = 0;
@@ -347,7 +375,7 @@ export function createFakeHost(cfg = {}) {
                         out.push({ _obj: "error", result: -25920, message: "The command “Replace Contents” is not currently available." });
                         continue;
                     }
-                    if (env.failReplace.has(file.name)) throw new Error("Could not complete the Replace Contents command because the file is not compatible.");
+                    if (env.failReplace.has(file.name) || !file.image) throw new Error("Could not complete the Replace Contents command because the file is not compatible.");
                     // Replace keeps the transform; content size follows the image.
                     const cx = (layer.b.left + layer.b.right) / 2;
                     const cy = (layer.b.top + layer.b.bottom) / 2;
@@ -356,6 +384,7 @@ export function createFakeHost(cfg = {}) {
                     out.push({});
                 } else if (d._obj === "placeEvent") {
                     const file = env.tokens.get(d.null._path);
+                    if (!file || !file.image || env.failReplace.has(file.name)) throw new Error("Could not complete the Place command because the file is not compatible.");
                     const target = doc.activeLayers[0];
                     const placed = new FakeLayer(doc, {
                         name: file.name,

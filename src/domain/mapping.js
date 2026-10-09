@@ -2,6 +2,7 @@
 // Keyed by template layer id, so one column can feed many layers and
 // duplicate layer names are unambiguous.
 import { isImageLayer, isTextLayer } from "./layers.js";
+import { IMAGE_EXTENSIONS, extensionOf } from "./imageFiles.js";
 
 export const EMPTY_POLICIES = ["blank", "keepTemplate", "skipRow"];
 export const FIT_MODES = ["fit", "fill", "none"];
@@ -41,14 +42,19 @@ export function mappedCount(mapping) {
 const normalize = (s) => String(s).toLowerCase().replace(/[\s_\-.]+/g, "");
 
 /** Map layers whose names match a header (case/space/underscore-insensitive). Existing mappings win. */
-export function autoMap(mapping, headers, layers) {
+export function autoMap(mapping, headers, layers, rows = null) {
     const byNorm = new Map(headers.map((h) => [normalize(h.label), h.key]));
+    // With rows, an image layer is only auto-mapped to a column that holds at
+    // least one image file name; a text column ("Badge": "NEW") that happens to
+    // share a layer's name would otherwise skip every row as "image not found".
+    const holdsFiles = (column) =>
+        !rows || rows.some((r) => r.values && IMAGE_EXTENSIONS.includes(extensionOf(String(r.values[column] || "").trim())));
     let next = mapping;
     for (const layer of layers) {
         const column = byNorm.get(normalize(layer.name));
         if (!column) continue;
         if (isTextLayer(layer) && !next.text[layer.id]) next = setTextMapping(next, layer.id, column);
-        else if (isImageLayer(layer) && !next.images[layer.id]) next = setImageMapping(next, layer.id, { column });
+        else if (isImageLayer(layer) && !next.images[layer.id] && holdsFiles(column)) next = setImageMapping(next, layer.id, { column });
     }
     return next;
 }
