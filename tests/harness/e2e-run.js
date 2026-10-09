@@ -168,7 +168,10 @@ async function saveOutputs(page, outName, dir) {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir, { recursive: true });
     const names = await page.evaluate((o) => window.__harness.outputNames(o), outName);
-    for (const n of names) fs.writeFileSync(path.join(dir, n), Buffer.from(await page.evaluate(([o, f]) => window.__harness.outputBase64(o, f), [outName, n]), "base64"));
+    for (const n of names) {
+        fs.mkdirSync(path.dirname(path.join(dir, n)), { recursive: true });
+        fs.writeFileSync(path.join(dir, n), Buffer.from(await page.evaluate(([o, f]) => window.__harness.outputBase64(o, f), [outName, n]), "base64"));
+    }
     return names;
 }
 async function finishRecording(page, name, title) {
@@ -673,6 +676,73 @@ scenario("F", "Selling cycle: admin dashboard creates a client, client works in 
     await np.waitForSelector(".alert-error");
     check("a client can't sign in to the dashboard", /ليس أدمن/.test(await np.textContent(".alert-error")));
     await n.close();
+});
+
+scenario("G", "Designer features: show/hide by column, shrink-to-fit, row selection, subfolders, output size, free preview, remembered mapping", async () => {
+    const email = `scenario-g-${RUN}@e2e.test`;
+    await post("/__e2e/users", { email, password: "correct horse", credits: 50 });
+    const p = await open({ width: 320, height: 760, record: true });
+    await signIn(p, email);
+    await setupDesign(p, { sheet: "products-valid.xlsx" });
+    // shrink-to-fit on Description, show/hide the Badge layer from the Badge column
+    await layerRow(p, "Description").locator('label:has-text("Shrink long text") input').check();
+    await p.evaluate(() => document.querySelector(".ez-content").scrollTo(0, 99999));
+    const picker = p.locator(".ez-section").filter({ hasText: "Show / hide layers" }).locator("select").last();
+    const badgeOption = await picker.locator("option", { hasText: /^Badge/ }).first().getAttribute("value");
+    await picker.selectOption(badgeOption);
+    await p.locator('sp-button:has-text("Add")').last().click();
+    await p.waitForTimeout(200);
+    await shot(p, "G01-map-show-hide-320-dark", "Map: show/hide a layer from a column + shrink-to-fit", { scroll: 99999 });
+    await click(p, "Next");
+    await chooseOutput(p, "Elzoz output G");
+    await p.locator('label:has-text("PSD") input').check();
+    const inputs = p.locator(".ez-content .ez-input");
+    await inputs.nth(1).fill("{Badge}/{row}_{Name}"); // file names (nth(0) is JPEG quality)
+    await inputs.nth(2).fill("2-5");
+    await inputs.nth(3).fill("540");
+    await p.waitForTimeout(200);
+    await shot(p, "G02-check-rows-folders-size-320-dark", "Check: subfolders, rows 2-5, 540 px output", { scroll: 200 });
+    const info = await p.locator(".ez-alert").filter({ hasText: "Generating 4 of 8 rows" }).count();
+    check("Check says only 4 of 8 rows will be generated (and charged)", info === 1);
+    await p.evaluate(() => document.querySelector(".ez-content").scrollTo(0, 99999));
+    await p.locator(".ez-section").filter({ hasText: "Preview a row" }).locator("select").selectOption("row-3");
+    await click(p, "Preview");
+    await p.waitForSelector(".ez-preview-img", { timeout: 30000 });
+    const previewSize = await p.evaluate(() => {
+        const img = document.querySelector(".ez-preview-img");
+        return [img.naturalWidth, img.naturalHeight];
+    });
+    check("free preview is low resolution (≤ 640 px) and costs nothing", previewSize[0] <= 640 && previewSize[1] <= 640, previewSize);
+    await shot(p, "G03-check-free-preview-320-dark", "Check: free low-resolution preview of row 3", { scroll: 99999 });
+    let acct = await account(email);
+    check("preview charged nothing", Number(acct.balance.balance) === 50);
+    await click(p, "Next");
+    await btn(p, "Generate 4").click();
+    await waitForResults(p);
+    await shot(p, "G04-results-subfolders-320-dark", "Results: files in subfolders per Badge value");
+    const dir = path.join(OUTS, "scenario-g");
+    const names = await saveOutputs(p, "Elzoz output G", dir);
+    check("outputs sorted into subfolders by the Badge column", JSON.stringify(names.filter((n) => n.endsWith(".jpg")).sort()) === JSON.stringify(["4_Orbit Watch.jpg", "HOT/2_Pulse Phone X.jpg", "NEW/1_Aurora Laptop 14.jpg", "SALE/3_Echo Headphones.jpg"]), names);
+    const imgs = {};
+    for (const sub of ["", "HOT", "NEW", "SALE"]) Object.assign(imgs, ...Object.entries(imageSummary(path.join(dir, sub))).map(([k, v]) => ({ [`${sub}/${k}`]: v })));
+    check("every JPG is 540×675", Object.values(imgs).length === 4 && Object.values(imgs).every((v) => v[1] === 540 && v[2] === 675), imgs);
+    const vis = JSON.parse(execFileSync("python3", ["-c", "import json,sys,os\nfrom psd_tools import PSDImage\nout={}\nfor root,_,fs in os.walk(sys.argv[1]):\n  for n in fs:\n    if n.endswith('.psd'):\n      p=PSDImage.open(os.path.join(root,n))\n      out[os.path.relpath(os.path.join(root,n),sys.argv[1])]=[l.visible for l in p.descendants() if l.name=='Badge'][0]\nprint(json.dumps(out))", dir]).toString());
+    check("Badge layer visible only where the sheet has a badge (psd-tools)", vis["NEW/1_Aurora Laptop 14.psd"] === true && vis["SALE/3_Echo Headphones.psd"] === true && vis["4_Orbit Watch.psd"] === false, vis);
+    acct = await account(email);
+    check("4 rows charged", Number(acct.balance.balance) === 46, acct.balance);
+    // A new job with the same template restores the mapping.
+    await click(p, "New job");
+    await queue(p, { file: "spreadsheets/products-valid.xlsx" });
+    await click(p, "Choose file");
+    await click(p, "Next");
+    await queue(p, { file: "templates/product-card-1080x1350.psd" });
+    await click(p, "Choose PSD");
+    await page_wait(p);
+    await click(p, "Next");
+    const restored = await p.locator(".ez-alert").filter({ hasText: "Restored the mapping" }).count();
+    check("mapping restored for the same template", restored === 1);
+    await shot(p, "G05-map-restored-320-dark", "Map: last mapping restored for this template");
+    await finishRecording(p, "SIMULATED-scenario-G-designer-features", "Scenario G: designer features (simulated host)");
 });
 
 const btnText = (hasChange, a, b) => (hasChange ? a : b);

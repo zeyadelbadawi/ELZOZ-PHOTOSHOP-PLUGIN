@@ -3,7 +3,8 @@ import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, Checkbox, Field, FileField, KindIcon, Section, Select } from "../../ui/components.jsx";
 import { isImageLayer, isTextLayer } from "../../domain/layers.js";
-import { autoMap, mappedCount, setImageMapping, setTextMapping } from "../../domain/mapping.js";
+import { autoMap, createMapping, mappedCount, setImageMapping, setTextMapping, setTextOptions, setVisibilityMapping } from "../../domain/mapping.js";
+import { VISIBILITY_EMPTY } from "../../domain/visibility.js";
 
 function LayerRow({ layer, rule, columns, firstRow, onColumn, children }) {
     const { t } = useI18n();
@@ -70,6 +71,18 @@ export default function MapStep() {
             <div className="ez-subtitle">
                 {t("map.subtitle")} {mappedCount(mapping) > 0 && <span className="ez-strong">{t("map.count", { n: mappedCount(mapping) })}</span>}
             </div>
+            {state.restoredMapping && (
+                <Alert
+                    tone="info"
+                    action={
+                        <Button quiet onClick={() => dispatch({ type: "mapping", mapping: createMapping(), clearRestored: true })}>
+                            {t("map.startFresh")}
+                        </Button>
+                    }
+                >
+                    {t("map.restored")}
+                </Alert>
+            )}
             {textLayers.length + imageLayers.length === 0 && <Alert tone="warning">{t("map.noLayers")}</Alert>}
 
             {textLayers.length > 0 && (
@@ -82,6 +95,7 @@ export default function MapStep() {
                                     <Field label={t("map.empty")}>
                                         <Select value={rule && rule.emptyPolicy} options={emptyOptions} onChange={(v) => set(setTextMapping(mapping, layer.id, rule.column, v))} />
                                     </Field>
+                                    <Checkbox checked={rule && rule.shrinkToFit} onChange={(v) => set(setTextOptions(mapping, layer.id, { shrinkToFit: v }))} label={t("map.shrink")} />
                                 </LayerRow>
                             );
                         })}
@@ -121,6 +135,70 @@ export default function MapStep() {
                     </Card>
                 </Section>
             )}
+
+            <VisibilitySection layers={template.layers} mapping={mapping} columns={columns} set={set} />
         </>
+    );
+}
+
+/** Show/hide any layer or group from a column ("Badge" column: NEW = show, empty = hide). */
+function VisibilitySection({ layers, mapping, columns, set }) {
+    const { t } = useI18n();
+    const rules = Object.values(mapping.visibility || {});
+    const usable = layers.filter((l) => !l.locked && !(mapping.visibility || {})[l.id]);
+    const [adding, setAdding] = React.useState("");
+    const label = (l) => (l.path.length > 1 ? `${l.name} (${l.path.slice(0, -1).join(" / ")})` : l.name);
+    const emptyOptions = VISIBILITY_EMPTY.map((v) => ({ value: v, label: t(`map.vis.empty.${v}`) }));
+    return (
+        <Section title={t("map.vis.title")}>
+            <div className="ez-small ez-muted ez-mb2">{t("map.vis.hint")}</div>
+            {rules.length > 0 && (
+                <Card>
+                    {rules.map((rule) => {
+                        const layer = layers.find((l) => l.id === rule.layerId);
+                        return (
+                            <div key={rule.layerId} className="ez-layer">
+                                <div className="ez-layer-main">
+                                    <KindIcon kind={layer ? layer.kind : "pixel"} />
+                                    <div className="ez-layer-name">
+                                        <div className="ez-ellipsis">{layer ? layer.name : "?"}</div>
+                                        {layer && layer.path.length > 1 && <div className="ez-small ez-muted ez-ellipsis">{layer.path.slice(0, -1).join(" / ")}</div>}
+                                    </div>
+                                    <div className="ez-layer-picker">
+                                        <Select value={rule.column} options={columns} onChange={(c) => set(setVisibilityMapping(mapping, rule.layerId, c, rule.emptyPolicy))} />
+                                    </div>
+                                </div>
+                                <div className="ez-layer-extra ez-row">
+                                    <div className="ez-grow ez-mr2">
+                                        <Field label={t("map.empty")}>
+                                            <Select value={rule.emptyPolicy} options={emptyOptions} onChange={(v) => set(setVisibilityMapping(mapping, rule.layerId, rule.column, v))} />
+                                        </Field>
+                                    </div>
+                                    <Button quiet onClick={() => set(setVisibilityMapping(mapping, rule.layerId, null))}>
+                                        {t("map.vis.remove")}
+                                    </Button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </Card>
+            )}
+            <div className="ez-row">
+                <div className="ez-grow ez-mr2">
+                    <Select value={adding} placeholder={t("map.vis.pick")} options={usable.map((l) => ({ value: String(l.id), label: label(l) }))} onChange={setAdding} />
+                </div>
+                <Button
+                    disabled={!adding || !columns.length}
+                    onClick={() => {
+                        const layer = layers.find((l) => String(l.id) === adding);
+                        const byName = columns.find((c) => c.value.toLowerCase() === layer.name.toLowerCase());
+                        set(setVisibilityMapping(mapping, layer.id, (byName || columns[0]).value));
+                        setAdding("");
+                    }}
+                >
+                    {t("map.vis.add")}
+                </Button>
+            </div>
+        </Section>
     );
 }

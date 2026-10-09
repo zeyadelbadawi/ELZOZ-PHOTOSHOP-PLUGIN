@@ -8,14 +8,29 @@ export const EMPTY_POLICIES = ["blank", "keepTemplate", "skipRow"];
 export const FIT_MODES = ["fit", "fill", "none"];
 
 export function createMapping() {
-    return { text: {}, images: {} };
+    return { text: {}, images: {}, visibility: {} };
 }
 
 export function setTextMapping(mapping, layerId, column, emptyPolicy = "blank") {
     const text = { ...mapping.text };
     if (!column) delete text[layerId];
-    else text[layerId] = { layerId, column, emptyPolicy };
+    else text[layerId] = { layerId, column, emptyPolicy, shrinkToFit: !!(mapping.text[layerId] && mapping.text[layerId].shrinkToFit) };
     return { ...mapping, text };
+}
+
+/** Text options other than the column, e.g. { shrinkToFit: true }. */
+export function setTextOptions(mapping, layerId, patch) {
+    const rule = mapping.text[layerId];
+    if (!rule) return mapping;
+    return { ...mapping, text: { ...mapping.text, [layerId]: { ...rule, ...patch } } };
+}
+
+/** Show/hide any layer (or group) from a column. emptyPolicy: "hide" | "show" | "keep". */
+export function setVisibilityMapping(mapping, layerId, column, emptyPolicy = "hide") {
+    const visibility = { ...(mapping.visibility || {}) };
+    if (!column) delete visibility[layerId];
+    else visibility[layerId] = { layerId, column, emptyPolicy };
+    return { ...mapping, visibility };
 }
 
 export function setImageMapping(mapping, layerId, rule) {
@@ -36,7 +51,7 @@ export function setImageMapping(mapping, layerId, rule) {
 }
 
 export function mappedCount(mapping) {
-    return Object.keys(mapping.text).length + Object.keys(mapping.images).length;
+    return Object.keys(mapping.text).length + Object.keys(mapping.images).length + Object.keys(mapping.visibility || {}).length;
 }
 
 const normalize = (s) => String(s).toLowerCase().replace(/[\s_\-.]+/g, "");
@@ -66,6 +81,7 @@ export function pruneMapping(mapping, headers, layers) {
     const keep = (rule) => columns.has(rule.column) && ids.has(rule.layerId);
     return {
         text: Object.fromEntries(Object.entries(mapping.text).filter(([, r]) => keep(r))),
-        images: Object.fromEntries(Object.entries(mapping.images).filter(([, r]) => keep(r)))
+        images: Object.fromEntries(Object.entries(mapping.images).filter(([, r]) => keep(r))),
+        visibility: Object.fromEntries(Object.entries(mapping.visibility || {}).filter(([, r]) => keep(r)))
     };
 }

@@ -81,6 +81,6 @@ describe("mapping", () => {
         let m = setTextMapping(createMapping(), 3, "Name");
         m = setImageMapping(m, 99, { column: "Photo" });
         m = setTextMapping(m, 4, "Gone");
-        expect(pruneMapping(m, headers, layers)).toEqual({ text: { 3: m.text[3] }, images: {} });
+        expect(pruneMapping(m, headers, layers)).toEqual({ text: { 3: m.text[3] }, images: {}, visibility: {} });
     });
 });

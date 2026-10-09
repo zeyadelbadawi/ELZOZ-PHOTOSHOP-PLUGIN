@@ -64,8 +64,10 @@ export async function runVideoJob({ port, billing, template, templateLayers, pla
                         await session.applyItem(planItem, folders);
                         const rowState = session.snapshot();
                         const baseOpacity = session.readOpacity(animatedIds);
+                        // baseName may contain subfolders ("Shoes/12_Name"), created on demand.
+                        const target = await port.outputTarget(output.entry, planItem.baseName);
                         frameFolder = options.keepFrames
-                            ? await output.entry.createFolder(`${planItem.baseName}_frames`)
+                            ? await target.folder.createFolder(`${target.name}_frames`)
                             : await port.createTempFolder(`elzoz-${job.jobId}-${i}`);
 
                         const frames = [];
@@ -78,7 +80,7 @@ export async function runVideoJob({ port, billing, template, templateLayers, pla
                             ctx.progress(done / totalFrames, `Video ${i + 1} of ${items.length} · frame ${f + 1} of ${tl.frameCount}`);
                             onEvent({ type: "frame", index: i, frame: f + 1, frames: tl.frameCount });
                         }
-                        const movie = await port.writeMovie({ folder: output.entry, name: `${planItem.baseName}.mov`, frames, width: tl.width, height: tl.height, fps: tl.fps });
+                        const movie = await port.writeMovie({ folder: target.folder, name: `${target.name}.mov`, frames, width: tl.width, height: tl.height, fps: tl.fps });
                         state.files = [{ format: "mov", ...movie }];
                         state.status = ITEM.succeeded;
                     } catch (e) {

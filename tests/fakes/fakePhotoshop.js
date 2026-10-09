@@ -131,10 +131,19 @@ class FakeLayer {
                     set contents(v) {
                         if (doc.env.rejectText) return; // simulate Photoshop ignoring the write
                         layer._text = v;
+                        layer.reflow();
                     }
                 };
             }
         }
+    }
+    /** Point text: width follows the content (left edge fixed), like left-aligned Photoshop text. */
+    reflow() {
+        if (this.kind !== "text" || !this.doc.env.textReflow) return;
+        const h = this.b.bottom - this.b.top;
+        const charW = (this.fontSize ? this.fontSize * this.scaleFactor() : h) * 0.55;
+        const longest = Math.max(1, ...String(this._text).split(/\r|\n/).map((l) => l.length));
+        this.b = { ...this.b, right: this.b.left + longest * charW };
     }
     scaleFactor() {
         return this.baseHeight > 0 ? (this.b.bottom - this.b.top) / this.baseHeight : 1;
@@ -229,7 +238,8 @@ class FakeDocument {
         const build = (spec) => {
             const layer = existing.get(spec.id) || new FakeLayer(this, spec);
             layer.name = spec.name;
-            layer.visible = spec.visible;
+            // Photoshop's default: layer visibility changes are not undoable (History Options).
+            if (this.env.visibilityUndoable) layer.visible = spec.visible;
             layer.opacity = spec.opacity;
             layer.b = { ...spec.bounds };
             layer.content = spec.content;
@@ -282,6 +292,10 @@ class FakeDocument {
         for (const l of this.allLayers()) l.b = { left: l.b.left * fx, top: l.b.top * fy, right: l.b.right * fx, bottom: l.b.bottom * fy };
         this.width = width;
         this.height = height;
+        // Like Photoshop: Image Size is one history state.
+        this.history = this.history.slice(0, this.historyIndex + 1);
+        this.history.push(this.serialize());
+        this.historyIndex = this.history.length - 1;
         this.env.calls.push({ op: "resizeImage", doc: this.id, width, height });
     }
     async save() {
@@ -309,6 +323,8 @@ export function createFakeHost(cfg = {}) {
         calls: [],
         modalDepth: 0,
         domText: cfg.domText ?? true,
+        textReflow: cfg.textReflow ?? false, // opt-in: text width follows its content
+        visibilityUndoable: cfg.visibilityUndoable ?? false,
         rejectText: false,
         failFormats: [],
         zeroByteFormats: [],
@@ -366,7 +382,9 @@ export function createFakeHost(cfg = {}) {
                     doc.activeLayers = [doc.findLayer(d._target[0]._id)];
                     out.push({});
                 } else if (d._obj === "set" && d._target[0]._ref === "textLayer") {
-                    doc.findLayer(d._target[0]._id)._text = d.to.textKey;
+                    const tl = doc.findLayer(d._target[0]._id);
+                    tl._text = d.to.textKey;
+                    tl.reflow();
                     out.push({});
                 } else if (d._obj === "placedLayerReplaceContents") {
                     const file = env.tokens.get(d.null._path);

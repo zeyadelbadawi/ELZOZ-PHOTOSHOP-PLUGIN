@@ -10,7 +10,7 @@
 // In Photoshop this is the evidence that the integration works; in the test
 // simulator it only proves the self-test itself is wired correctly.
 import { readTable, readWorkbook } from "../domain/excel.js";
-import { autoMap, createMapping, setImageMapping } from "../domain/mapping.js";
+import { autoMap, createMapping, setImageMapping, setTextOptions, setVisibilityMapping } from "../domain/mapping.js";
 import { buildFolderIndex } from "../domain/imageFiles.js";
 import { runPreflight } from "../domain/preflight.js";
 import { runVideoPreflight } from "../domain/video/preflight.js";
@@ -64,7 +64,9 @@ export async function runSelfTest({ photoshop, uxp, port, kit, onStep = () => {}
             "Open the 3 JPG/PNG files: product photo and logo sit inside their frames, text is the row's text (including the Arabic row), nothing is cut off unexpectedly.",
             "Open one PSD: layers are intact and editable; the Smart Objects contain the row's images.",
             "Play the MOV in QuickTime or VLC: 2 s, text slides up, photo slowly zooms.",
-            "Photoshop's History panel for the template shows no Elzoz changes, and the template file was not saved."
+            "Photoshop's History panel for the template shows no Elzoz changes, and the template file was not saved.",
+            "features/: the files in NEW/ and HOT/ show the yellow badge; features/4_Orbit Watch.jpg (no badge in the sheet) has none.",
+            "features/: every image is 540 px wide; long descriptions are scaled down to fit their original width."
         ]
     };
     const ctx = {};
@@ -171,6 +173,44 @@ export async function runSelfTest({ photoshop, uxp, port, kit, onStep = () => {}
                 checked.push({ name: f.name, bytes: bytes.length });
             }
             return checked;
+        });
+    }
+
+    if (ctx.info && ctx.table && ctx.out) {
+        await step("features", "Show/hide by column, shrink-to-fit, rows, subfolders and output size", async () => {
+            const byPath = (p) => ctx.info.layers.find((l) => l.path.join("/") === p);
+            let mapping = mapFor(ctx.info.layers);
+            mapping = setVisibilityMapping(mapping, byPath("Card/Badge").id, "Badge", "hide");
+            mapping = setTextOptions(mapping, byPath("Card/Text/Description").id, { shrinkToFit: true });
+            const features = await ctx.out.createFolder("features");
+            const plan = runPreflight({
+                table: ctx.table,
+                layers: ctx.info.layers,
+                mapping,
+                folders: planFolders(),
+                output: { name: features.name, existingFileNames: [] },
+                formats: ["jpg"],
+                namePattern: "{Badge}/{row}_{Name}",
+                rowSelection: "2-3, 5",
+                outputWidth: 540,
+                templateSize: { width: ctx.info.width, height: ctx.info.height },
+                pricing: { unitPrice: 1 },
+                balance: null
+            });
+            need(plan.ok, `preflight blocked: ${plan.blocking.map((b) => b.message).join("; ")}`);
+            need(plan.items.length === 3, `row selection gave ${plan.items.length} rows`);
+            const result = await runDesignJob({ port, billing: createDevBilling(), template: { entry: ctx.card }, templateLayers: ctx.info.layers, plan, folders: jobFolders(), output: { entry: features } });
+            const failed = result.items.filter((i) => i.status !== "succeeded");
+            need(!failed.length, failed.map((i) => `row ${i.sourceRow}: ${i.error ? `${i.error.step}: ${i.error.message}` : i.status}`).join("; "));
+            const checked = [];
+            for (const it of plan.items) {
+                const target = await port.outputTarget(features, it.baseName);
+                const bytes = toU8(await (await target.folder.getEntry(`${target.name}.jpg`)).read({ format: binary }));
+                const info = imageInfo(bytes);
+                need(info && info.width === 540 && info.height === 675, `${it.baseName}.jpg is ${info ? `${info.width}x${info.height}` : "unreadable"}`);
+                checked.push(`${it.baseName}.jpg`);
+            }
+            return { files: checked };
         });
     }
 

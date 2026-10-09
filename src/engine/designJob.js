@@ -54,7 +54,8 @@ export async function runDesignJob({ port, billing, template, templateLayers, pl
     let cancelled = false;
     try {
         await port.runModal("Elzoz: generating designs", async (ctx) => {
-            const session = await port.openWorkingCopy(template, templateLayers);
+            // Optional output size: the working copy is resized once, before any row is applied.
+            const session = await port.openWorkingCopy(template, templateLayers, { resizeTo: plan.outputSize || null });
             try {
                 for (let i = 0; i < plan.items.length; i++) {
                     if (ctx.isCancelled() || signal.cancelled) {

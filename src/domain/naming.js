@@ -29,17 +29,41 @@ export function sanitizeFileName(name) {
     return s;
 }
 
+export const MAX_FOLDER_DEPTH = 3;
+
+/**
+ * Render a pattern for one row. A "/" in the PATTERN makes subfolders
+ * ("{Category}/{row}_{Name}"); a "/" inside a cell value is sanitized like any
+ * other illegal character, so data can never create folders by itself.
+ * Empty folder segments (an empty cell) are dropped.
+ */
 export function renderName(pattern, row, { total }) {
     const width = String(Math.max(total, 1)).length;
     const byLabel = {};
     for (const [k, v] of Object.entries(row.values)) byLabel[k] = v;
-    const rendered = String(pattern || DEFAULT_PATTERN).replace(/\{([^{}]+)\}/g, (_, token) => {
-        if (token === "row") return String(row.index + 1).padStart(width, "0");
-        if (token === "sheetRow") return String(row.sourceRow);
-        return byLabel[token] !== undefined ? String(byLabel[token]) : "";
-    });
-    const safe = sanitizeFileName(rendered);
-    return safe === "_" ? `design_${String(row.index + 1).padStart(width, "0")}` : safe;
+    const renderSegment = (seg) =>
+        seg.replace(/\{([^{}]+)\}/g, (_, token) => {
+            if (token === "row") return String(row.index + 1).padStart(width, "0");
+            if (token === "sheetRow") return String(row.sourceRow);
+            return byLabel[token] !== undefined ? String(byLabel[token]) : "";
+        });
+    const segments = String(pattern || DEFAULT_PATTERN).split("/");
+    const fileSeg = segments.pop();
+    const folders = segments
+        .map((seg) => renderSegment(seg))
+        .filter((v) => v.trim() !== "")
+        .map((v) => sanitizeFileName(v))
+        .slice(0, MAX_FOLDER_DEPTH);
+    const rendered = renderSegment(fileSeg);
+    let safe = sanitizeFileName(rendered);
+    if (safe === "_") safe = `design_${String(row.index + 1).padStart(width, "0")}`;
+    return [...folders, safe].join("/");
+}
+
+/** "Shoes/Red/12_Name" -> { folders: ["Shoes", "Red"], name: "12_Name" } */
+export function splitOutputPath(baseName) {
+    const parts = String(baseName).split("/");
+    return { folders: parts.slice(0, -1), name: parts[parts.length - 1] };
 }
 
 /**

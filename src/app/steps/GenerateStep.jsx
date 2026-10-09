@@ -4,7 +4,7 @@ import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, ProgressBar, Section, Stat } from "../../ui/components.jsx";
 import { runDesignJob, summarize } from "../../engine/designJob.js";
 import { runVideoJob } from "../../engine/videoJob.js";
-import { computePlan, reportCsv, retryKeys, runProgress, subsetPlan } from "../state.js";
+import { computePlan, rememberMapping, reportCsv, retryKeys, runProgress, subsetPlan } from "../state.js";
 
 const CONFIRM_ABOVE = 50;
 
@@ -26,6 +26,11 @@ export default function GenerateStep() {
         setNotice(null);
         signal.current = { cancelled: false };
         dispatch({ type: "run-start", total: thePlan.items.length, plan: thePlan });
+        try {
+            rememberMapping(window.localStorage, state.template, state.mapping);
+        } catch (e) {
+            /* storage unavailable: memory is a convenience only */
+        }
         const args = {
             port: services.port,
             billing: services.billing({ dev: session.dev }),

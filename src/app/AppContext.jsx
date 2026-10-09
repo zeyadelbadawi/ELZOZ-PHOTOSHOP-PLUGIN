@@ -22,7 +22,7 @@ export function AppProvider({ services, children }) {
     // Remember preferences (never files, tokens or data).
     useEffect(() => {
         try {
-            localStorage.setItem(SAVE_KEY, JSON.stringify({ mode: state.mode, settings: state.settings, video: { ...state.video, tracks: {} } }));
+            localStorage.setItem(SAVE_KEY, JSON.stringify({ mode: state.mode, settings: { ...state.settings, rowSelection: "" }, video: { ...state.video, tracks: {} } }));
         } catch (e) {
             /* storage unavailable */
         }

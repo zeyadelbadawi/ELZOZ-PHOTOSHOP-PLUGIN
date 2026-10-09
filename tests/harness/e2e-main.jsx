@@ -122,9 +122,17 @@ window.__harness = {
         file.image = (await import("../fakes/imageInfo.js")).imageInfo(bytes);
         allFiles.set(name, file);
     },
-    outputNames: (out) => [...((outputs.get(out) || { files: new Map() }).files.keys())],
+    outputNames: (out) => {
+        // Relative paths, including subfolders ("NEW/1_Name.jpg").
+        const walk = (f, prefix) => [...f.files.keys()].map((n) => prefix + n).concat(...[...(f.folders ? f.folders.entries() : [])].map(([n, sub]) => walk(sub, `${prefix}${n}/`)));
+        const root = outputs.get(out);
+        return root ? walk(root, "") : [];
+    },
     async outputBase64(out, name) {
-        const b = outputs.get(out).files.get(name).bytes;
+        let f = outputs.get(out);
+        const parts = name.split("/");
+        for (const seg of parts.slice(0, -1)) f = f.folders.get(seg);
+        const b = f.files.get(parts[parts.length - 1]).bytes;
         let s = "";
         for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
         return btoa(s);

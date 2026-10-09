@@ -5,6 +5,8 @@ import { findLayer, isImageLayer, isTextLayer, displayPath, summarizeTemplate } 
 import { resolveImage } from "./imageFiles.js";
 import { dedupeNames, renderName, validatePattern } from "./naming.js";
 import { mappedCount } from "./mapping.js";
+import { parseRowSelection, rowSelected } from "./rows.js";
+import { visibilityFor } from "./visibility.js";
 
 export const FORMATS = ["jpg", "png", "psd"];
 
@@ -28,7 +30,7 @@ export function resolveRow(row, mapping, folders) {
             text.push({ layerId: rule.layerId, value: "" });
             continue;
         }
-        text.push({ layerId: rule.layerId, value: String(value) });
+        text.push({ layerId: rule.layerId, value: String(value), ...(rule.shrinkToFit ? { shrink: true } : {}) });
     }
 
     for (const rule of Object.values(mapping.images)) {
@@ -51,7 +53,13 @@ export function resolveRow(row, mapping, folders) {
         images.push({ layerId: rule.layerId, folderKey: rule.folderKey, file: res.file, fit: rule.fit });
     }
 
-    return { text, images, problems, notes };
+    const visibility = [];
+    for (const rule of Object.values(mapping.visibility || {})) {
+        const visible = visibilityFor(row.values[rule.column], rule.emptyPolicy);
+        if (visible !== null) visibility.push({ layerId: rule.layerId, visible });
+    }
+
+    return { text, images, visibility, problems, notes };
 }
 
 const PROBLEM_TEXT = {
@@ -76,9 +84,12 @@ const PROBLEM_TEXT = {
  * @param {number|null} input.balance     available credits (null = unknown)
  * @param {string[]} [input.allowedFormats] defaults to the design formats
  * @param {number} [input.unitsPerItem]     credit units per item (video: per started 5 s)
+ * @param {string} [input.rowSelection]     "" = all rows, or e.g. "2-10, 15" (spreadsheet row numbers)
+ * @param {number|null} [input.outputWidth] resize designs to this width (keeps the aspect ratio)
+ * @param {{width, height}} [input.templateSize]
  */
 export function runPreflight(input) {
-    const { table, layers, mapping, folders = {}, output, formats = [], namePattern, pricing, balance = null, allowedFormats = FORMATS, unitsPerItem = 1 } = input;
+    const { table, layers, mapping, folders = {}, output, formats = [], namePattern, pricing, balance = null, allowedFormats = FORMATS, unitsPerItem = 1, rowSelection = "", outputWidth = null, templateSize = null } = input;
     const blocking = [];
     const warnings = [];
 
@@ -92,6 +103,17 @@ export function runPreflight(input) {
     if (!fmts.length) blocking.push(issue("error", "no_format", "Select at least one output format.", { fix: { step: "generate" } }));
     const unknownTokens = table ? validatePattern(namePattern, table.headers) : [];
     if (unknownTokens.length) blocking.push(issue("error", "bad_pattern", `Unknown name token(s): ${unknownTokens.map((t) => `{${t}}`).join(", ")}`, { fix: { step: "generate" } }));
+    const selection = parseRowSelection(rowSelection);
+    if (!selection.ok) blocking.push(issue("error", "bad_rows", `Row selection "${selection.error}" isn't valid. Use spreadsheet row numbers like 2-10, 15.`, { fix: { step: "generate" } }));
+    let outputSize = null;
+    if (outputWidth !== null && outputWidth !== undefined && outputWidth !== "") {
+        const w = Number(outputWidth);
+        if (!Number.isInteger(w) || w < 16 || w > 10000) blocking.push(issue("error", "bad_size", "Output width must be a whole number between 16 and 10000 px.", { fix: { step: "generate" } }));
+        else if (templateSize && templateSize.width > 0) {
+            outputSize = { width: w, height: Math.max(1, Math.round((w * templateSize.height) / templateSize.width)) };
+            if (w > templateSize.width) warnings.push(issue("warning", "upscale", `Output is larger than the template (${templateSize.width} px wide); images may look soft.`, { fix: { step: "generate" } }));
+        }
+    }
 
     if (blocking.length) return { ok: false, blocking, warnings, items: [], skipped: [], units: 0, cost: 0 };
 
@@ -110,6 +132,11 @@ export function runPreflight(input) {
         if (!columns.has(rule.column)) blocking.push(issue("error", "column_missing", `Column "${rule.column}" is not in the spreadsheet.`, { fix: { step: "map", layerId: rule.layerId } }));
         if (!rule.folderKey || !folders[rule.folderKey]) blocking.push(issue("error", "folder_missing", `Choose an image folder for "${layer ? displayPath(layer) : rule.column}".`, { fix: { step: "map", layerId: rule.layerId } }));
     }
+    for (const rule of Object.values(mapping.visibility || {})) {
+        const layer = findLayer(layers, rule.layerId);
+        if (!layer) blocking.push(issue("error", "layer_missing", `A layer used for show/hide no longer exists in the template.`, { fix: { step: "map", layerId: rule.layerId } }));
+        if (!columns.has(rule.column)) blocking.push(issue("error", "column_missing", `Column "${rule.column}" is not in the spreadsheet.`, { fix: { step: "map", layerId: rule.layerId } }));
+    }
     const mappedIds = new Set([...Object.keys(mapping.text), ...Object.keys(mapping.images)].map(Number));
     for (const dup of summarizeTemplate(layers).duplicateNames) {
         if (dup.layers.some((l) => mappedIds.has(l.id))) {
@@ -124,7 +151,12 @@ export function runPreflight(input) {
     const grouped = new Map(); // code|column -> {problem, rows}
     const ambiguous = new Map();
     const dataRows = table.rows.filter((r) => !r.isEmpty);
-    for (const row of dataRows) {
+    const chosenRows = dataRows.filter((r) => rowSelected(selection, r.sourceRow));
+    if (!selection.all) {
+        if (!chosenRows.length) blocking.push(issue("error", "no_rows_selected", "No data rows match the row selection.", { fix: { step: "generate" } }));
+        else warnings.push(issue("info", "rows_selected", `Generating ${chosenRows.length} of ${dataRows.length} rows (${String(rowSelection).trim()}).`, { fix: { step: "generate" } }));
+    }
+    for (const row of chosenRows) {
         const res = resolveRow(row, mapping, folders);
         for (const n of res.notes) {
             const k = `${n.column}`;
@@ -142,7 +174,7 @@ export function runPreflight(input) {
             }
             continue;
         }
-        items.push({ key: `row-${row.sourceRow}`, index: row.index, sourceRow: row.sourceRow, text: res.text, images: res.images, row });
+        items.push({ key: `row-${row.sourceRow}`, index: row.index, sourceRow: row.sourceRow, text: res.text, images: res.images, visibility: res.visibility, row });
     }
     for (const { problem, rows } of grouped.values()) {
         const describe = PROBLEM_TEXT[problem.code] || (() => problem.code);
@@ -166,8 +198,8 @@ export function runPreflight(input) {
     // --- Cost --------------------------------------------------------------------
     const units = items.length;
     const cost = units * unitsPerItem * (pricing?.unitPrice ?? 1);
-    if (!units) blocking.push(issue("error", "nothing_to_generate", "Every row has a problem, so nothing can be generated.", { fix: { step: "map" } }));
+    if (!units && !blocking.some((b) => b.code === "no_rows_selected")) blocking.push(issue("error", "nothing_to_generate", "Every row has a problem, so nothing can be generated.", { fix: { step: "map" } }));
     if (balance !== null && balance < cost) blocking.push(issue("error", "insufficient_credits", `This job needs ${cost} credits; ${balance} available.`, { fix: { step: "account" } }));
 
-    return { ok: blocking.length === 0, blocking, warnings, items, skipped, units, cost, formats: fmts };
+    return { ok: blocking.length === 0, blocking, warnings, items, skipped, units, cost, formats: fmts, outputSize };
 }

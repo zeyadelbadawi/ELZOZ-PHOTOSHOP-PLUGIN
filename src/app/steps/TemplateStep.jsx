@@ -1,5 +1,14 @@
 import React, { useState } from "react";
 import { useApp } from "../AppContext.jsx";
+import { recallMapping } from "../state.js";
+
+const storage = () => {
+    try {
+        return window.localStorage;
+    } catch (e) {
+        return null;
+    }
+};
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, FileField, Section, Stat } from "../../ui/components.jsx";
 import { summarizeTemplate } from "../../domain/layers.js";
@@ -17,7 +26,12 @@ export default function TemplateStep() {
         setError(null);
         try {
             const result = await fn();
-            if (result) dispatch({ type: "template", template: result });
+            if (result) {
+                dispatch({ type: "template", template: result });
+                // Offer the mapping last used with this template (folders are picked again).
+                const recalled = state.data ? recallMapping(storage(), result, state.data.table.headers) : null;
+                if (recalled) dispatch({ type: "mapping", mapping: recalled, restored: true });
+            }
             else if (fn === services.useActiveDocument) setError(t("template.noActive"));
         } catch (e) {
             setError(t("error.generic", { message: e.message }));

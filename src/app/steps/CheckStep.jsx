@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
-import { Alert, Button, Card, Checkbox, Field, FileField, NumberInput, Section, Stat, TextInput } from "../../ui/components.jsx";
-import { computePlan } from "../state.js";
+import { Alert, Button, Card, Checkbox, Field, FileField, NumberInput, Section, Select, Stat, TextInput } from "../../ui/components.jsx";
+import { computePlan, previewPlan } from "../state.js";
 
 const rowsText = (rows) => (rows.length > 8 ? `${rows.slice(0, 8).join(", ")} … (+${rows.length - 8})` : rows.join(", "));
 
@@ -63,6 +63,18 @@ export default function CheckStep() {
                     <Field label={t("check.pattern")} hint={t("check.patternHint")}>
                         <TextInput value={state.settings.namePattern} onChange={(v) => setSettings({ namePattern: v })} />
                     </Field>
+                    <Field label={t("check.rowsField")} hint={t("check.rowsHint")}>
+                        <TextInput value={state.settings.rowSelection} placeholder={t("check.rowsAll")} onChange={(v) => setSettings({ rowSelection: v })} />
+                    </Field>
+                    {!video && state.template && (
+                        <Field label={t("check.width")} hint={t("check.widthHint", { w: state.template.width, h: state.template.height })}>
+                            <TextInput
+                                value={state.settings.outputWidth == null ? "" : String(state.settings.outputWidth)}
+                                placeholder={t("check.widthOriginal")}
+                                onChange={(v) => setSettings({ outputWidth: v.trim() === "" ? null : /^\d+$/.test(v.trim()) ? Number(v.trim()) : v })}
+                            />
+                        </Field>
+                    )}
                 </Card>
             </Section>
 
@@ -112,6 +124,50 @@ export default function CheckStep() {
                     </Card>
                 </Section>
             )}
+
+            {!video && <DesignPreview />}
         </>
+    );
+}
+
+/** Free, low-resolution preview of any row before spending credits. */
+function DesignPreview() {
+    const { state, services } = useApp();
+    const { t } = useI18n();
+    const plan = useMemo(() => previewPlan(state), [state.data, state.template, state.mapping, state.folders, state.settings]); // eslint-disable-line react-hooks/exhaustive-deps
+    const [key, setKey] = useState("");
+    const [preview, setPreview] = useState({ busy: false, url: null, error: null });
+    if (!plan.items || !plan.items.length) return null;
+    const item = plan.items.find((i) => i.key === key) || plan.items[0];
+    const run = async () => {
+        setPreview({ busy: true, url: null, error: null });
+        try {
+            const template = state.template;
+            const r = await services.previewDesign({
+                template: { ref: template.entry ? { entry: template.entry } : { documentId: template.documentId }, width: template.width, height: template.height },
+                layers: template.layers,
+                item,
+                folders: Object.fromEntries(Object.entries(state.folders).map(([k, f]) => [k, { name: f.name, entry: f.entry }])),
+                outputSize: plan.outputSize
+            });
+            setPreview({ busy: false, url: r.url, error: null });
+        } catch (e) {
+            setPreview({ busy: false, url: null, error: e.message });
+        }
+    };
+    return (
+        <Section title={t("check.preview")}>
+            <div className="ez-row ez-mb2">
+                <div className="ez-grow ez-mr2">
+                    <Select value={item.key} onChange={setKey} options={plan.items.map((i) => ({ value: i.key, label: `${t("gen.row", { row: i.sourceRow })} · ${i.baseName}` }))} />
+                </div>
+                <Button onClick={run} disabled={preview.busy}>
+                    {preview.busy ? "…" : t("check.previewBtn")}
+                </Button>
+            </div>
+            {preview.error && <Alert tone="error">{preview.error}</Alert>}
+            {preview.url && <img className="ez-preview-img" src={preview.url} alt="" />}
+            <div className="ez-small ez-muted ez-mt1">{t("check.previewNote")}</div>
+        </Section>
     );
 }

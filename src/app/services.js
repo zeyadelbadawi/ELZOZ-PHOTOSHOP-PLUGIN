@@ -24,6 +24,8 @@ export function base64(bytes) {
     return out;
 }
 
+export const PREVIEW_MAX = 640;
+
 export function createServices({ photoshop, uxp }) {
     const port = createPhotoshopPort({ photoshop, uxp });
     const fs = uxp.storage.localFileSystem;
@@ -107,6 +109,30 @@ export function createServices({ photoshop, uxp }) {
             const file = await output.entry.createFile(fileName, { overwrite: false });
             await file.write(text);
             return file.name;
+        },
+
+        /**
+         * Free preview of one design row: rendered on a temporary copy at most
+         * PREVIEW_MAX px on the long edge (low resolution on purpose, so a preview
+         * can't replace a paid export). Returns a data URL.
+         */
+        async previewDesign({ template, layers, item, folders, outputSize }) {
+            return port.runModal("Elzoz: preview", async () => {
+                const base = outputSize || { width: template.width, height: template.height };
+                const scale = Math.min(1, PREVIEW_MAX / Math.max(base.width, base.height));
+                const resizeTo = { width: Math.max(1, Math.round(base.width * scale)), height: Math.max(1, Math.round(base.height * scale)) };
+                const session = await port.openWorkingCopy(template.ref, layers, { resizeTo });
+                const temp = await port.createTempFolder(`elzoz-preview-${Date.now()}`);
+                try {
+                    await session.applyItem(item, folders);
+                    const file = await session.exportFrame(temp, "preview.jpg");
+                    const bytes = new Uint8Array(await file.read({ format: binary }));
+                    return { url: `data:image/jpeg;base64,${base64(bytes)}`, width: resizeTo.width, height: resizeTo.height };
+                } finally {
+                    await session.close();
+                    await port.removeFolder(temp);
+                }
+            });
         },
 
         /** Render one frame of row 1 on a temporary copy and return a data URL. */

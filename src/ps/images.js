@@ -10,7 +10,7 @@ import { assertBatchPlayOk, StepError } from "./text.js";
 
 const DONT_DISPLAY = { dialogOptions: "dontDisplay" };
 
-function bounds(layer) {
+export function bounds(layer) {
     const b = layer.boundsNoEffects || layer.bounds;
     const box = { left: Number(b.left), top: Number(b.top), right: Number(b.right), bottom: Number(b.bottom) };
     box.width = box.right - box.left;

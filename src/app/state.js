@@ -8,7 +8,9 @@ export const DESIGN_STEPS = ["data", "template", "map", "check", "generate"];
 export const VIDEO_STEPS = ["data", "template", "map", "animate", "check", "generate"];
 export const stepsFor = (mode) => (mode === "video" ? VIDEO_STEPS : DESIGN_STEPS);
 
-export const initialSettings = { formats: ["jpg"], jpgQuality: 10, namePattern: "elzoz_{row}", keepFrames: false };
+export const initialSettings = { formats: ["jpg"], jpgQuality: 10, namePattern: "elzoz_{row}", keepFrames: false, rowSelection: "", outputWidth: null };
+/** Settings that belong to one job and are not remembered between sessions. */
+export const JOB_ONLY_SETTINGS = ["rowSelection"];
 export const initialVideo = { format: "reel", fps: 30, durationMs: 6000, fadeOutMs: 500, tracks: {} };
 
 export function initialState(saved = {}) {
@@ -20,7 +22,8 @@ export function initialState(saved = {}) {
         mapping: createMapping(),
         folders: {}, // key -> { name, entry, index }
         output: null, // { entry, name, path, existingFileNames }
-        settings: { ...initialSettings, ...(saved.settings || {}) },
+        settings: { ...initialSettings, ...(saved.settings || {}), rowSelection: "" },
+        restoredMapping: false,
         video: { ...initialVideo, ...(saved.video || {}), tracks: {} },
         run: idleRun()
     };
@@ -36,14 +39,14 @@ export function reducer(state, action) {
             return { ...state, step: action.step };
         case "data": {
             const mapping = state.template && action.data ? pruneMapping(state.mapping, action.data.table.headers, state.template.layers) : state.mapping;
-            return { ...state, data: action.data, mapping, run: idleRun() };
+            return { ...state, data: action.data, mapping, settings: { ...state.settings, rowSelection: "" }, run: idleRun() };
         }
         case "template": {
             const mapping = state.data && action.template ? pruneMapping(state.mapping, state.data.table.headers, action.template.layers) : createMapping();
-            return { ...state, template: action.template, mapping, video: { ...state.video, tracks: {} }, run: idleRun() };
+            return { ...state, template: action.template, mapping, restoredMapping: false, video: { ...state.video, tracks: {} }, run: idleRun() };
         }
         case "mapping":
-            return { ...state, mapping: action.mapping };
+            return { ...state, mapping: action.mapping, restoredMapping: action.restored ? true : state.restoredMapping && !action.clearRestored };
         case "folder":
             return { ...state, folders: { ...state.folders, [action.key]: action.folder } };
         case "output":
@@ -110,6 +113,7 @@ export function timelineSpec(state) {
 /** Preflight for the current state (design or video). */
 export function computePlan(state, { balance = null, pricing = {} } = {}) {
     const input = {
+        rowSelection: state.settings.rowSelection,
         table: state.data ? state.data.table : null,
         layers: state.template ? state.template.layers : [],
         mapping: state.mapping,
@@ -128,7 +132,12 @@ export function computePlan(state, { balance = null, pricing = {} } = {}) {
             pricing: { unitPrice: video.price ?? 1, hdLongEdge: video.hd_long_edge, hdMultiplier: video.hd_multiplier }
         });
     }
-    return runPreflight({ ...input, pricing: { unitPrice: (pricing.design && pricing.design.price) ?? 1 } });
+    return runPreflight({
+        ...input,
+        outputWidth: state.settings.outputWidth,
+        templateSize: state.template ? { width: state.template.width, height: state.template.height } : null,
+        pricing: { unitPrice: (pricing.design && pricing.design.price) ?? 1 }
+    });
 }
 
 /**
@@ -183,4 +192,48 @@ export function reportCsv(result) {
         lines.push([it.sourceRow, it.status, (it.files || []).map((f) => f.name).join(" | "), it.error ? it.error.step : "", it.error ? it.error.message : ""].map(esc).join(","));
     }
     return lines.join("\r\n") + "\r\n";
+}
+
+// ---------------------------------------------------------------- mapping memory
+// The last mapping used with a template is remembered (per template name + layer
+// structure) and offered again next time. Folders are not stored: UXP folder
+// access is granted per session, so the user picks them again.
+const MEMORY_KEY = "elzoz.mappings.v1";
+const MEMORY_MAX = 30;
+
+export function templateSignature(template) {
+    const text = `${template.title}|${template.width}x${template.height}|${template.layers.map((l) => `${l.path.join("/")}:${l.kind}`).join(",")}`;
+    let h = 5381;
+    for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) >>> 0;
+    return `${template.title}#${h.toString(36)}`;
+}
+
+function readMemory(storage) {
+    try {
+        return JSON.parse(storage.getItem(MEMORY_KEY) || "{}") || {};
+    } catch (e) {
+        return {};
+    }
+}
+
+export function rememberMapping(storage, template, mapping, now = Date.now()) {
+    if (!storage || !template || mappedCount(mapping) === 0) return;
+    const all = readMemory(storage);
+    const images = Object.fromEntries(Object.entries(mapping.images).map(([id, r]) => [id, { ...r, folderKey: null }]));
+    all[templateSignature(template)] = { text: mapping.text, images, visibility: mapping.visibility || {}, savedAt: now };
+    const keep = Object.entries(all).sort((a, b) => b[1].savedAt - a[1].savedAt).slice(0, MEMORY_MAX);
+    try {
+        storage.setItem(MEMORY_KEY, JSON.stringify(Object.fromEntries(keep)));
+    } catch (e) {
+        /* storage full or unavailable: memory is a convenience only */
+    }
+}
+
+/** The remembered mapping for this template, limited to columns that exist now; null if none. */
+export function recallMapping(storage, template, headers) {
+    if (!storage || !template || !headers) return null;
+    const saved = readMemory(storage)[templateSignature(template)];
+    if (!saved) return null;
+    const mapping = pruneMapping({ text: saved.text || {}, images: saved.images || {}, visibility: saved.visibility || {} }, headers, template.layers);
+    return mappedCount(mapping) > 0 ? mapping : null;
 }

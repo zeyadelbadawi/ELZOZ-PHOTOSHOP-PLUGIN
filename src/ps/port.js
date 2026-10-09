@@ -7,7 +7,9 @@
 import { detectCapabilities } from "./compat.js";
 import { mapLayersByStructure, walkDocument } from "./layerTree.js";
 import { setLayerText, StepError } from "./text.js";
-import { placeImage } from "./images.js";
+import { bounds, placeImage } from "./images.js";
+import { shrinkTextToBox } from "./textFit.js";
+import { splitOutputPath } from "../domain/naming.js";
 import { exportDocument } from "./export.js";
 import { applyFrameState, exportFrame, writeAndVerifyMovie } from "./video.js";
 
@@ -19,6 +21,30 @@ async function asStep(step, layerId, fn) {
         if (e instanceof StepError) throw e;
         throw new StepError(step, e.message || String(e), { layerId });
     }
+}
+
+/** Resolve "Shoes/Red/12_Name" under the output folder, creating missing subfolders. */
+async function outputTarget(root, relPath) {
+    const { folders, name } = splitOutputPath(relPath);
+    let folder = root;
+    for (const seg of folders) {
+        let next = null;
+        try {
+            next = await folder.getEntry(seg);
+        } catch (e) {
+            next = null;
+        }
+        if (next && !next.isFolder) throw new StepError("export", `"${seg}" in the output folder is a file, not a folder.`);
+        if (!next) {
+            try {
+                next = await folder.createFolder(seg);
+            } catch (e) {
+                throw new StepError("export", `Can't create the folder "${seg}": ${e.message}`);
+            }
+        }
+        folder = next;
+    }
+    return { folder, name };
 }
 
 export function createPhotoshopPort({ photoshop, uxp }) {
@@ -61,6 +87,8 @@ export function createPhotoshopPort({ photoshop, uxp }) {
             });
         },
 
+        outputTarget: (root, relPath) => outputTarget(root, relPath),
+
         /** A fresh temporary folder for one item's frames. */
         async createTempFolder(name) {
             const temp = await fs.getTemporaryFolder();
@@ -97,6 +125,10 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 await doc.resizeImage(resizeTo.width, resizeTo.height);
             }
             const layerMap = mapLayersByStructure(templateLayers, doc, constants);
+            // Pristine state of layers a row changes outside History: visibility changes are not
+            // undoable by default in Photoshop (History Options), so reset() restores them itself.
+            const baseVisible = new Map();
+            const baseBox = new Map(); // text box before any row, for shrink-to-fit
             const kinds = new Map(templateLayers.map((l) => [l.id, l.kind]));
             const baseState = doc.activeHistoryState;
 
@@ -113,7 +145,10 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 async applyItem(item, folders) {
                     await doc.suspendHistory(async () => {
                         for (const t of item.text) {
-                            await asStep("text", t.layerId, () => setLayerText({ photoshop, layer: layerFor(t.layerId), value: t.value }));
+                            const layer = layerFor(t.layerId);
+                            if (t.shrink && !baseBox.has(t.layerId)) baseBox.set(t.layerId, bounds(layer));
+                            await asStep("text", t.layerId, () => setLayerText({ photoshop, layer, value: t.value }));
+                            if (t.shrink) await asStep("text", t.layerId, () => shrinkTextToBox({ photoshop, layer, box: baseBox.get(t.layerId) }));
                         }
                         for (const img of item.images) {
                             const folder = folders[img.folderKey];
@@ -125,10 +160,19 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                             }
                             await asStep("image", img.layerId, () => placeImage({ photoshop, fs, doc, layer: layerFor(img.layerId), kind: kinds.get(img.layerId), file, fit: img.fit }));
                         }
+                        for (const v of item.visibility || []) {
+                            const layer = layerFor(v.layerId);
+                            if (!baseVisible.has(v.layerId)) baseVisible.set(v.layerId, !!layer.visible);
+                            await asStep("layer", v.layerId, async () => {
+                                layer.visible = v.visible;
+                            });
+                        }
                     }, "Elzoz: apply row");
                 },
+                /** baseName may contain subfolders ("Shoes/12_Name"); they are created as needed. */
                 async exportItem(folder, baseName, formats, options) {
-                    return exportDocument({ doc, folder, baseName, formats, options });
+                    const target = await outputTarget(folder, baseName);
+                    return exportDocument({ doc, folder: target.folder, baseName: target.name, formats, options });
                 },
                 snapshot() {
                     return doc.activeHistoryState;
@@ -149,6 +193,10 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 /** Back to the untouched duplicate. */
                 async reset() {
                     doc.activeHistoryState = baseState;
+                    for (const [id, visible] of baseVisible) {
+                        const layer = layerFor(id);
+                        if (!!layer.visible !== visible) layer.visible = visible;
+                    }
                 },
                 async close() {
                     try {

@@ -57,7 +57,11 @@ d("developer self-test (on the SIMULATED host)", () => {
         expect(failed).toEqual([]);
         expect(report.passed).toBe(true);
         expect(report.marker).toBe(SELF_TEST_MARKER);
-        expect(seen).toEqual(["kit", "spreadsheet", "integrity-before", "inspect", "design", "outputs", "integrity-after", "video", "integrity-video"]);
+        expect(seen).toEqual(["kit", "spreadsheet", "integrity-before", "inspect", "design", "outputs", "features", "integrity-after", "video", "integrity-video"]);
+        const features = [...kit.folders.values()].find((f) => f.shortName.startsWith("selftest-")).folders.get("features");
+        expect([...features.folders.keys()].sort()).toEqual(["HOT", "NEW"]);
+        expect([...features.folders.get("NEW").files.keys()]).toEqual(["1_Aurora Laptop 14.jpg"]);
+        expect([...features.files.keys()]).toEqual(["4_Orbit Watch.jpg"]); // empty Badge cell: no folder
         const out = [...kit.folders.values()].find((f) => f.shortName.startsWith("selftest-"));
         expect([...out.files.keys()].sort()).toEqual(
             ["1_Aurora Laptop 14", "2_Pulse Phone X", "7_سماعة لاسلكية"].flatMap((b) => ["jpg", "png", "psd"].map((x) => `${b}.${x}`)).concat(["elzoz-selftest-report.json", "video_1.mov"]).sort()

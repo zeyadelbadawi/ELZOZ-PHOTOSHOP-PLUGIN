@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePlan, initialState, previewPlan, reducer, reportCsv, retryKeys, runProgress, stepBlocker, stepsFor, subsetPlan } from "../../src/app/state.js";
+import { computePlan, initialState, previewPlan, recallMapping, rememberMapping, templateSignature, reducer, reportCsv, retryKeys, runProgress, stepBlocker, stepsFor, subsetPlan } from "../../src/app/state.js";
 import { setTextMapping } from "../../src/domain/mapping.js";
 import { buildFolderIndex } from "../../src/domain/imageFiles.js";
 import { sampleLayers } from "../helpers/fixtures.js";
@@ -106,4 +106,43 @@ describe("folder-backed image mapping in state", () => {
         expect(retryKeys(items(["not_started", "not_started"]))).toEqual(["row-2", "row-3"]);
         expect(retryKeys(items(["succeeded"]))).toEqual([]);
     });
+    it("row selection and output width reach the plan; row selection resets with new data and isn't persisted", () => {
+        let s0 = reducer(ready(), { type: "settings", patch: { rowSelection: "3", outputWidth: 540 } });
+        const plan = computePlan(s0);
+        expect(plan.items.map((i) => i.sourceRow)).toEqual([3]);
+        expect(plan.outputSize).toEqual({ width: 540, height: 960 });
+        s0 = reducer(s0, { type: "data", data: s0.data });
+        expect(s0.settings.rowSelection).toBe("");
+        expect(initialState({ settings: { rowSelection: "2-4", outputWidth: 540 } }).settings).toMatchObject({ rowSelection: "", outputWidth: 540 });
+    });
+
+    it("remembers the last mapping per template (without folders) and restores only what still exists", () => {
+        const store = new Map();
+        const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+        const s0 = ready();
+        const withFolder = { ...s0.mapping, images: { 5: { layerId: 5, column: "Photo", folderKey: "f-5", fit: "fit" } } };
+        rememberMapping(storage, s0.template, withFolder);
+        const headers = [...s0.data.table.headers, { key: "Photo", label: "Photo" }];
+        const back = recallMapping(storage, s0.template, headers);
+        expect(back.text).toEqual(s0.mapping.text);
+        expect(back.images[5]).toMatchObject({ column: "Photo", folderKey: null });
+        // A different template (other layers) gets nothing; a sheet without the column drops that rule.
+        const other = { ...s0.template, layers: s0.template.layers.slice(0, 2) };
+        expect(templateSignature(other)).not.toBe(templateSignature(s0.template));
+        expect(recallMapping(storage, other, headers)).toBeNull();
+        expect(recallMapping(storage, s0.template, [{ key: "Name", label: "Name" }]).images).toEqual({});
+        // Restoring marks the state so the Map step can say so.
+        expect(reducer(s0, { type: "mapping", mapping: back, restored: true }).restoredMapping).toBe(true);
+    });
+
+    it("keeps at most 30 remembered templates (most recent first)", () => {
+        const store = new Map();
+        const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+        const s0 = ready();
+        for (let i = 0; i < 35; i++) rememberMapping(storage, { ...s0.template, title: `t${i}.psd` }, s0.mapping, 1000 + i);
+        const saved = JSON.parse(store.get("elzoz.mappings.v1"));
+        expect(Object.keys(saved)).toHaveLength(30);
+        expect(Object.keys(saved).some((k) => k.startsWith("t0.psd"))).toBe(false);
+    });
 });
+
