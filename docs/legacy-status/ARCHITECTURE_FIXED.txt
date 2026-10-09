@@ -1,0 +1,306 @@
+================================================================================
+                    ELZOZ PLUGIN ARCHITECTURE (FIXED)
+================================================================================
+
+OVERALL STRUCTURE
+-----------------
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                         PHOTOSHOP                                   │
+│                    (Host Application)                               │
+└────────────────────────┬────────────────────────────────────────────┘
+                         │
+                         │
+┌────────────────────────▼────────────────────────────────────────────┐
+│                    UXP PLUGIN CONTAINER                              │
+│                    (Plugin Runtime)                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  plugin/index.html  →  Loads compiled JavaScript bundle             │
+└────────────────────────┬────────────────────────────────────────────┘
+                         │
+                         │
+┌────────────────────────▼────────────────────────────────────────────┐
+│                    REACT APPLICATION                                 │
+│                 (src/index.jsx entry point)                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  AccountProvider (Context)                                          │
+│    └─ AccountManager (Component)                                    │
+│       └─ Credits, accounts, usage                                   │
+│                                                                      │
+│  ProjectProvider (Context)                                          │
+│    └─ AppContainer (Main Component)                                 │
+│       ├─ Header (Logo & Title)                                      │
+│       ├─ TabNavigation (Setup, Mapping, Execute, Analytics)        │
+│       └─ Tab Content (Based on activeTab state)                     │
+│           ├─ SetupPanel         → File selection & preview          │
+│           ├─ MappingPanel       → Column to layer mapping           │
+│           ├─ ExecutePanel       → Batch processing                  │
+│           └─ AnalyticsPanel     → Statistics & usage                │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+
+
+LAYER DETAIL: FILE OPERATIONS
+------------------------------
+
+When user clicks "Select Excel" button:
+
+1. SetupPanel Component
+   └─ handlePickExcel() function called
+      │
+      ├─ fileOps.pickExcelFile() [UXPBridge.js]
+      │  │
+      │  ├─ Check if fs.getFileForOpening exists
+      │  │  (If not, throw "File system API not available" error)
+      │  │
+      │  ├─ Call fs.getFileForOpening({ types: ['xlsx', 'xls', 'csv'] })
+      │  │  (Opens native file picker dialog)
+      │  │
+      │  ├─ If file selected:
+      │  │  ├─ Read file as binary data
+      │  │  └─ Return { file, fileName, path, data }
+      │  │
+      │  └─ If cancelled:
+      │     └─ Return null
+      │
+      ├─ If success:
+      │  ├─ Parse with XLSX library
+      │  ├─ Extract columns and rows
+      │  ├─ Update ProjectContext:
+      │  │  ├─ excelPath
+      │  │  ├─ excelFile
+      │  │  ├─ excelData (array of rows)
+      │  │  ├─ excelColumns (array of column names)
+      │  │  └─ excelRowCount
+      │  │
+      │  └─ Update UI:
+      │     ├─ Button changes to "✅ Excel Selected"
+      │     └─ Data preview table appears
+      │
+      └─ If error:
+         └─ setError() displays error message
+
+
+FILE STRUCTURE
+--------------
+
+src/
+├─ index.jsx                    ← React root
+├─ styles.css                   ← Global styles [FIXED: Added root CSS]
+│
+├─ components/
+│  ├─ AppContainer.jsx          ← Main app wrapper
+│  ├─ TabNavigation.jsx         ← Tab buttons
+│  ├─ AccountManager.jsx        ← Account display
+│  ├─ Login.jsx                 ← Auth
+│  ├─ Register.jsx              ← Auth
+│  └─ AdminPanel.jsx            ← Admin dashboard
+│
+├─ panels/
+│  ├─ Demos.jsx                 ← Renders AppContainer [FIXED: Simplified]
+│  ├─ SetupPanel.jsx            ← File selection
+│  ├─ MappingPanel.jsx          ← Column mapping
+│  ├─ ExecutePanel.jsx          ← Batch processing
+│  └─ AnalyticsPanel.jsx        ← Statistics
+│
+├─ context/
+│  ├─ ProjectContext.jsx        ← Project state
+│  └─ AccountContext.jsx        ← Account/credits state
+│
+├─ controllers/
+│  ├─ PanelController.jsx       ← Panel logic
+│  └─ CommandController.jsx     ← Command handling
+│
+└─ services/
+   ├─ UXPBridge.js             ← Photoshop APIs [FIXED: Better initialization]
+   └─ BatchProcessor.js        ← Batch processing logic
+
+plugin/
+├─ manifest.json               ← Plugin config (has "localFileSystem": "fullAccess")
+└─ index.html                  ← HTML entry point (loads index.js)
+
+dist/
+└─ index.js                    ← Compiled bundle (webpack output)
+
+
+STATE MANAGEMENT
+----------------
+
+ProjectContext (Global State):
+{
+  // Files
+  excelPath: "/path/to/file.xlsx" | null
+  excelFile: File object | null
+  excelData: [ { col1: val1, col2: val2 }, ... ]
+  excelColumns: ["col1", "col2", "col3"]
+  excelRowCount: 150
+  
+  // Folders
+  imagesFolder: "/path/to/folder" | null
+  imageFolderName: "Images"
+  imageFiles: [{ name: "image1.jpg", nativePath: "..." }, ...]
+  
+  // PSD
+  psdFile: File object | null
+  psdPath: "/path/to/template.psd" | null
+  psdFileName: "template.psd"
+  psdLayers: [{ id, name, kind, visible, opacity, blendMode }, ...]
+  
+  // Mapping
+  mapping: { "ProductName": "text-layer-id", "Price": "price-layer-id" }
+  
+  // Processing
+  isProcessing: true | false
+  progress: 0-100
+  results: [ { row: 1, status: "success", data: {...} }, ...]
+  errors: [ { row: 1, error: "message" }, ...]
+}
+
+AccountContext (Global State):
+{
+  accounts: [ { id, email, credits, usage }, ...]
+  currentAccount: { id, email, credits, usage }
+  
+  // Methods:
+  // createAccount(email, password)
+  // login(email, password)
+  // logout()
+  // updateCredits(accountId, amount)
+  // logUsage(accountId, data)
+}
+
+
+COMPONENT FLOW (Setup Tab Example)
+-----------------------------------
+
+AppContainer
+  │
+  ├─ Header (Elzoz Title)
+  │
+  ├─ AccountManager
+  │  └─ Shows: Email, Credits, Account selector
+  │
+  ├─ TabNavigation
+  │  └─ Shows: 4 tabs (Setup, Mapping, Execute, Analytics)
+  │
+  └─ TabContent Wrapper
+     │
+     └─ SetupPanel (rendered because activeTab === 'setup')
+        │
+        ├─ File Picker #1 (Excel)
+        │  ├─ Button: "Select Excel"
+        │  └─ onClick → handlePickExcel()
+        │
+        ├─ File Picker #2 (Folder)
+        │  ├─ Button: "Select Folder"
+        │  └─ onClick → handlePickImages()
+        │
+        ├─ File Picker #3 (PSD)
+        │  ├─ Button: "Select PSD"
+        │  └─ onClick → handlePickPSD()
+        │
+        └─ Data Preview (if Excel selected)
+           ├─ Table with first 3 rows
+           └─ Shows file info & column count
+
+
+CSS HIERARCHY (Scrolling)
+-------------------------
+
+html { width: 100%; height: 100%; }
+body { width: 100%; height: 100%; }
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;  ← Main panel container
+}
+
+.panel > div:last-child {
+  flex: 1;
+  overflow: auto;    ← Scrollable content area
+}
+
+Scrollbars appear automatically when:
+  - Content height > Container height
+  - overflow: auto is set
+  - Container has fixed height
+
+
+ERROR HANDLING FLOW
+-------------------
+
+File Picker Called
+  │
+  ├─ API Available?
+  │  ├─ NO  → throw Error("File system API not available")
+  │  │       → setError() displays in UI
+  │  │       → User sees: ⚠️ message
+  │  │
+  │  └─ YES → Proceed
+  │
+  ├─ Dialog Opened
+  │  ├─ User Cancels → return null
+  │  │                → No error, just no file selected
+  │  │
+  │  └─ User Selects → Proceed
+  │
+  ├─ File Processing
+  │  ├─ Read Success → Parse & Store
+  │  │
+  │  └─ Read Error → throw Error("Read failed: reason")
+  │                  → setError() displays
+  │                  → User sees: ⚠️ message
+  │
+  ├─ Parse Success
+  │  ├─ Update state
+  │  └─ Update UI
+  │
+  └─ Parse Error
+     └─ throw Error("Parse failed: reason")
+        → setError() displays
+        → User sees: ⚠️ message
+
+
+WHAT'S FIXED
+-------------
+
+✓ UXP API Initialization (UXPBridge.js)
+  Before: const fs = localFileSystem || {};
+          → fs might be undefined, causing failures
+  
+  After:  let fs = {};
+          if (typeof window !== 'undefined') {
+              try {
+                  const uxp = window.uxp || {};
+                  fs = uxp.storage ? uxp.storage.localFileSystem : {};
+              }
+          }
+          → Safely checks if API exists before using
+
+✓ Error Handling (All file picker methods)
+  Before: No error handling, silent failures
+  
+  After:  try-catch blocks with clear error messages
+          → User sees what went wrong
+
+✓ CSS Layout (styles.css)
+  Before: Missing root element styling
+          → Scrolling didn't work properly
+  
+  After:  Added html, body, #root styling
+          → Proper flexbox layout with scrollable panels
+
+
+================================================================================
+                        READY FOR TESTING & PHASE 3
+================================================================================
