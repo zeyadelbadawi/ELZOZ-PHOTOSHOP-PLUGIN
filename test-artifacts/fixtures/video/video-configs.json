@@ -1,0 +1,194 @@
+[
+  {
+    "id": "reel-6s-30fps",
+    "valid": true,
+    "template": "reel-1080x1920.psd",
+    "spec": {
+      "format": "reel",
+      "fps": 30,
+      "durationMs": 6000,
+      "fadeOutMs": 500,
+      "tracks": {
+        "Name": {
+          "preset": "slideUp",
+          "startMs": 300,
+          "lengthMs": 800,
+          "easing": "easeOut"
+        },
+        "Price": {
+          "preset": "fadeIn",
+          "startMs": 900,
+          "lengthMs": 600,
+          "easing": "easeInOut"
+        },
+        "Photo": {
+          "preset": "kenBurns"
+        },
+        "Logo": {
+          "preset": "pop",
+          "startMs": 0,
+          "lengthMs": 500,
+          "easing": "backOut"
+        }
+      }
+    },
+    "expect": {
+      "width": 1080,
+      "height": 1920,
+      "frames": 180,
+      "durationMs": 6000,
+      "units": 2
+    }
+  },
+  {
+    "id": "reel-2s-24fps-preview",
+    "valid": true,
+    "template": "reel-1080x1920.psd",
+    "spec": {
+      "format": "reel",
+      "fps": 24,
+      "durationMs": 2000,
+      "fadeOutMs": 0,
+      "tracks": {
+        "Name": {
+          "preset": "slideLeft",
+          "startMs": 0,
+          "lengthMs": 700,
+          "easing": "linear"
+        },
+        "Photo": {
+          "preset": "zoomIn",
+          "startMs": 0,
+          "lengthMs": 800,
+          "easing": "easeOut"
+        }
+      }
+    },
+    "expect": {
+      "width": 1080,
+      "height": 1920,
+      "frames": 48,
+      "durationMs": 2000,
+      "units": 1
+    }
+  },
+  {
+    "id": "square-3s-25fps",
+    "valid": true,
+    "template": "square-1080x1080.psd",
+    "spec": {
+      "format": "square",
+      "fps": 25,
+      "durationMs": 3000,
+      "fadeOutMs": 300,
+      "tracks": {
+        "Name": {
+          "preset": "slideDown",
+          "startMs": 0,
+          "lengthMs": 600,
+          "easing": "easeOut"
+        },
+        "Photo": {
+          "preset": "slideRight",
+          "startMs": 200,
+          "lengthMs": 800,
+          "easing": "easeInOut"
+        }
+      }
+    },
+    "expect": {
+      "width": 1080,
+      "height": 1080,
+      "frames": 75,
+      "durationMs": 3000,
+      "units": 1
+    }
+  },
+  {
+    "id": "reel-on-square-template",
+    "valid": false,
+    "template": "square-1080x1080.psd",
+    "spec": {
+      "format": "reel",
+      "fps": 30,
+      "durationMs": 3000,
+      "tracks": {}
+    },
+    "expectError": "aspect_mismatch"
+  },
+  {
+    "id": "fps-60",
+    "valid": false,
+    "spec": {
+      "format": "reel",
+      "fps": 60,
+      "durationMs": 3000,
+      "tracks": {}
+    },
+    "expectError": "bad_fps"
+  },
+  {
+    "id": "too-short",
+    "valid": false,
+    "spec": {
+      "format": "reel",
+      "fps": 30,
+      "durationMs": 500,
+      "tracks": {}
+    },
+    "expectError": "bad_duration"
+  },
+  {
+    "id": "too-long",
+    "valid": false,
+    "spec": {
+      "format": "reel",
+      "fps": 30,
+      "durationMs": 61000,
+      "tracks": {}
+    },
+    "expectError": "bad_duration"
+  },
+  {
+    "id": "track-overflow",
+    "valid": false,
+    "spec": {
+      "format": "reel",
+      "fps": 30,
+      "durationMs": 2000,
+      "tracks": {
+        "Name": {
+          "preset": "fadeIn",
+          "startMs": 1800,
+          "lengthMs": 600
+        }
+      }
+    },
+    "expectError": "track_overflow"
+  },
+  {
+    "id": "fade-too-long",
+    "valid": false,
+    "spec": {
+      "format": "reel",
+      "fps": 30,
+      "durationMs": 2000,
+      "fadeOutMs": 1500,
+      "tracks": {}
+    },
+    "expectError": "bad_fade"
+  },
+  {
+    "id": "max-60s-4k-pricing",
+    "valid": true,
+    "pricingOnly": true,
+    "spec": {
+      "durationMs": 60000,
+      "width": 3840,
+      "height": 2160
+    },
+    "expect": {
+      "units": 24
+    }
+  }
+]

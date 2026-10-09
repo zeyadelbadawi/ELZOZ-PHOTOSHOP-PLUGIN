@@ -1,0 +1,290 @@
+{
+  "no-mappable-layers.psd": {
+    "ok": true,
+    "size": [
+      800,
+      600
+    ],
+    "layers": [
+      {
+        "path": "Background",
+        "kind": "pixel",
+        "bbox": [
+          0,
+          0,
+          800,
+          600
+        ],
+        "smart_object": null,
+        "text": null
+      }
+    ]
+  },
+  "product-card-1080x1350.psd": {
+    "ok": true,
+    "size": [
+      1080,
+      1350
+    ],
+    "layers": [
+      {
+        "path": "Background",
+        "kind": "pixel",
+        "bbox": [
+          0,
+          0,
+          1080,
+          1350
+        ],
+        "smart_object": null,
+        "text": null
+      },
+      {
+        "path": "Media",
+        "kind": "group",
+        "bbox": [
+          60,
+          60,
+          940,
+          900
+        ],
+        "smart_object": null,
+        "text": null
+      },
+      {
+        "path": "Media/Photo",
+        "kind": "smartObject",
+        "bbox": [
+          140,
+          300,
+          940,
+          900
+        ],
+        "smart_object": "Photo.png",
+        "text": null
+      },
+      {
+        "path": "Media/Logo",
+        "kind": "smartObject",
+        "bbox": [
+          60,
+          60,
+          300,
+          156
+        ],
+        "smart_object": "Logo.png",
+        "text": null
+      },
+      {
+        "path": "Card",
+        "kind": "group",
+        "bbox": [
+          860,
+          60,
+          1040,
+          124
+        ],
+        "smart_object": null,
+        "text": null
+      },
+      {
+        "path": "Card/Badge",
+        "kind": "pixel",
+        "bbox": [
+          860,
+          60,
+          1040,
+          124
+        ],
+        "smart_object": null,
+        "text": null
+      },
+      {
+        "path": "Card/Text",
+        "kind": "group",
+        "bbox": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "smart_object": null,
+        "text": null
+      },
+      {
+        "path": "Card/Text/Name",
+        "kind": "text",
+        "bbox": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "smart_object": null,
+        "text": "Product name"
+      },
+      {
+        "path": "Card/Text/Price",
+        "kind": "text",
+        "bbox": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "smart_object": null,
+        "text": "$0.00"
+      },
+      {
+        "path": "Card/Text/Description",
+        "kind": "text",
+        "bbox": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "smart_object": null,
+        "text": "Short description"
+      },
+      {
+        "path": "Footer",
+        "kind": "group",
+        "bbox": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "smart_object": null,
+        "text": null
+      },
+      {
+        "path": "Footer/Name",
+        "kind": "text",
+        "bbox": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "smart_object": null,
+        "text": "Brand footer (duplicate name)"
+      }
+    ]
+  },
+  "reel-1080x1920.psd": {
+    "ok": true,
+    "size": [
+      1080,
+      1920
+    ],
+    "layers": [
+      {
+        "path": "Background",
+        "kind": "pixel",
+        "bbox": [
+          0,
+          0,
+          1080,
+          1920
+        ],
+        "smart_object": null,
+        "text": null
+      },
+      {
+        "path": "Photo",
+        "kind": "smartObject",
+        "bbox": [
+          90,
+          520,
+          990,
+          1420
+        ],
+        "smart_object": "Photo.png",
+        "text": null
+      },
+      {
+        "path": "Logo",
+        "kind": "smartObject",
+        "bbox": [
+          60,
+          80,
+          360,
+          200
+        ],
+        "smart_object": "Logo.png",
+        "text": null
+      },
+      {
+        "path": "Name",
+        "kind": "text",
+        "bbox": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "smart_object": null,
+        "text": "Product name"
+      },
+      {
+        "path": "Price",
+        "kind": "text",
+        "bbox": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "smart_object": null,
+        "text": "$0.00"
+      }
+    ]
+  },
+  "square-1080x1080.psd": {
+    "ok": true,
+    "size": [
+      1080,
+      1080
+    ],
+    "layers": [
+      {
+        "path": "Background",
+        "kind": "pixel",
+        "bbox": [
+          0,
+          0,
+          1080,
+          1080
+        ],
+        "smart_object": null,
+        "text": null
+      },
+      {
+        "path": "Photo",
+        "kind": "smartObject",
+        "bbox": [
+          140,
+          140,
+          940,
+          740
+        ],
+        "smart_object": "Photo.png",
+        "text": null
+      },
+      {
+        "path": "Name",
+        "kind": "text",
+        "bbox": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "smart_object": null,
+        "text": "Product name"
+      }
+    ]
+  }
+}

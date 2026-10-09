@@ -1,0 +1,110 @@
+{
+  "no-mappable-layers.psd": {
+    "width": 800,
+    "height": 600,
+    "layers": [
+      {
+        "path": "Background",
+        "kind": "pixel"
+      }
+    ]
+  },
+  "product-card-1080x1350.psd": {
+    "width": 1080,
+    "height": 1350,
+    "layers": [
+      {
+        "path": "Background",
+        "kind": "pixel"
+      },
+      {
+        "path": "Media",
+        "kind": "group"
+      },
+      {
+        "path": "Media/Photo",
+        "kind": "smartObject"
+      },
+      {
+        "path": "Media/Logo",
+        "kind": "smartObject"
+      },
+      {
+        "path": "Card",
+        "kind": "group"
+      },
+      {
+        "path": "Card/Badge",
+        "kind": "pixel"
+      },
+      {
+        "path": "Card/Text",
+        "kind": "group"
+      },
+      {
+        "path": "Card/Text/Name",
+        "kind": "text"
+      },
+      {
+        "path": "Card/Text/Price",
+        "kind": "text"
+      },
+      {
+        "path": "Card/Text/Description",
+        "kind": "text"
+      },
+      {
+        "path": "Footer",
+        "kind": "group"
+      },
+      {
+        "path": "Footer/Name",
+        "kind": "text"
+      }
+    ]
+  },
+  "reel-1080x1920.psd": {
+    "width": 1080,
+    "height": 1920,
+    "layers": [
+      {
+        "path": "Background",
+        "kind": "pixel"
+      },
+      {
+        "path": "Photo",
+        "kind": "smartObject"
+      },
+      {
+        "path": "Logo",
+        "kind": "smartObject"
+      },
+      {
+        "path": "Name",
+        "kind": "text"
+      },
+      {
+        "path": "Price",
+        "kind": "text"
+      }
+    ]
+  },
+  "square-1080x1080.psd": {
+    "width": 1080,
+    "height": 1080,
+    "layers": [
+      {
+        "path": "Background",
+        "kind": "pixel"
+      },
+      {
+        "path": "Photo",
+        "kind": "smartObject"
+      },
+      {
+        "path": "Name",
+        "kind": "text"
+      }
+    ]
+  }
+}

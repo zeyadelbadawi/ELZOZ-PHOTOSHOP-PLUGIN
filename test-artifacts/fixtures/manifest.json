@@ -1,0 +1,197 @@
+{
+  "generated": "2026-10-09",
+  "synthetic": true,
+  "fixtures": [
+    {
+      "file": "spreadsheets/products-valid.xlsx",
+      "kind": "xlsx",
+      "purpose": "8 valid rows: text, Arabic, image names with/without extension, case-insensitive and spaced names, logos",
+      "scenarios": [
+        "A",
+        "C",
+        "E"
+      ]
+    },
+    {
+      "file": "spreadsheets/products-edge.xlsx",
+      "kind": "xlsx",
+      "purpose": "Duplicate and empty headers, missing/traversal/non-image/corrupt/ambiguous image refs, blank row, empty cells, long and illegal names, numbers, second sheet",
+      "scenarios": [
+        "B",
+        "edge"
+      ]
+    },
+    {
+      "file": "spreadsheets/products-recovery.xlsx",
+      "kind": "xlsx",
+      "purpose": "1 missing image (preflight skip) + 1 corrupt image (render-time failure, retry after fixing)",
+      "scenarios": [
+        "B",
+        "D"
+      ]
+    },
+    {
+      "file": "spreadsheets/products-1000.xlsx",
+      "kind": "xlsx",
+      "purpose": "1000 rows for performance (preflight + simulated batch timing)",
+      "scenarios": [
+        "perf"
+      ]
+    },
+    {
+      "file": "spreadsheets/too-many-rows.xlsx",
+      "kind": "xlsx",
+      "purpose": "5001 rows: exceeds the 5000-row job limit (blocking error)",
+      "scenarios": [
+        "edge"
+      ]
+    },
+    {
+      "file": "spreadsheets/headers-only.xlsx",
+      "kind": "xlsx",
+      "purpose": "Headers but no data (blocking error)",
+      "scenarios": [
+        "edge"
+      ]
+    },
+    {
+      "file": "spreadsheets/products.csv",
+      "kind": "csv",
+      "purpose": "UTF-8 CSV with BOM",
+      "scenarios": [
+        "edge"
+      ]
+    },
+    {
+      "file": "spreadsheets/corrupt.xlsx",
+      "kind": "xlsx",
+      "purpose": "Corrupt workbook (load error state)",
+      "scenarios": [
+        "edge"
+      ]
+    },
+    {
+      "file": "templates/product-card-1080x1350.psd",
+      "kind": "psd",
+      "purpose": "Design template 4:5: nested groups (Card/Text), 3 text layers, 2 Smart Objects, pixel Badge (pixel placement target), Background, duplicate layer name 'Name' in Footer",
+      "scenarios": [
+        "A",
+        "B",
+        "D",
+        "E"
+      ]
+    },
+    {
+      "file": "templates/reel-1080x1920.psd",
+      "kind": "psd",
+      "purpose": "Video template 9:16 (Reel/Story): Photo and Logo Smart Objects, Name and Price text",
+      "scenarios": [
+        "C"
+      ]
+    },
+    {
+      "file": "templates/square-1080x1080.psd",
+      "kind": "psd",
+      "purpose": "Square 1:1 template (aspect-mismatch case for Reel video; valid for Square)",
+      "scenarios": [
+        "C",
+        "edge"
+      ]
+    },
+    {
+      "file": "templates/no-mappable-layers.psd",
+      "kind": "psd",
+      "purpose": "Only a background pixel layer: Map step 'nothing to map' state",
+      "scenarios": [
+        "edge"
+      ]
+    },
+    {
+      "file": "video/video-configs.json",
+      "kind": "json",
+      "purpose": "Video configurations: 3 valid (durations 2-6 s, 24/25/30 fps, 9:16 and 1:1, all presets) and 6 invalid cases with the expected error code",
+      "scenarios": [
+        "C",
+        "video"
+      ]
+    }
+  ],
+  "images": [
+    {
+      "file": "images/products/Desk Chair.jpg",
+      "bytes": 91740
+    },
+    {
+      "file": "images/products/Lamp.JPG",
+      "bytes": 118962
+    },
+    {
+      "file": "images/products/banner-wide.jpg",
+      "bytes": 98767
+    },
+    {
+      "file": "images/products/broken.jpg",
+      "bytes": 620
+    },
+    {
+      "file": "images/products/camera-hires.jpg",
+      "bytes": 3207539
+    },
+    {
+      "file": "images/products/camera.jpeg",
+      "bytes": 446191
+    },
+    {
+      "file": "images/products/headphones.png",
+      "bytes": 37936
+    },
+    {
+      "file": "images/products/laptop.jpg",
+      "bytes": 111129
+    },
+    {
+      "file": "images/products/mug.jpg",
+      "bytes": 60363
+    },
+    {
+      "file": "images/products/mug.png",
+      "bytes": 28502
+    },
+    {
+      "file": "images/products/notes.txt",
+      "bytes": 13
+    },
+    {
+      "file": "images/products/phone.jpg",
+      "bytes": 77032
+    },
+    {
+      "file": "images/products/speaker.webp",
+      "bytes": 18580
+    },
+    {
+      "file": "images/products/tall-skinny.png",
+      "bytes": 18009
+    },
+    {
+      "file": "images/products/tiny.png",
+      "bytes": 1608
+    },
+    {
+      "file": "images/products/watch.png",
+      "bytes": 32774
+    },
+    {
+      "file": "images/logos/acme.png",
+      "bytes": 10162
+    },
+    {
+      "file": "images/logos/elzoz-logo.png",
+      "bytes": 7622
+    },
+    {
+      "file": "images/logos/nova.png",
+      "bytes": 9634
+    }
+  ]
+}

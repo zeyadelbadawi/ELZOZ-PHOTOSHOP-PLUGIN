@@ -14,7 +14,8 @@
     "test:db": "bash scripts/test-db.sh",
     "harness": "webpack --config tests/harness/webpack.harness.js",
     "test-env": "bash scripts/test-env.sh",
-    "test:e2e": "bash -c \"source ${ELZOZ_TEST_HOME:-/tmp/elzoz-test}/env && vitest run tests/e2e\""
+    "test:e2e": "bash -c \"source ${ELZOZ_TEST_HOME:-/tmp/elzoz-test}/env && vitest run tests/e2e\"",
+    "fixtures": "python3 tests/fixtures-gen/images.py test-artifacts/fixtures/images && node tests/fixtures-gen/generate.mjs && python3 tests/fixtures-gen/verify_psd.py test-artifacts/fixtures/templates"
   },
   "author": "Elzoz",
   "license": "Apache-2.0",
