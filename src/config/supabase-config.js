@@ -8,6 +8,9 @@ export const supabaseConfig = {
     anonKey: __ELZOZ_SUPABASE_ANON_KEY__
 };
 
+// Public website for sign-up, password pages and buying credits (optional).
+export const websiteUrl = __ELZOZ_WEBSITE_URL__;
+
 export function validateSupabaseConfig() {
     if (!supabaseConfig.url || !supabaseConfig.anonKey) {
         console.error('Supabase is not configured. Set ELZOZ_SUPABASE_URL and ELZOZ_SUPABASE_ANON_KEY before building.');

@@ -241,3 +241,13 @@ describe("runDesignJob — failures are isolated and never reported as success",
         await expect(runDesignJob({ plan: { ok: false } })).rejects.toThrow(/blocking/);
     });
 });
+
+describe("runDesignJob — partial exports", () => {
+    it("removes the JPG of a row whose PSD export failed, so a retry can write it", async () => {
+        const s = await setup({ rows: [ROWS[0]] });
+        s.host.env.failFormats.push("psd");
+        const result = await run(s, fakeBilling());
+        expect(result.items[0]).toMatchObject({ status: ITEM.failed, error: { step: "export", format: "psd" } });
+        expect(s.out.files.size).toBe(0);
+    });
+});

@@ -33,15 +33,9 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.38.0",
-    "lucide-react": "^0.263.1",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
-    "uxp": "^0.0.1",
     "xlsx": "^0.18.5"
-  },
-  "resolutions": {
-    "acorn": "npm:acorn-with-stage3"
   },
   "private": true
 }

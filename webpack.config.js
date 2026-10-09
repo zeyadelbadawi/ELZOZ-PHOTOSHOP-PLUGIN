@@ -35,6 +35,7 @@ module.exports = (env, argv) => {
     const fileEnv = readEnvFile(path.resolve(__dirname, ".env"));
     const supabaseUrl = process.env.ELZOZ_SUPABASE_URL || fileEnv.ELZOZ_SUPABASE_URL || "";
     const supabaseAnonKey = process.env.ELZOZ_SUPABASE_ANON_KEY || fileEnv.ELZOZ_SUPABASE_ANON_KEY || "";
+    const websiteUrl = process.env.ELZOZ_WEBSITE_URL || fileEnv.ELZOZ_WEBSITE_URL || "";
     assertPublicKey(supabaseAnonKey);
 
     return {
@@ -84,11 +85,26 @@ module.exports = (env, argv) => {
             new webpack.DefinePlugin({
                 __ELZOZ_SUPABASE_URL__: JSON.stringify(supabaseUrl),
                 __ELZOZ_SUPABASE_ANON_KEY__: JSON.stringify(supabaseAnonKey),
+                __ELZOZ_WEBSITE_URL__: JSON.stringify(websiteUrl),
                 __ELZOZ_DEV__: JSON.stringify(!isProd)
             }),
-            new CopyPlugin(["plugin"], {
-                copyUnmodified: true
-            })
+            new CopyPlugin(
+                [
+                    {
+                        from: "plugin",
+                        // The manifest is a template: network domains and dev-only permissions are build-specific.
+                        transform(content, file) {
+                            if (!file.endsWith("manifest.json")) return content;
+                            const manifest = JSON.parse(content.toString());
+                            const perms = manifest.requiredPermissions;
+                            perms.network.domains = supabaseUrl ? [new URL(supabaseUrl).origin] : [];
+                            perms.allowCodeGenerationFromStrings = !isProd; // eval-based dev source maps only
+                            return JSON.stringify(manifest, null, 2);
+                        }
+                    }
+                ],
+                { copyUnmodified: true }
+            )
         ]
     };
 };

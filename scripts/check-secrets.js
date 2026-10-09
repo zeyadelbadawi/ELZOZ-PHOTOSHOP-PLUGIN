@@ -34,6 +34,15 @@ for (const root of roots) {
     }
 }
 
+// Production builds must not contain the development billing stub.
+const manifestPath = path.join("dist", "manifest.json");
+if (fs.existsSync(manifestPath) && fs.existsSync(path.join("dist", "index.js"))) {
+    const isProd = JSON.parse(fs.readFileSync(manifestPath, "utf8")).requiredPermissions.allowCodeGenerationFromStrings === false;
+    if (isProd && fs.readFileSync(path.join("dist", "index.js"), "utf8").includes("elzoz-dev-billing")) {
+        problems.push("dist/index.js: development billing stub present in a production build");
+    }
+}
+
 if (problems.length) {
     console.error("Secret check FAILED:\n" + problems.join("\n"));
     process.exit(1);
