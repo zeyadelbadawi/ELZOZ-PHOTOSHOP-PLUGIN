@@ -15,7 +15,8 @@ create role service_role nologin noinherit bypassrls;
 create schema auth;
 create table auth.users (
     id uuid primary key,
-    email text unique
+    email text unique,
+    created_at timestamptz not null default now() -- as in Supabase's auth.users
 );
 
 create function auth.uid() returns uuid language sql stable as $$

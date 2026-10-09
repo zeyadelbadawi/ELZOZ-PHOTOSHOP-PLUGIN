@@ -202,7 +202,8 @@ d("credits database", () => {
             const u = await createUser(c, { balance: 100 });
             await c.query("delete from private.rate_limits where user_id = $1", [u]);
             let limited = null;
-            for (let i = 0; i < 25 && !limited; i++) {
+            // 20 per fixed 60 s window: 41 calls hit the limit even if they straddle a window boundary.
+            for (let i = 0; i < 45 && !limited; i++) {
                 try {
                     const j = await startDesign(u, 1);
                     await finish(u, j.job_id, "cancelled");
