@@ -74,9 +74,11 @@ const PROBLEM_TEXT = {
  * @param {string} input.namePattern
  * @param {{unitPrice: number}} input.pricing
  * @param {number|null} input.balance     available credits (null = unknown)
+ * @param {string[]} [input.allowedFormats] defaults to the design formats
+ * @param {number} [input.unitsPerItem]     credit units per item (video: per started 5 s)
  */
 export function runPreflight(input) {
-    const { table, layers, mapping, folders = {}, output, formats = [], namePattern, pricing, balance = null } = input;
+    const { table, layers, mapping, folders = {}, output, formats = [], namePattern, pricing, balance = null, allowedFormats = FORMATS, unitsPerItem = 1 } = input;
     const blocking = [];
     const warnings = [];
 
@@ -86,7 +88,7 @@ export function runPreflight(input) {
     if (!layers || !layers.length) blocking.push(issue("error", "no_template", "Load a PSD template first.", { fix: { step: "template" } }));
     if (!mapping || mappedCount(mapping) === 0) blocking.push(issue("error", "no_mapping", "Map at least one layer to a column.", { fix: { step: "map" } }));
     if (!output) blocking.push(issue("error", "no_output", "Choose an output folder.", { fix: { step: "generate" } }));
-    const fmts = formats.filter((f) => FORMATS.includes(f));
+    const fmts = formats.filter((f) => allowedFormats.includes(f));
     if (!fmts.length) blocking.push(issue("error", "no_format", "Select at least one output format.", { fix: { step: "generate" } }));
     const unknownTokens = table ? validatePattern(namePattern, table.headers) : [];
     if (unknownTokens.length) blocking.push(issue("error", "bad_pattern", `Unknown name token(s): ${unknownTokens.map((t) => `{${t}}`).join(", ")}`, { fix: { step: "generate" } }));
@@ -163,7 +165,7 @@ export function runPreflight(input) {
 
     // --- Cost --------------------------------------------------------------------
     const units = items.length;
-    const cost = units * (pricing?.unitPrice ?? 1);
+    const cost = units * unitsPerItem * (pricing?.unitPrice ?? 1);
     if (!units) blocking.push(issue("error", "nothing_to_generate", "Every row has a problem, so nothing can be generated.", { fix: { step: "map" } }));
     if (balance !== null && balance < cost) blocking.push(issue("error", "insufficient_credits", `This job needs ${cost} credits; ${balance} available.`, { fix: { step: "account" } }));
 

@@ -9,6 +9,7 @@ import { mapLayersByStructure, walkDocument } from "./layerTree.js";
 import { setLayerText, StepError } from "./text.js";
 import { placeImage } from "./images.js";
 import { exportDocument } from "./export.js";
+import { applyFrameState, exportFrame, writeAndVerifyMovie } from "./video.js";
 
 // Label any Photoshop exception with the step and layer it happened on.
 async function asStep(step, layerId, fn) {
@@ -60,11 +61,30 @@ export function createPhotoshopPort({ photoshop, uxp }) {
             });
         },
 
+        /** A fresh temporary folder for one item's frames. */
+        async createTempFolder(name) {
+            const temp = await fs.getTemporaryFolder();
+            return temp.createFolder(name);
+        },
+
+        async writeMovie(args) {
+            return writeAndVerifyMovie({ uxp, ...args });
+        },
+
+        async removeFolder(folder) {
+            try {
+                for (const e of await folder.getEntries()) await e.delete();
+                await folder.delete();
+            } catch (e) {
+                /* best effort: temp files are cleaned by the OS eventually */
+            }
+        },
+
         /**
          * Must be called inside runModal. Returns a session bound to a duplicate
          * of the template. `templateLayers` are the descriptors used for mapping.
          */
-        async openWorkingCopy(template, templateLayers) {
+        async openWorkingCopy(template, templateLayers, { resizeTo = null } = {}) {
             let source = findOpenDocument(template);
             let openedByUs = false;
             if (!source) {
@@ -72,6 +92,10 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 openedByUs = true;
             }
             const doc = await source.duplicate("Elzoz working copy");
+            // Video: render at the output size (aspect ratio already checked by preflight).
+            if (resizeTo && (doc.width !== resizeTo.width || doc.height !== resizeTo.height)) {
+                await doc.resizeImage(resizeTo.width, resizeTo.height);
+            }
             const layerMap = mapLayersByStructure(templateLayers, doc, constants);
             const kinds = new Map(templateLayers.map((l) => [l.id, l.kind]));
             const baseState = doc.activeHistoryState;
@@ -105,6 +129,22 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 },
                 async exportItem(folder, baseName, formats, options) {
                     return exportDocument({ doc, folder, baseName, formats, options });
+                },
+                snapshot() {
+                    return doc.activeHistoryState;
+                },
+                async restore(state) {
+                    doc.activeHistoryState = state;
+                },
+                /** Current opacity of the given template layers (video frames scale relative to it). */
+                readOpacity(layerIds) {
+                    return new Map(layerIds.map((id) => [id, Number(layerFor(id).opacity)]));
+                },
+                async applyFrame(states, baseOpacity) {
+                    await asStep("video", null, () => applyFrameState({ photoshop, doc, layerFor, states, baseOpacity }));
+                },
+                async exportFrame(folder, name) {
+                    return asStep("video", null, () => exportFrame({ doc, folder, name }));
                 },
                 /** Back to the untouched duplicate. */
                 async reset() {

@@ -6,6 +6,21 @@
 
 let nextId = 1000;
 
+/** A structurally valid JPEG (SOI, COM with payload, SOF0 with size, EOI). Not decodable pixels. */
+export function fakeJpeg(width, height, payload = "") {
+    const data = new TextEncoder().encode(payload).slice(0, 60000);
+    const com = [0xff, 0xfe, ((data.length + 2) >> 8) & 0xff, (data.length + 2) & 0xff, ...data];
+    const sof = [0xff, 0xc0, 0x00, 0x11, 0x08, height >> 8, height & 0xff, width >> 8, width & 0xff, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1];
+    return Uint8Array.from([0xff, 0xd8, ...com, ...sof, 0xff, 0xd9]);
+}
+
+/** Read the document state embedded by fakeJpeg. */
+export function readFakeJpeg(bytes) {
+    const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    const len = (b[4] << 8) | b[5];
+    return JSON.parse(new TextDecoder().decode(b.subarray(6, 4 + len)));
+}
+
 class FakeFile {
     constructor(folder, name, meta = {}) {
         this.folder = folder;
@@ -14,7 +29,27 @@ class FakeFile {
         this.isFolder = false;
         this.nativePath = `${folder.nativePath}/${name}`;
         this.size = 0;
+        this.bytes = null;
         this.image = meta.image || null; // {width, height} for image fixtures
+    }
+    async read() {
+        if (!this.folder.files.has(this.name)) throw new Error("not found");
+        const b = this.bytes || new Uint8Array(this.size);
+        return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+    }
+    async write(data, { append = false } = {}) {
+        const add = new Uint8Array(data);
+        const prev = append && this.bytes ? this.bytes : new Uint8Array(0);
+        const next = new Uint8Array(prev.length + add.length);
+        next.set(prev);
+        next.set(add, prev.length);
+        this.bytes = next;
+        this.size = next.length;
+        this.folder.files.set(this.name, this);
+        return add.length;
+    }
+    async delete() {
+        this.folder.files.delete(this.name);
     }
     async getMetadata() {
         if (!this.folder.files.has(this.name)) throw new Error("not found");
@@ -48,6 +83,19 @@ export class FakeFolder {
         if (this.files.has(name) && !overwrite) throw new Error(`file exists: ${name}`);
         return new FakeFile(this, name);
     }
+    async createFolder(name) {
+        if (!this.folders) this.folders = new Map();
+        const f = new FakeFolder(`${this.name}/${name}`);
+        f.parent = this;
+        f.shortName = name;
+        this.folders.set(name, f);
+        return f;
+    }
+    async delete() {
+        if (this.files.size) throw new Error("folder not empty");
+        if (this.parent) this.parent.folders.delete(this.shortName);
+        this.deleted = true;
+    }
 }
 
 class FakeLayer {
@@ -57,6 +105,7 @@ class FakeLayer {
         this.name = spec.name;
         this.kind = spec.kind;
         this.visible = spec.visible ?? true;
+        this.opacity = spec.opacity ?? 100;
         this.locked = false;
         this.b = { ...(spec.bounds || { left: 0, top: 0, right: 100, bottom: 100 }) };
         this.content = spec.content ?? null;
@@ -98,6 +147,7 @@ class FakeLayer {
             name: this.name,
             kind: this.kind,
             visible: this.visible,
+            opacity: this.opacity,
             bounds: { ...this.b },
             content: this.content,
             text: this._text,
@@ -128,9 +178,16 @@ class FakeDocument {
                 env.calls.push({ op: "saveAs", fmt, doc: doc.id, name: entry.name, options, asCopy });
                 if (!asCopy) throw new Error("test: saveAs must be called with asCopy=true");
                 if (entry.folder.failWrites || env.failFormats.includes(fmt)) throw new Error("disk full");
-                entry.size = env.zeroByteFormats.includes(fmt) ? 0 : 2048;
-                entry.folder.files.set(entry.name, entry);
+                env.jpgCount = (env.jpgCount || 0) + (fmt === "jpg" ? 1 : 0);
+                if (fmt === "jpg" && env.failJpgAt && env.jpgCount === env.failJpgAt) throw new Error("Photoshop could not save the JPEG");
                 entry.snapshot = doc.serialize(); // what the file "contains"
+                if (fmt === "jpg") {
+                    entry.bytes = fakeJpeg(env.wrongFrameSize ? doc.width + 2 : doc.width, doc.height, entry.snapshot);
+                    entry.size = entry.bytes.length;
+                } else {
+                    entry.size = env.zeroByteFormats.includes(fmt) ? 0 : 2048;
+                }
+                entry.folder.files.set(entry.name, entry);
             };
         }
     }
@@ -148,6 +205,7 @@ class FakeDocument {
             const layer = existing.get(spec.id) || new FakeLayer(this, spec);
             layer.name = spec.name;
             layer.visible = spec.visible;
+            layer.opacity = spec.opacity;
             layer.b = { ...spec.bounds };
             layer.content = spec.content;
             if (spec.kind === "text") layer._text = spec.text;
@@ -191,6 +249,15 @@ class FakeDocument {
         this.env.app.documents.push(copy);
         this.env.calls.push({ op: "duplicate", from: this.id, to: copy.id });
         return copy;
+    }
+    async resizeImage(width, height) {
+        this.requireModal();
+        const fx = width / this.width;
+        const fy = height / this.height;
+        for (const l of this.allLayers()) l.b = { left: l.b.left * fx, top: l.b.top * fy, right: l.b.right * fx, bottom: l.b.bottom * fy };
+        this.width = width;
+        this.height = height;
+        this.env.calls.push({ op: "resizeImage", doc: this.id, width, height });
     }
     async save() {
         this.saveCalls++;
@@ -329,11 +396,17 @@ export function createFakeHost(cfg = {}) {
             AnchorPosition: { MIDDLECENTER: "middleCenter" }
         }
     };
+    const tempRoot = new FakeFolder("temp");
+    env.tempRoot = tempRoot;
     const uxp = {
         versions: { uxp: "uxp-9.0.2" },
         storage: {
             secureStorage: {},
+            formats: { binary: Symbol("binary"), utf8: Symbol("utf8") },
             localFileSystem: {
+                async getTemporaryFolder() {
+                    return tempRoot;
+                },
                 createSessionToken(entry) {
                     const t = `token-${env.tokens.size + 1}`;
                     env.tokens.set(t, entry);
