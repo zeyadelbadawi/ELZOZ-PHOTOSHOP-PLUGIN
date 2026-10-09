@@ -34,7 +34,7 @@ export const PRESETS = {
     zoomIn: { label: "Zoom in", at: (p) => ({ opacity: p, dx: 0, dy: 0, scale: 0.6 + 0.4 * p }) },
     pop: { label: "Pop", defaultEasing: "backOut", at: (p) => ({ opacity: Math.min(1, p * 2), dx: 0, dy: 0, scale: Math.max(0.01, p) }) },
     // Ken Burns runs for the whole clip: slow zoom from 100% to 112%.
-    kenBurns: { label: "Ken Burns (slow zoom)", wholeClip: true, at: (p) => ({ opacity: 1, dx: 0, dy: 0, scale: 1 + 0.12 * p }) }
+    kenBurns: { label: "Ken Burns", wholeClip: true, at: (p) => ({ opacity: 1, dx: 0, dy: 0, scale: 1 + 0.12 * p }) }
 };
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));

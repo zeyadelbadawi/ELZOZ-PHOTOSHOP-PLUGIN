@@ -104,7 +104,7 @@ export default function CheckStep() {
                         <div className="ez-label">{t("check.names")}</div>
                         {plan.items.slice(0, 3).map((it) => (
                             <div key={it.key} className="ez-small ez-ellipsis">
-                                {it.baseName}.{video ? "mov" : plan.formats.join(" / .")}
+                                {(video ? ["mov"] : plan.formats).map((f) => `${it.baseName}.${f}`).join(", ")}
                             </div>
                         ))}
                     </Card>

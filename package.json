@@ -11,7 +11,8 @@
     "uxp:load": "cd dist && uxp plugin load",
     "uxp:reload": "cd dist && uxp plugin reload",
     "uxp:debug": "cd dist && uxp plugin debug",
-    "test:db": "bash scripts/test-db.sh"
+    "test:db": "bash scripts/test-db.sh",
+    "harness": "webpack --config tests/harness/webpack.harness.js"
   },
   "author": "Elzoz",
   "license": "Apache-2.0",

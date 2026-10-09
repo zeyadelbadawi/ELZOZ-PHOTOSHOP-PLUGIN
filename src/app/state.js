@@ -8,7 +8,7 @@ export const DESIGN_STEPS = ["data", "template", "map", "check", "generate"];
 export const VIDEO_STEPS = ["data", "template", "map", "animate", "check", "generate"];
 export const stepsFor = (mode) => (mode === "video" ? VIDEO_STEPS : DESIGN_STEPS);
 
-export const initialSettings = { formats: ["jpg"], jpgQuality: 10, namePattern: "{row}", keepFrames: false };
+export const initialSettings = { formats: ["jpg"], jpgQuality: 10, namePattern: "elzoz_{row}", keepFrames: false };
 export const initialVideo = { format: "reel", fps: 30, durationMs: 6000, fadeOutMs: 500, tracks: {} };
 
 export function initialState(saved = {}) {

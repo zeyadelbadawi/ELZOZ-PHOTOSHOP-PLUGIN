@@ -244,3 +244,18 @@ record → apply text/images (design engine) → for each frame t:
 5. Kill Photoshop mid-job, relaunch: reservation released after the TTL; no charge for unreported rows.
 6. Video job, 3 records, Reel 1080×1920, 30 fps, 6 s, 3 presets: 3 MOV files play in QuickTime and VLC, with correct duration and frame count, and are charged 2 credits each.
 7. Spike A (§3.4) result recorded.
+
+
+---
+
+## 8. Implementation status (2026-10-09)
+
+| Milestone | Delivered | Verified here | Not verified |
+|---|---|---|---|
+| M0 Baseline | Sanitized import, prod build (558 KiB), secret scan, CI | Builds | — |
+| M1 Engine | compat, working copy, text (DOM + fallback), SO/pixel images, saveAs export with on-disk check, partial-output cleanup, job runner | 21 contract tests on a Photoshop fake | Everything inside Photoshop |
+| M2 Credits | Migrations, RLS, definer RPCs, idempotency, rate limits, expiry, refunds; auth + credits clients; security doc | 30 DB tests on PostgreSQL 16 (mutation-checked), 10 client tests | Real Supabase project, Auth settings, pg_cron |
+| M3 Video | Timeline/presets, frame renderer, MOV writer, verifier, video runner | 17 timeline, 5 ffmpeg-checked media, 8 engine tests | Rendering in Photoshop; playback of Photoshop-produced files; performance |
+| M4 UI | Design system, guided flow for designs and video, account, EN/AR, dev mode (dev builds only) | 10 state tests; browser walkthrough of both flows at 260/320/520 px with zero errors | UXP rendering, RTL in UXP, Spectrum widget behavior |
+
+**Remaining before launch (P3):** run §7 on the version matrix; Spike A (native H.264 MP4); deploy staging Supabase; performance test (500 rows, 15 s videos); upgrade SheetJS from its official CDN; product license decision; Adobe Marketplace listing (plugin id issued by Adobe).

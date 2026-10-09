@@ -35,7 +35,7 @@ function Root() {
     const { session } = useApp();
     const { rtl } = useI18n();
     return (
-        <div className={`ez-app ${rtl ? "ez-rtl" : ""}`}>
+        <div className={`ez-app ${rtl ? "ez-rtl" : ""}`} dir={rtl ? "rtl" : "ltr"} lang={rtl ? "ar" : "en"}>
             {session.status === "loading" ? <div className="ez-content ez-muted">…</div> : session.status === "signedIn" ? <Shell /> : <SignIn />}
         </div>
     );

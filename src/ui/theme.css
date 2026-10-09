@@ -448,25 +448,23 @@ body {
     color: var(--ez-link);
 }
 
-/* ---------- RTL (Arabic): mirror flex rows; text direction follows the content ---------- */
-.ez-rtl .ez-row,
-.ez-rtl .ez-header,
-.ez-rtl .ez-stepper,
-.ez-rtl .ez-actionbar,
-.ez-rtl .ez-layer-main,
-.ez-rtl .ez-file,
-.ez-rtl .ez-alert,
-.ez-rtl .ez-result,
-.ez-rtl .ez-section-head {
-    flex-direction: row-reverse;
-}
-.ez-rtl .ez-content {
-    text-align: right;
+/* ---------- RTL (Arabic) ----------
+ * Mirroring relies on the standard dir="rtl" attribute set on .ez-app.
+ * UXP's CSS reference does not document `direction`, so RTL layout must be
+ * verified in Photoshop (see docs/PLAN.md section 7).
+ */
+.ez-rtl .ez-actionbar-hint {
+    text-align: left;
 }
 
 /* ---------- responsive ---------- */
+@media (max-width: 399px) {
+    .ez-step .ez-step-label { display: none; }
+    .ez-step-current .ez-step-label { display: inline; }
+    .ez-step { margin-right: var(--ez-s2); }
+}
 @media (max-width: 279px) {
-    .ez-step-label { display: none; }
+    .ez-step-current .ez-step-label { display: none; }
     .ez-chip-label { display: none; }
     .ez-layer-main { flex-wrap: wrap; }
     .ez-layer-picker { width: 100%; margin-top: var(--ez-s1); }

@@ -1,50 +1,58 @@
-# React Starter Plugin
+# Elzoz — batch designs and videos for Photoshop
 
-This plugin is a good place to get started when building a Photoshop plugin using React. It comes defined with all the dependencies that you'll need to get started. As this is a React project, you'll need to do some initial configuration before this will be usable in Photoshop.
+Elzoz is a Photoshop UXP panel that turns a spreadsheet and a PSD template into one finished design (JPG/PNG/PSD) or one animated video (MOV) per row. Credits are server-authoritative (Supabase).
 
-## Install dependencies
+> **Status (2026-10-09):** pre-launch. The engine, credits backend and UI are implemented and covered by automated tests. **Nothing has been verified inside Photoshop yet.** See `docs/PLAN.md` §7 for the Photoshop checklist.
 
-First, make sure that `npm` is installed on your system.
-
-After you ensure that your terminal is in the root of this project, use `npm` to install the various dependencies needed:
+## How it works
 
 ```
-npm install
+Data (xlsx/csv) → Template (PSD) → Map columns to layers → [Animate] → Check → Generate → Results
 ```
 
-<b>Optional</b></br> 
-If you prefer to use `yarn`, after you generate the `package-lock.json` file you can run the following line to import dependencies to a `yarn.lock` file: 
+- The template is **never modified or saved**: Elzoz duplicates it, renders each row as one history state, exports copies, reverts, and closes the duplicate without saving.
+- A row succeeds only if every text/image change succeeded **and** every output file exists on disk (videos are re-read and validated frame by frame).
+- Credits are **reserved** when a job starts and **charged only for succeeded items**; failed, cancelled and abandoned items are released.
+
+## Repository layout
+
+| Path | What |
+|---|---|
+| `src/domain/` | Pure logic: spreadsheet parsing, mapping, image matching, naming, preflight, video timeline |
+| `src/ps/` | The only code that touches Photoshop (`require('photoshop')`): compatibility, layer tree, text, images, export, video frames, the non-destructive port |
+| `src/media/` | MOV (Photo-JPEG) writer, JPEG and container validation |
+| `src/engine/` | Design and video job runners (reservation → render → verify → report) |
+| `src/account/` | Supabase Auth client, credits client (idempotent RPCs) |
+| `src/app/`, `src/ui/` | React UI: guided flow, design system, EN/AR |
+| `supabase/migrations/` | Database schema, RLS, credit RPCs |
+| `tests/` | Unit, contract (fake Photoshop), media (ffmpeg), database (PostgreSQL) tests; browser harness |
+| `docs/` | Audit, plan, security, compatibility, design system |
+
+## Develop
+
+Requirements: Node 22, npm 10. For database tests: PostgreSQL 15+. For media tests: ffmpeg/ffprobe.
+
+```bash
+npm ci
+cp .env.example .env          # ELZOZ_SUPABASE_URL / ELZOZ_SUPABASE_ANON_KEY (public anon key only)
+npm run build                 # development build into dist/ (developer mode available)
+npm run build:prod            # production build (no eval, no developer mode)
+npm test                      # unit + contract + media tests
+ELZOZ_TEST_ADMIN_URL=postgresql://postgres@localhost:5432/postgres npm run test:db
+npm run check:secrets         # fails if a privileged key or the dev billing stub is bundled
+npm run harness && node tests/harness/walkthrough.js   # browser preview + flow walkthrough (not UXP)
 ```
-yarn import
-```
 
-## Build Process
+Load in Photoshop with the **UXP Developer Tool**: *Add Plugin* → `dist/manifest.json` → *Load*. Without a Supabase configuration, a development build offers **developer mode** (nothing is charged); production builds never include it.
 
-There are two ways to build the plugin for use in Photoshop:
+## Backend
 
-* `yarn watch` (or `npm run watch`) will build a development version of the plugin, and recompile every time you make a change to the source files. The result is placed in `dist` folder. Make sure your plugin is in watch mode in UDT app.
-* `yarn build` (or `npm run build`) will build a production version of the plugin and place it in `dist` folder. It will not update every time you make a change to the source files.
+See `docs/SECURITY.md` for the deployment and secrets checklist. In short: create a Supabase project, enable `pg_cron`, run `supabase db push`, configure Auth (email confirmation, CAPTCHA), and put only the URL and anon key in `.env`.
 
-> You **must** run either `watch` or `build` prior to trying to use within Photoshop!
+## Compatibility
 
-## Launching in Photoshop
+Manifest minimum Photoshop **23.3** (Manifest v5). Recommended **24.2+**. Supported versions are only those that pass the Photoshop checklist; see `docs/COMPATIBILITY.md`.
 
-You can use the UXP Developer Tools to load the plugin into Photoshop.
+## License
 
-If the plugin hasn't already been added to your workspace in the UXP Developer Tools, you can add it by clicking "Add Plugin...". You can either add the `manifest.json` file in the `dist` folder or the `plugin` folder.
-* If you add the one in the `plugin` folder, then you need to update the relative path to the plugin build folder ( `dist` ) by clicking the ••• button > "Options" > "Advanced" > "Plugin build folder".
-* During development, it is recommended to build the plugin using `yarn watch` and load the `manifest.json` in the (plugin build) `dist` folder. 
-
-Once added, you can load it into Photoshop by clicking the ••• button on the corresponding row, and clicking "Load". Switch to Photoshop and you should see the starter panels.
-
-## What this plugin does
-
-This plugin doesn't do much, but does illustrate how to create two panels in Photoshop with `entrypoints.setup`, and how to create flyout menus. It also demonstrates the use of several Spectrum UXP widgets to create a simple color picker in the primary panel.
-
-### Common Issues 
-
-* If you're getting errors with `npm install`, we can reinstall the project dependencies. Let's first make sure to delete `node_modules/*` from the `template` folder as well as the `package-lock.json` and `yarn.lock` file. Staying in the `template` directory, run `npm install` again and this will regenerate your `package-lock.json` file.
-* After running `yarn import` if you end up with the error `Lockfile already exists, not importing.`, then it is likely due to an already existing `yarn.lock` in your project. In such a case, you can either delete the lock file to generate a new `yarn.lock` or continue with the [Build Process](#build-process) steps.
-
-PS Version : 23.2.0 or higher
-UXP Version : 5.6 or higher
+The project started from Adobe's React starter plugin, whose `LICENSE` (Apache-2.0) is kept. Decide the product license before release.

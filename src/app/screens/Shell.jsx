@@ -37,7 +37,7 @@ function Header({ onAccount }) {
             <div className="ez-header-spacer" />
             <div className={`ez-chip ${low ? "ez-chip-low" : ""}`} onClick={onAccount} title={t("app.account")}>
                 {session.dev ? "DEV" : account ? account.available : "–"}
-                <span className="ez-chip-label ez-ml2 ez-muted">{t("app.credits")}</span>
+                <span className="ez-chip-label ez-muted">&nbsp;{t("app.credits")}</span>
             </div>
         </div>
     );

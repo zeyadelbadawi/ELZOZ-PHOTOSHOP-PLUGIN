@@ -104,7 +104,7 @@ export default function AnimateStep() {
                                         </div>
                                         <div className="ez-grow">
                                             <Field label={t("animate.easing")}>
-                                                <Select value={track.easing} onChange={(v) => setTrack({ easing: v })} options={Object.keys(EASINGS).map((k) => ({ value: k, label: k }))} />
+                                                <Select value={track.easing} onChange={(v) => setTrack({ easing: v })} options={Object.keys(EASINGS).map((k) => ({ value: k, label: t(`easing.${k}`) }))} />
                                             </Field>
                                         </div>
                                     </div>
