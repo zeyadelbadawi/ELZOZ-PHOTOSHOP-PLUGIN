@@ -17,3 +17,4 @@ dist-qa/
 admin/node_modules/
 admin/dist/
 admin/dist-e2e/
+dist-release/

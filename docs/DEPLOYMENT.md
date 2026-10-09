@@ -9,6 +9,8 @@ Three parts, all of them yours:
 | **Plugin** | The Photoshop panel your clients install | Your clients' computers |
 
 Do everything once on a **staging** project first, then repeat on **production**.
+
+> The production project already exists (`elzoz`, set up through the Supabase connector). See [`ENVIRONMENTS.md`](ENVIRONMENTS.md) for its details, the one SQL file still to run, and the `supabase migration repair` step to do before using the CLI on it.
 Arabic quick guide for daily use: [`ADMIN_GUIDE_AR.md`](ADMIN_GUIDE_AR.md).
 
 ---
