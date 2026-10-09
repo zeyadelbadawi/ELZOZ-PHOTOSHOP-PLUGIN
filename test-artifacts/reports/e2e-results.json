@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-09T20:11:55.234Z",
+  "generated": "2026-10-09T22:54:15.109Z",
   "host": "SIMULATED Photoshop host in Chromium (not Adobe Photoshop, not UXP)",
   "backend": "REAL local Postgres + PostgREST with the Elzoz migrations; Auth is a local stub",
   "scenarios": [
@@ -106,7 +106,7 @@
           "ok": true,
           "detail": [
             {
-              "id": "a09b52dc-9814-4bcb-b85e-6e86158e3a77",
+              "id": "c262c1d6-072b-4f79-ab6e-dd324e52457d",
               "status": "completed",
               "planned_items": 8,
               "reserved_total": "8",
@@ -122,11 +122,11 @@
         {
           "name": "recording SIMULATED-scenario-A-design-batch.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x720 9.8 s"
+          "detail": "h264 320x720 10.5 s"
         }
       ],
       "error": null,
-      "ms": 10101
+      "ms": 10910
     },
     {
       "id": "B",
@@ -178,11 +178,11 @@
         {
           "name": "recording SIMULATED-scenario-B-missing-asset-recovery.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x720 7.0 s"
+          "detail": "h264 320x720 6.9 s"
         }
       ],
       "error": null,
-      "ms": 7309
+      "ms": 7152
     },
     {
       "id": "C",
@@ -253,11 +253,11 @@
         {
           "name": "recording SIMULATED-scenario-C-video.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x720 18.5 s"
+          "detail": "h264 320x720 18.7 s"
         }
       ],
       "error": null,
-      "ms": 18455
+      "ms": 18428
     },
     {
       "id": "D",
@@ -313,7 +313,7 @@
         }
       ],
       "error": null,
-      "ms": 18583,
+      "ms": 18414,
       "faultsInjected": true
     },
     {
@@ -342,7 +342,7 @@
         }
       ],
       "error": null,
-      "ms": 45222,
+      "ms": 43973,
       "faultsInjected": false
     },
     {
@@ -352,7 +352,7 @@
         {
           "name": "dashboard shows a generated password once",
           "ok": true,
-          "detail": "Vzf5-8DtS-9THE"
+          "detail": "CfZb-8N7m-MCJJ"
         },
         {
           "name": "client detail shows 50 available",
@@ -381,7 +381,7 @@
         {
           "name": "refresh keeps the client page open (URL hash)",
           "ok": true,
-          "detail": "http://127.0.0.1:54340/admin/#/clients/4ce094fa-7b24-45b6-a576-2b97cec8db21"
+          "detail": "http://127.0.0.1:54340/admin/#/clients/c58033b1-b2e0-41c1-835e-d937f8057b88"
         },
         {
           "name": "dashboard sees the 3 charges",
@@ -395,12 +395,12 @@
             {
               "amount": "50",
               "remaining": "47",
-              "expires_at": "2026-11-08T20:13:36.681Z"
+              "expires_at": "2026-11-08T22:55:55.924Z"
             },
             {
               "amount": "100",
               "remaining": "100",
-              "expires_at": "2026-12-08T20:13:43.697Z"
+              "expires_at": "2026-12-08T22:56:02.843Z"
             }
           ]
         },
@@ -429,7 +429,7 @@
         {
           "name": "recording SIMULATED-scenario-F-admin-dashboard.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 1280x800 13.0 s"
+          "detail": "h264 1280x800 12.9 s"
         },
         {
           "name": "dashboard fits a 390 px phone without horizontal scrolling",
@@ -443,7 +443,7 @@
         }
       ],
       "error": null,
-      "ms": 16230,
+      "ms": 15862,
       "faultsInjected": false
     },
     {
@@ -535,11 +535,11 @@
         {
           "name": "recording SIMULATED-scenario-G-designer-features.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x760 8.5 s"
+          "detail": "h264 320x760 8.4 s"
         }
       ],
       "error": null,
-      "ms": 8736
+      "ms": 8618
     }
   ],
   "screenshots": [
@@ -1298,8 +1298,8 @@
       "codec": "h264",
       "width": 320,
       "height": 720,
-      "durationSec": 9.8,
-      "bytes": 193181,
+      "durationSec": 10.52,
+      "bytes": 188750,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -1309,8 +1309,8 @@
       "codec": "h264",
       "width": 320,
       "height": 720,
-      "durationSec": 7,
-      "bytes": 174966,
+      "durationSec": 6.88,
+      "bytes": 176470,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -1320,8 +1320,8 @@
       "codec": "h264",
       "width": 320,
       "height": 720,
-      "durationSec": 18.52,
-      "bytes": 194932,
+      "durationSec": 18.68,
+      "bytes": 189607,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -1331,8 +1331,8 @@
       "codec": "h264",
       "width": 520,
       "height": 700,
-      "durationSec": 12.64,
-      "bytes": 549078,
+      "durationSec": 12.6,
+      "bytes": 552716,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -1342,8 +1342,8 @@
       "codec": "h264",
       "width": 1280,
       "height": 800,
-      "durationSec": 13.04,
-      "bytes": 410677,
+      "durationSec": 12.88,
+      "bytes": 553723,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -1353,8 +1353,8 @@
       "codec": "h264",
       "width": 320,
       "height": 760,
-      "durationSec": 8.48,
-      "bytes": 235177,
+      "durationSec": 8.44,
+      "bytes": 229423,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     }

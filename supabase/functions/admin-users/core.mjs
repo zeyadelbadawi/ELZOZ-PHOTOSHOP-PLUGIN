@@ -52,8 +52,10 @@ class HttpError extends Error {
 }
 
 function corsHeaders(origin, allowed) {
-    const list = String(allowed || "").split(",").map((s) => s.trim()).filter(Boolean);
-    const ok = origin && (list.includes("*") || list.includes(origin));
+    // Tolerate "https://host/" or upper case in the secret; browsers send the bare origin.
+    const norm = (s) => String(s || "").trim().replace(/\/+$/, "").toLowerCase();
+    const list = String(allowed || "").split(/[,\s]+/).map(norm).filter(Boolean);
+    const ok = origin && (list.includes("*") || list.includes(norm(origin)));
     return {
         ...(ok ? { "Access-Control-Allow-Origin": origin, Vary: "Origin" } : {}),
         "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",

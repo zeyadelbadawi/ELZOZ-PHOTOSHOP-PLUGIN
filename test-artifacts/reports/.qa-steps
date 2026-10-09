@@ -1,7 +1,7 @@
 backend|pass
 admin-deps|pass
 vitest|pass
-e2e|fail
+e2e|pass
 build|pass
 admin-build|pass
 audit|info

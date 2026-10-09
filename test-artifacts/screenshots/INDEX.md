@@ -2,7 +2,7 @@
 
 All images and recordings come from the **SIMULATED Photoshop host in Chromium** (banner at the top of each). They show Elzoz's UI and flow, not Adobe Photoshop or UXP rendering.
 
-Run: 2026-10-09T20:11:55.234Z. Layout check = automatic test for elements overflowing the panel.
+Run: 2026-10-09T22:54:15.109Z. Layout check = automatic test for elements overflowing the panel.
 
 | File | Scenario | Width | Theme | Lang | What it shows | Layout check |
 |---|---|---|---|---|---|---|

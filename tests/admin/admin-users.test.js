@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { generatePassword, pickKey } from "../../supabase/functions/admin-users/core.mjs";
+import { generatePassword, handleAdminRequest, pickKey } from "../../supabase/functions/admin-users/core.mjs";
 
 const hasBackend = !!(process.env.ELZOZ_TEST_DATABASE_URL && process.env.ELZOZ_TEST_POSTGREST_URL && process.env.ELZOZ_TEST_JWT_SECRET);
 const PORT = 54350;
@@ -19,6 +19,17 @@ describe("pickKey (new and legacy Supabase key env)", () => {
         expect(pickKey("not json", "legacy-jwt")).toBe("legacy-jwt");
         expect(pickKey('{"other":"k2"}', undefined)).toBe("k2");
         expect(pickKey(undefined, undefined)).toBeUndefined();
+    });
+});
+
+describe("CORS origin matching", () => {
+    it("matches the dashboard origin even when the secret has a trailing slash or capitals", async () => {
+        const env = { supabaseUrl: "http://x", serviceKey: "s", anonKey: "a", allowedOrigins: " HTTPS://Admin.Example/ , https://other.example" };
+        const r = await handleAdminRequest({ method: "OPTIONS", headers: { origin: "https://admin.example" }, body: "" }, env);
+        expect(r.status).toBe(204);
+        expect(r.headers["Access-Control-Allow-Origin"]).toBe("https://admin.example");
+        const bad = await handleAdminRequest({ method: "OPTIONS", headers: { origin: "https://admin.example.evil" }, body: "" }, env);
+        expect(bad.headers["Access-Control-Allow-Origin"]).toBeUndefined();
     });
 });
 
