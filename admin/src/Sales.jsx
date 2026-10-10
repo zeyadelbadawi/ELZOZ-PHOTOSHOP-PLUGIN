@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "./api.js";
 import { errorText } from "./i18n.js";
-import { ErrorBox, fmtDate, num, useAsync, useT } from "./ui.jsx";
+import { ErrorBox, fmtDate, num, useAsync, useConfirm, useT } from "./ui.jsx";
 
 export const SALES_TABS = ["orders", "contacts", "payments", "packages", "bot"];
 
@@ -73,11 +73,14 @@ function Orders() {
     const q = useDebounced(search);
     const [{ data, error }, reload] = useAsync(() => api.botOrders(status || null, q || null), [status, q]);
     const [actionErr, setActionErr] = useState(null);
-    const act = async (fn, msg) => {
-        if (!window.confirm(msg)) return;
+    const [dialog, ask] = useConfirm();
+    // withNotify: show the "tell the client on WhatsApp" checkbox; fn receives the choice.
+    const act = async (fn, msg, withNotify = false) => {
+        const ok = await ask(msg, { notify: withNotify, danger: withNotify });
+        if (!ok) return;
         setActionErr(null);
         try {
-            await fn();
+            await fn(ok.notify);
             reload();
         } catch (e) {
             setActionErr(e);
@@ -97,6 +100,7 @@ function Orders() {
                 <input className="search grow" type="search" placeholder={t("ordersSearch")} value={search} onChange={(e) => setSearch(e.target.value)} dir="auto" />
             </div>
             <ErrorBox error={error} />
+            {dialog}
             {actionErr && <div className="alert alert-error">{errorText(lang, actionErr)}</div>}
             {data && data.length === 0 && <div className="empty">{t("noOrders")}</div>}
             {data && data.length > 0 && (
@@ -137,7 +141,7 @@ function Orders() {
                                                 <button className="btn btn-primary" onClick={() => act(() => api.botApprove(o.code), t("confirmApprove", { code: o.code, amount: Number(o.amount_due) }))}>
                                                     {t("approve")}
                                                 </button>{" "}
-                                                <button className="btn btn-danger" onClick={() => act(() => api.botReject(o.code, "rejected from dashboard"), t("confirmReject", { code: o.code }))}>
+                                                <button className="btn btn-danger" onClick={() => act((notify) => api.botReject(o.code, "rejected from dashboard", notify), t("confirmReject", { code: o.code }), true)}>
                                                     {t("reject")}
                                                 </button>
                                             </>

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api, configured, currentEmail, restore, signIn, signOut } from "./api.js";
 import { errorText, translate } from "./i18n.js";
-import { Ctx, ErrorBox, PAGE, daysUntil, fmtDate, num, useAsync, useT } from "./ui.jsx";
+import { Ctx, ErrorBox, PAGE, daysUntil, fmtDate, num, useAsync, useConfirm, useT } from "./ui.jsx";
 import Sales from "./Sales.jsx";
 
 function CopyButton({ text, label }) {
@@ -308,8 +308,9 @@ function Clients({ open }) {
 
 // ------------------------------------------------------------------ client detail
 
-function ActionForm({ title, button, confirmText, fields, onSubmit, danger }) {
+function ActionForm({ title, button, confirmText, fields, onSubmit, danger, notify }) {
     const { lang } = useT();
+    const [dialog, ask] = useConfirm();
     const [values, setValues] = useState(Object.fromEntries(fields.map((f) => [f.name, f.initial ?? ""])));
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
@@ -317,11 +318,12 @@ function ActionForm({ title, button, confirmText, fields, onSubmit, danger }) {
     const [idem, setIdem] = useState(api.newKey());
     const submit = async (e) => {
         e.preventDefault();
-        if (!window.confirm(confirmText(values))) return;
+        const ok = await ask(confirmText(values), { notify, danger });
+        if (!ok) return;
         setBusy(true);
         setError(null);
         try {
-            await onSubmit(values, idem);
+            await onSubmit(values, idem, ok.notify);
             setValues(Object.fromEntries(fields.map((f) => [f.name, f.initial ?? ""])));
             setIdem(api.newKey());
         } catch (err) {
@@ -332,6 +334,7 @@ function ActionForm({ title, button, confirmText, fields, onSubmit, danger }) {
     };
     return (
         <form className="card" onSubmit={submit}>
+            {dialog}
             <h3>{title}</h3>
             {error && <div className="alert alert-error">{errorText(lang, error)}</div>}
             <div className="row gap wrap">
@@ -403,6 +406,12 @@ function ClientDetail({ id, back }) {
     const [{ data, error }, reload] = useAsync(() => api.userDetail(id), [id]);
     const [secret, setSecret] = useState(null);
     const [actionError, setActionError] = useState(null);
+    const [dialog, ask] = useConfirm();
+    // Ask first (with the WhatsApp checkbox), then run fn(notify).
+    const confirmAct = async (message, fn, danger = false) => {
+        const ok = await ask(message, { notify: true, danger });
+        if (ok) await act(() => fn(ok.notify));
+    };
     if (error) return <ErrorBox error={error} />;
     if (!data) return <div className="muted">…</div>;
     const a = data.account || {};
@@ -429,6 +438,7 @@ function ClientDetail({ id, back }) {
                 <span className={`badge ${a.disabled ? "badge-off" : "badge-on"}`}>{a.disabled ? t("disabled") : t("active")}</span>
             </div>
             <ErrorBox error={actionError} />
+            {dialog}
             {secret && <CredentialsCard email={data.user.email} password={secret} onClose={() => setSecret(null)} />}
             <div className="stats">
                 <div className="stat">
@@ -456,9 +466,10 @@ function ClientDetail({ id, back }) {
                         { name: "days", label: t("validDays"), type: "number", min: 1, max: 3660, required: true, initial: 30, grow: true },
                         { name: "note", label: t("note"), grow: true }
                     ]}
+                    notify
                     confirmText={(v) => t("topUpConfirm", { n: v.amount, d: v.days })}
-                    onSubmit={async (v, idem) => {
-                        await api.grant(id, Number(v.amount), Number(v.days), v.note, idem);
+                    onSubmit={async (v, idem, notify) => {
+                        await api.grant(id, Number(v.amount), Number(v.days), v.note, idem, notify);
                         await reload();
                     }}
                 />
@@ -470,9 +481,10 @@ function ClientDetail({ id, back }) {
                         { name: "amount", label: t("credits"), type: "number", min: 1, required: true, initial: "", grow: true },
                         { name: "note", label: t("noteRequired"), required: true, grow: true }
                     ]}
+                    notify
                     confirmText={(v) => t("removeConfirm", { n: v.amount })}
-                    onSubmit={async (v, idem) => {
-                        await api.remove(id, Number(v.amount), v.note, idem);
+                    onSubmit={async (v, idem, notify) => {
+                        await api.remove(id, Number(v.amount), v.note, idem, notify);
                         await reload();
                     }}
                 />
@@ -481,15 +493,15 @@ function ClientDetail({ id, back }) {
             <p className="muted small">{t("notifyHint")}</p>
 
             <div className="row gap wrap">
-                <button className="btn" onClick={() => window.confirm(t("resetConfirm")) && act(async () => setSecret((await api.resetPassword(id)).password))}>
+                <button className="btn" onClick={() => confirmAct(t("resetConfirm"), async (notify) => setSecret((await api.resetPassword(id, notify)).password))}>
                     {t("resetPassword")}
                 </button>
                 {a.disabled ? (
-                    <button className="btn" onClick={() => act(() => api.setDisabled(id, false))}>
+                    <button className="btn" onClick={() => confirmAct(t("enableConfirm"), (notify) => api.setDisabled(id, false, notify))}>
                         {t("enable")}
                     </button>
                 ) : (
-                    <button className="btn btn-danger" onClick={() => window.confirm(t("disableConfirm")) && act(() => api.setDisabled(id, true))}>
+                    <button className="btn btn-danger" onClick={() => confirmAct(t("disableConfirm"), (notify) => api.setDisabled(id, true, notify), true)}>
                         {t("disable")}
                     </button>
                 )}
@@ -549,7 +561,7 @@ function ClientDetail({ id, back }) {
                                     <span dir="auto">{e.kind === "expiry" ? "" : e.note || e.item_key || ""}</span>
                                     {e.actor && e.actor !== "system" && <span className="muted"> · {e.actor.replace(/^admin:/, "")}</span>}
                                     {e.kind === "charge" && (
-                                        <button className="btn btn-link small" onClick={() => window.confirm(t("refundConfirm")) && act(() => api.refund(e.id, "refund"))}>
+                                        <button className="btn btn-link small" onClick={() => confirmAct(t("refundConfirm"), (notify) => api.refund(e.id, "refund", notify))}>
                                             {t("refund")}
                                         </button>
                                     )}

@@ -8,8 +8,9 @@
 // service key (Supabase Auth admin API).
 //
 // POST body: { action: "create_user", email, password?, credits?, valid_days?, note?, idempotency_key? }
-//            { action: "reset_password", user_id, password? }
-//            { action: "set_disabled", user_id, disabled }
+//            { action: "reset_password", user_id, password?, notify? }
+//            { action: "set_disabled", user_id, disabled, notify? }
+// notify (default true): tell the client on WhatsApp through the sales bot.
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"; // no 0/O, 1/l/I
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -152,11 +153,14 @@ export async function handleAdminRequest(req, env) {
             await authAdmin("PUT", `/${id}`, { password });
             // Tell the client on WhatsApp that the password changed (never the password itself).
             // Best effort: the reset has already succeeded.
-            let notified = true;
-            try {
-                await asCaller("admin_note_password_reset", { p_user: id });
-            } catch {
-                notified = false;
+            let notified = false;
+            if (input.notify !== false) {
+                try {
+                    await asCaller("admin_note_password_reset", { p_user: id });
+                    notified = true;
+                } catch {
+                    notified = false;
+                }
             }
             return reply(200, { user_id: id, password, notified });
         }
@@ -166,7 +170,7 @@ export async function handleAdminRequest(req, env) {
             if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(400, "invalid_user_id");
             const disabled = input.disabled === true;
             // Database first (blocks new jobs immediately), then sign-in.
-            await asCaller("admin_set_disabled", { p_user: id, p_disabled: disabled });
+            await asCaller("admin_set_disabled", { p_user: id, p_disabled: disabled, p_notify: input.notify !== false });
             await authAdmin("PUT", `/${id}`, { ban_duration: disabled ? BAN_FOREVER : "none" });
             return reply(200, { user_id: id, disabled });
         }

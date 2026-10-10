@@ -42,3 +42,47 @@ export function ErrorBox({ error }) {
     );
 }
 
+
+/**
+ * Confirmation dialog with an optional "notify the client on WhatsApp" checkbox (checked by default).
+ * const [dialog, ask] = useConfirm();  ...  const r = await ask(text, { notify: true });  // null = cancelled
+ * Render {dialog} once in the component.
+ */
+export function useConfirm() {
+    const { t } = useT();
+    const [state, setState] = useState(null);
+    const ask = useCallback(
+        (message, { notify = false, danger = false } = {}) =>
+            new Promise((resolve) => setState({ message, withNotify: notify, notify: true, danger, resolve })),
+        []
+    );
+    const close = (result) => {
+        state.resolve(result);
+        setState(null);
+    };
+    const dialog = state ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => close(null)}>
+            <div className="modal card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                <p className="modal-text">{state.message}</p>
+                {state.withNotify && (
+                    <label className="check" data-testid="notify-check">
+                        <input type="checkbox" checked={state.notify} onChange={(e) => setState({ ...state, notify: e.target.checked })} />
+                        <span>
+                            {t("notifyClient")}
+                            <span className="muted small block">{state.notify ? t("notifyOn") : t("notifyOff")}</span>
+                        </span>
+                    </label>
+                )}
+                <div className="row gap end">
+                    <button className="btn" onClick={() => close(null)}>
+                        {t("cancel")}
+                    </button>
+                    <button className={`btn ${state.danger ? "btn-danger" : "btn-primary"}`} autoFocus onClick={() => close({ notify: state.withNotify ? state.notify : true })}>
+                        {t("confirm")}
+                    </button>
+                </div>
+            </div>
+        </div>
+    ) : null;
+    return [dialog, ask];
+}

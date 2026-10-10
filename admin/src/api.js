@@ -110,21 +110,24 @@ export const api = {
     listUsers: (search, limit, offset) => rpc("admin_list_users", { p_search: search || null, p_limit: limit, p_offset: offset }),
     userDetail: (id) => rpc("admin_user_detail", { p_user: id }),
     // One idempotency key per form submission: a double click or a retried request adds credits once.
-    grant: (id, amount, days, note, idemKey = key()) => rpc("admin_grant_credits", { p_user: id, p_amount: amount, p_valid_days: days, p_note: note || null, p_idempotency_key: idemKey }),
-    remove: (id, amount, note, idemKey = key()) => rpc("admin_remove_credits", { p_user: id, p_amount: amount, p_note: note, p_idempotency_key: idemKey }),
-    refund: (ledgerId, note) => rpc("admin_refund_charge", { p_ledger_id: ledgerId, p_note: note }),
+    // notify: tell the client on WhatsApp (the sales bot sends the message).
+    grant: (id, amount, days, note, idemKey = key(), notify = true) =>
+        rpc("admin_grant_credits", { p_user: id, p_amount: amount, p_valid_days: days, p_note: note || null, p_idempotency_key: idemKey, p_notify: notify }),
+    remove: (id, amount, note, idemKey = key(), notify = true) =>
+        rpc("admin_remove_credits", { p_user: id, p_amount: amount, p_note: note, p_idempotency_key: idemKey, p_notify: notify }),
+    refund: (ledgerId, note, notify = true) => rpc("admin_refund_charge", { p_ledger_id: ledgerId, p_note: note, p_notify: notify }),
     setPrice: (unit, price) => rpc("admin_set_price", { p_unit: unit, p_price: price }),
     createUser: (input) => adminFn({ action: "create_user", ...input, idempotency_key: key() }),
-    resetPassword: (userId) => adminFn({ action: "reset_password", user_id: userId }),
+    resetPassword: (userId, notify = true) => adminFn({ action: "reset_password", user_id: userId, notify }),
     clientNotices: (userId) => rpc("admin_client_notifications", { p_user: userId, p_limit: 20 }),
-    setDisabled: (userId, disabled) => adminFn({ action: "set_disabled", user_id: userId, disabled }),
+    setDisabled: (userId, disabled, notify = true) => adminFn({ action: "set_disabled", user_id: userId, disabled, notify }),
     // WhatsApp sales bot
     botOverview: () => rpc("admin_bot_overview"),
     botOrders: (status, search) => rpc("admin_bot_orders", { p_status: status, p_search: search, p_limit: 100 }),
     botContacts: (search) => rpc("admin_bot_contacts", { p_search: search, p_limit: 100 }),
     botPayments: () => rpc("admin_bot_payments", { p_limit: 100 }),
     botApprove: (code) => rpc("admin_bot_approve", { p_code: code }),
-    botReject: (code, reason) => rpc("admin_bot_reject", { p_code: code, p_reason: reason }),
+    botReject: (code, reason, notify = true) => rpc("admin_bot_reject", { p_code: code, p_reason: reason, p_notify: notify }),
     botPackages: () => rpc("admin_bot_packages"),
     botSavePackage: (p) =>
         rpc("admin_bot_save_package", { p_code: p.code, p_name: p.name, p_credits: p.credits, p_valid_days: p.valid_days, p_price_egp: p.price_egp, p_active: p.active, p_sort: p.sort }),

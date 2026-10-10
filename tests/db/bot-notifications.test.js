@@ -93,6 +93,26 @@ d("bot notifications (database)", () => {
         expect(rows[0]).toMatchObject({ kind: "order_rejected", data: { code: o.code } });
     });
 
+    it("the admin can choose not to notify: nothing is queued, the change itself still happens", async () => {
+        const user = await createUser(db);
+        await rpc(db, admin, "admin_grant_credits", [user, 50, 30, "quiet top-up", key(), false]);
+        await rpc(db, admin, "admin_remove_credits", [user, 5, "quiet fix", key(), false]);
+        await rpc(db, admin, "admin_set_disabled", [user, true, false]);
+        await rpc(db, admin, "admin_set_disabled", [user, false, true]);
+        await rpc(db, admin, "admin_grant_credits", [user, 1, 30, null, key()]); // default: notify
+        const rows = await notices(user);
+        expect(rows.map((r) => r.kind)).toEqual(["enabled", "credits_added"]);
+        const bal = (await db.query("select balance, disabled from public.credit_accounts where user_id = $1", [user])).rows[0];
+        expect(Number(bal.balance)).toBe(46);
+        expect(bal.disabled).toBe(false);
+
+        const c = await svc("select public.bot_touch_contact($1, 'T', 'hi') as r", [phone()]);
+        const o = await svc("select public.bot_create_order($1, 'basic', $2) as r", [c.id, `${randomUUID()}@x.test`]);
+        const r = await rpc(db, admin, "admin_bot_reject", [o.code, "quiet", false]);
+        expect(r.changed).toBe(true);
+        expect((await db.query("select count(*)::int n from public.bot_notifications where contact_id = $1", [c.id])).rows[0].n).toBe(0);
+    });
+
     it("only service_role reads or delivers notices; admins read a client's list", async () => {
         const user = await createUser(db);
         await expect(asUser(db, user, "select * from public.bot_notifications")).rejects.toThrow(/permission denied/);
