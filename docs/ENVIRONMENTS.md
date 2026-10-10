@@ -13,6 +13,7 @@
 | Admin dashboard | `https://elzoadmin.vercel.app` (Vercel, root directory `admin`) |
 | Admin account | the owner's account, in `private.admins` |
 | Contact link in the plugin | WhatsApp (`ELZOZ_CONTACT_URL` in the local `.env`) |
+| Sales bot | Edge Function `sales-bot` (verify JWT: off, each route checks its own secret); cron `elzoz-bot-tick` every 5 min (key in Vault); Storage bucket `releases` (private). Setup: [`SALES_BOT_SETUP_AR.md`](SALES_BOT_SETUP_AR.md) |
 | Created | 2026-10-09 via the Supabase connector |
 
 Never store the secret / service_role key here or anywhere in the repository.
@@ -37,7 +38,7 @@ On this project the migration history holds the connector's step names (`credits
 
 ```bash
 supabase link --project-ref qxclgvmqeztonhdntvni
-supabase migration repair --status applied 20261009000001 20261009000002 20261010000001
+supabase migration repair --status applied 20261009000001 20261009000002 20261010000001 20261011000001
 ```
 
 After that, new migration files are pushed normally.
