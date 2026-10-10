@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Alert, Field, FileField, NumberInput, Section, Select } from "../../ui/components.jsx";
+import { effectiveTable } from "../state.js";
+import SmartColumns from "./SmartColumns.jsx";
 
 function Preview({ table }) {
     const headers = table.headers;
@@ -94,9 +96,10 @@ export default function DataStep() {
                     ))}
                     {data.table.headers.length > 0 && (
                         <Section title={t("data.preview")}>
-                            <Preview table={data.table} />
+                            <Preview table={effectiveTable(state)} />
                         </Section>
                     )}
+                    {data.table.headers.length > 0 && <SmartColumns />}
                 </>
             )}
         </>

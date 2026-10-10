@@ -7,6 +7,8 @@ import crypto from "node:crypto";
 import * as XLSX from "xlsx";
 import { writePsdBuffer, readPsd } from "ag-psd";
 
+XLSX.set_fs(fs); // the ESM build of SheetJS needs the file system handed to it
+
 const OUT = path.resolve(process.argv[2] || "test-artifacts/fixtures");
 const dirs = { sheets: path.join(OUT, "spreadsheets"), psd: path.join(OUT, "templates"), video: path.join(OUT, "video") };
 Object.values(dirs).forEach((d) => fs.mkdirSync(d, { recursive: true }));
@@ -50,6 +52,17 @@ const edge = [
     [42, "", 0.5, "", "laptop.jpg", "nova.png", "numeric cells"]
 ];
 add(writeXlsx(path.join(dirs.sheets, "products-edge.xlsx"), { Edge: edge, Second: [["Other"], ["sheet"]] }), "xlsx", "Duplicate and empty headers, missing/traversal/non-image/corrupt/ambiguous image refs, blank row, empty cells, long and illegal names, numbers, second sheet", ["B", "edge"]);
+
+// Features 9-15: offers with old/new prices, dates, phones, colors, product codes and image links.
+const offers = [
+    ["Name", "Old price", "New price", "Description", "Photo", "Logo", "Ends", "Phone", "Color", "SKU", "Image URL", "Key"],
+    ["  aurora   laptop 14 ", "1,500", "1,299", "Thin, light, all-day battery.", "laptop.jpg", "elzoz-logo.png", "15/10/2026", "01012345678", "#E30613", "ELZ-0001", "https://images.example.test/laptop.jpg", "A1"],
+    ["pulse phone x", "999", "799", "Bright display, fast charging.", "phone.jpg", "nova.png", "20/10/2026", "+201112223334", "#0B5FFF", "ELZ-0002", "https://images.example.test/phone.jpg", "A2"],
+    ["echo headphones", "199", "199", "Noise cancelling, 30 h battery.", "headphones.png", "acme.png", "31/10/2026", "01223334445", "#1DB954", "ELZ-0003", "", "A3"],
+    ["orbit watch", "350", "249", "Fitness and sleep tracking.", "watch.png", "elzoz-logo.png", "soon", "0225551234", "zzz", "ELZ-0004", "https://images.example.test/missing.jpg", "A4"],
+    ["سماعة لاسلكية", "٣٠٠", "٢٤٩", "صوت نقي وبطارية تدوم طويلًا.", "speaker.webp", "nova.png", "01/11/2026", "01555666777", "#FF8800", "ELZ-0005", "", "A5"]
+];
+add(writeXlsx(path.join(dirs.sheets, "offers.xlsx"), { Offers: offers }), "xlsx", "Offers: old/new prices (discount, one without), messy names, dates (one unreadable), phones, HEX colors (one invalid), product codes, image URLs, a key column", ["I"]);
 
 const recovery = [
     ["Name", "Price", "Description", "Photo", "Logo", "Badge"],

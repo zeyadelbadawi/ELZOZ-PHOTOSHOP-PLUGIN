@@ -14,7 +14,10 @@ export function createMapping() {
 export function setTextMapping(mapping, layerId, column, emptyPolicy = "blank") {
     const text = { ...mapping.text };
     if (!column) delete text[layerId];
-    else text[layerId] = { layerId, column, emptyPolicy, shrinkToFit: !!(mapping.text[layerId] && mapping.text[layerId].shrinkToFit) };
+    else {
+        const prev = mapping.text[layerId] || {};
+        text[layerId] = { layerId, column, emptyPolicy, shrinkToFit: !!prev.shrinkToFit, ...(prev.format ? { format: prev.format } : {}) };
+    }
     return { ...mapping, text };
 }
 

@@ -7,6 +7,7 @@ import { dedupeNames, renderName, validatePattern } from "./naming.js";
 import { mappedCount } from "./mapping.js";
 import { parseRowSelection, rowSelected } from "./rows.js";
 import { visibilityFor } from "./visibility.js";
+import { formatValue } from "./transforms.js";
 
 export const FORMATS = ["jpg", "png", "psd"];
 
@@ -30,7 +31,9 @@ export function resolveRow(row, mapping, folders) {
             text.push({ layerId: rule.layerId, value: "" });
             continue;
         }
-        text.push({ layerId: rule.layerId, value: String(value), ...(rule.shrinkToFit ? { shrink: true } : {}) });
+        const formatted = formatValue(value, rule.format);
+        if (formatted.problem) notes.push({ code: formatted.problem, column: rule.column, value: String(value).trim() });
+        text.push({ layerId: rule.layerId, value: formatted.value, ...(rule.shrinkToFit ? { shrink: true } : {}) });
     }
 
     for (const rule of Object.values(mapping.images)) {
@@ -150,6 +153,7 @@ export function runPreflight(input) {
     const skipped = [];
     const grouped = new Map(); // code|column -> {problem, rows}
     const ambiguous = new Map();
+    const unreadable = new Map(); // "not_a_number|column" -> rows (formatting couldn't read the cell)
     const dataRows = table.rows.filter((r) => !r.isEmpty);
     const chosenRows = dataRows.filter((r) => rowSelected(selection, r.sourceRow));
     if (!selection.all) {
@@ -159,6 +163,13 @@ export function runPreflight(input) {
     for (const row of chosenRows) {
         const res = resolveRow(row, mapping, folders);
         for (const n of res.notes) {
+            if (n.code === "not_a_number" || n.code === "not_a_date") {
+                const k = `${n.code}|${n.column}`;
+                const g = unreadable.get(k) || { code: n.code, column: n.column, rows: [] };
+                g.rows.push(row.sourceRow);
+                unreadable.set(k, g);
+                continue;
+            }
             const k = `${n.column}`;
             const g = ambiguous.get(k) || { column: n.column, rows: [] };
             g.rows.push(row.sourceRow);
@@ -179,6 +190,10 @@ export function runPreflight(input) {
     for (const { problem, rows } of grouped.values()) {
         const describe = PROBLEM_TEXT[problem.code] || (() => problem.code);
         warnings.push(issue("warning", problem.code, `${describe(problem)} in ${rows.length} row(s); those rows will be skipped.`, { rows, fix: { step: "map", layerId: problem.layerId } }));
+    }
+    for (const g of unreadable.values()) {
+        const what = g.code === "not_a_number" ? "a number" : "a date";
+        warnings.push(issue("warning", g.code, `"${g.column}" can't be read as ${what} in ${g.rows.length} row(s); the text is used as it is.`, { rows: g.rows, fix: { step: "map" } }));
     }
     for (const g of ambiguous.values()) {
         warnings.push(issue("warning", "image_ambiguous", `Several files match "${g.column}" values without an extension in ${g.rows.length} row(s); JPG is preferred, then PNG.`, { rows: g.rows, fix: { step: "map" } }));

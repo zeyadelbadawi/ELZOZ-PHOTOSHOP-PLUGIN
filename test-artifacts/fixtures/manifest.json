@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-09",
+  "generated": "2026-10-10",
   "synthetic": true,
   "fixtures": [
     {
@@ -19,6 +19,14 @@
       "scenarios": [
         "B",
         "edge"
+      ]
+    },
+    {
+      "file": "spreadsheets/offers.xlsx",
+      "kind": "xlsx",
+      "purpose": "Offers: old/new prices (discount, one without), messy names, dates (one unreadable), phones, HEX colors (one invalid), product codes, image URLs, a key column",
+      "scenarios": [
+        "I"
       ]
     },
     {

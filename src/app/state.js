@@ -3,6 +3,7 @@ import { createMapping, mappedCount, pruneMapping } from "../domain/mapping.js";
 import { runPreflight } from "../domain/preflight.js";
 import { runVideoPreflight } from "../domain/video/preflight.js";
 import { buildTimeline } from "../domain/video/timeline.js";
+import { applyDerived, validateDerived } from "../domain/derived.js";
 
 export const DESIGN_STEPS = ["data", "template", "map", "check", "generate"];
 export const VIDEO_STEPS = ["data", "template", "map", "animate", "check", "generate"];
@@ -20,6 +21,7 @@ export function initialState(saved = {}) {
         data: null, // { fileName, sheetNames, sheetName, headerRow, table, workbook }
         template: null, // { entry, documentId, title, width, height, layers }
         mapping: createMapping(),
+        derived: [], // smart columns (src/domain/derived.js)
         folders: {}, // key -> { name, entry, index }
         output: null, // { entry, name, path, existingFileNames }
         settings: { ...initialSettings, ...(saved.settings || {}), rowSelection: "" },
@@ -38,11 +40,18 @@ export function reducer(state, action) {
         case "go":
             return { ...state, step: action.step };
         case "data": {
-            const mapping = state.template && action.data ? pruneMapping(state.mapping, action.data.table.headers, state.template.layers) : state.mapping;
-            return { ...state, data: action.data, mapping, settings: { ...state.settings, rowSelection: "" }, run: idleRun() };
+            const next = { ...state, data: action.data };
+            const mapping = state.template && action.data ? pruneMapping(state.mapping, effectiveTable(next).headers, state.template.layers) : state.mapping;
+            return { ...next, mapping, settings: { ...state.settings, rowSelection: "" }, run: idleRun() };
+        }
+        case "derived": {
+            // Removing a smart column also removes the mappings that used it.
+            const next = { ...state, derived: action.derived };
+            const mapping = state.data && state.template ? pruneMapping(state.mapping, effectiveTable(next).headers, state.template.layers) : state.mapping;
+            return { ...next, mapping, run: idleRun() };
         }
         case "template": {
-            const mapping = state.data && action.template ? pruneMapping(state.mapping, state.data.table.headers, action.template.layers) : createMapping();
+            const mapping = state.data && action.template ? pruneMapping(state.mapping, effectiveTable(state).headers, action.template.layers) : createMapping();
             return { ...state, template: action.template, mapping, restoredMapping: false, video: { ...state.video, tracks: {} }, run: idleRun() };
         }
         case "mapping":
@@ -72,7 +81,7 @@ export function reducer(state, action) {
         case "run-reset":
             return { ...state, run: idleRun() };
         case "new-job":
-            return { ...initialState({ mode: state.mode, settings: state.settings, video: state.video }), output: state.output };
+            return { ...initialState({ mode: state.mode, settings: state.settings, video: state.video }), output: state.output, derived: state.derived };
         default:
             return state;
     }
@@ -91,6 +100,19 @@ function applyRunEvent(run, e) {
         default:
             return run;
     }
+}
+
+// Smart columns are computed once per (table, definitions) pair.
+const derivedCache = new WeakMap();
+/** The spreadsheet table plus smart columns: what Map, Check and the engine see. */
+export function effectiveTable(state) {
+    const table = state.data ? state.data.table : null;
+    if (!table || !state.derived || !state.derived.length) return table;
+    let byDefs = derivedCache.get(table);
+    if (!byDefs) derivedCache.set(table, (byDefs = new WeakMap()));
+    let t = byDefs.get(state.derived);
+    if (!t) byDefs.set(state.derived, (t = applyDerived(table, state.derived)));
+    return t;
 }
 
 /** Overall progress 0..1 including frames of the video in progress. */
@@ -114,7 +136,7 @@ export function timelineSpec(state) {
 export function computePlan(state, { balance = null, pricing = {} } = {}) {
     const input = {
         rowSelection: state.settings.rowSelection,
-        table: state.data ? state.data.table : null,
+        table: effectiveTable(state),
         layers: state.template ? state.template.layers : [],
         mapping: state.mapping,
         folders: Object.fromEntries(Object.entries(state.folders).map(([k, f]) => [k, { name: f.name, index: f.index }])),
@@ -156,6 +178,7 @@ export function stepBlocker(state, step) {
         case "data":
             if (!state.data) return "data.empty";
             if (state.data.table.issues.some((i) => i.severity === "error")) return "check.blocking";
+            if ((state.derived || []).some((d) => validateDerived(d, state.data.table.headers).length)) return "derived.invalid";
             return null;
         case "template":
             return state.template ? null : "template.empty";
@@ -216,11 +239,11 @@ function readMemory(storage) {
     }
 }
 
-export function rememberMapping(storage, template, mapping, now = Date.now()) {
+export function rememberMapping(storage, template, mapping, now = Date.now(), derived = []) {
     if (!storage || !template || mappedCount(mapping) === 0) return;
     const all = readMemory(storage);
     const images = Object.fromEntries(Object.entries(mapping.images).map(([id, r]) => [id, { ...r, folderKey: null }]));
-    all[templateSignature(template)] = { text: mapping.text, images, visibility: mapping.visibility || {}, savedAt: now };
+    all[templateSignature(template)] = { text: mapping.text, images, visibility: mapping.visibility || {}, derived: derived || [], savedAt: now };
     const keep = Object.entries(all).sort((a, b) => b[1].savedAt - a[1].savedAt).slice(0, MEMORY_MAX);
     try {
         storage.setItem(MEMORY_KEY, JSON.stringify(Object.fromEntries(keep)));
@@ -231,9 +254,20 @@ export function rememberMapping(storage, template, mapping, now = Date.now()) {
 
 /** The remembered mapping for this template, limited to columns that exist now; null if none. */
 export function recallMapping(storage, template, headers) {
-    if (!storage || !template || !headers) return null;
+    const r = recallMemory(storage, template, { headers, issues: [], rows: [] });
+    return r ? r.mapping : null;
+}
+
+/**
+ * The remembered mapping and smart columns for this template. Smart columns are
+ * restored only if the columns they read still exist. null if nothing usable.
+ */
+export function recallMemory(storage, template, table) {
+    if (!storage || !template || !table) return null;
     const saved = readMemory(storage)[templateSignature(template)];
     if (!saved) return null;
+    const derived = (saved.derived || []).filter((d) => validateDerived(d, table.headers).length === 0);
+    const headers = derived.length ? applyDerived({ ...table, rows: [] }, derived).headers : table.headers;
     const mapping = pruneMapping({ text: saved.text || {}, images: saved.images || {}, visibility: saved.visibility || {} }, headers, template.layers);
-    return mappedCount(mapping) > 0 ? mapping : null;
+    return mappedCount(mapping) > 0 ? { mapping, derived } : null;
 }

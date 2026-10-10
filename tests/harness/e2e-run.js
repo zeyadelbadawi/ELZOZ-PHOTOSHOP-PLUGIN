@@ -839,6 +839,107 @@ scenario("H", "WhatsApp sales bot in the dashboard: orders, approval, conversati
     await m.close();
 });
 
+// ---------- Scenario I: features 1-15 (added feature by feature) ----------
+const sel = (page, sectionText) => page.locator(".ez-section").filter({ hasText: sectionText });
+async function addSmartColumn(page, typeLabel) {
+    const section = sel(page, "Smart columns");
+    await section.locator("select").last().selectOption({ label: typeLabel });
+    await section.locator('sp-button:has-text("Add")').last().click();
+    await page.waitForTimeout(150);
+    return section.locator(".ez-derived").last();
+}
+async function openFormat(page, layer) {
+    const row = layerRow(page, layer);
+    await row.locator('sp-button:has-text("Formatting")').click();
+    await page.waitForTimeout(100);
+    return row.locator(".ez-format-body");
+}
+async function fieldIn(scope, label) {
+    return scope.locator(".ez-field", { has: scope.page().locator(".ez-label", { hasText: label }) }).locator("select, input").first();
+}
+
+scenario("I", "Features 1-15: smart prices, formatting (more added per feature)", async () => {
+    const email = `scenario-i-${RUN}@e2e.test`;
+    await post("/__e2e/users", { email, password: "correct horse", credits: 80 });
+    const p = await open({ width: 320, height: 820, record: true });
+    await signIn(p, email);
+
+    // ---- F9: smart columns on the Data step
+    await queue(p, { file: "spreadsheets/offers.xlsx" });
+    await click(p, "Choose file");
+    const disc = await addSmartColumn(p, "Discount %");
+    await (await fieldIn(disc, "Style")).selectOption("minus");
+    const has = await addSmartColumn(p, "Has a discount (for show/hide)");
+    const price = await addSmartColumn(p, "Formatted price");
+    await (await fieldIn(price, "After")).fill(" ج.م");
+    await p.waitForTimeout(200);
+    const samples = await p.locator('[data-testid="derived-sample"]').allTextContents();
+    check("smart columns guess Old/New price and preview row 1", samples.join(" | ") === "Row 1: -13% | Row 1: yes | Row 1: 1,299 ج.م", samples);
+    await shot(p, "I01-data-smart-columns-320-dark", "Data: smart columns (discount, has discount, formatted price) previewed on row 1", { scroll: 99999 });
+    const previewHas = await p.locator(".ez-table-head .ez-cell").allTextContents();
+    check("the data preview shows the smart columns", previewHas.includes("✦ Discount") && previewHas.includes("✦ Price"), previewHas);
+    await click(p, "Next");
+    await queue(p, { file: "templates/product-card-1080x1350.psd" });
+    await click(p, "Choose PSD");
+    await page_wait(p);
+    await click(p, "Next");
+
+    // ---- F10: formatting on the Map step
+    await click(p, "Auto-map by name");
+    await layerRow(p, "Price").locator("select").first().selectOption("✦ Discount");
+    await pickLayerFolder(p, "Photo", "images/products");
+    await pickLayerFolder(p, "Logo", "images/logos");
+    // Footer/Name: phone formatted; Card Name: title case + trimmed
+    const nameRows = p.locator(".ez-layer", { has: p.locator(".ez-layer-name > div:first-child", { hasText: /^Name$/ }) });
+    // Template order: Footer/Name first, then Card/Text/Name.
+    await nameRows.nth(0).locator("select").first().selectOption("Phone");
+    let f = await openFormat(p, "Description");
+    await nameRows.nth(1).locator('sp-button:has-text("Formatting")').click();
+    const nameFmt = nameRows.nth(1).locator(".ez-format-body");
+    await (await fieldIn(nameFmt, "Letters")).selectOption("title");
+    await nameFmt.locator('label:has-text("Remove extra spaces") input').check();
+    await nameRows.nth(0).locator('sp-button:has-text("Formatting")').click();
+    const phoneFmt = nameRows.nth(0).locator(".ez-format-body");
+    await (await fieldIn(phoneFmt, "The cell is")).selectOption("phone");
+    await (await fieldIn(phoneFmt, "Phone style")).selectOption("international");
+    await (await fieldIn(f, "Before")).fill("✓ ");
+    await p.waitForTimeout(150);
+    const previews = await p.locator('[data-testid="format-preview"]').allTextContents();
+    check("formatting previews row 1 live", previews.some((t) => t.includes("→ Aurora Laptop 14")) && previews.some((t) => t.includes("→ +20 10 1234 5678")), previews);
+    await shot(p, "I02-map-formatting-320-dark", "Map: title case + trim on Name, international phone, prefix on Description", { scroll: 0 });
+    // Badge shows only when there is a discount
+    await p.evaluate(() => document.querySelector(".ez-content").scrollTo(0, 99999));
+    const picker = sel(p, "Show / hide layers").locator("select").last();
+    await picker.selectOption(await picker.locator("option", { hasText: /^Badge/ }).first().getAttribute("value"));
+    await p.locator('sp-button:has-text("Add")').last().click();
+    await p.waitForTimeout(150);
+    await sel(p, "Show / hide layers").locator(".ez-layer-picker select").last().selectOption("✦ Has discount");
+    await shot(p, "I03-map-badge-has-discount-320-dark", "Map: Badge shown only when the row has a discount", { scroll: 99999 });
+
+    await click(p, "Next");
+    await chooseOutput(p, "Elzoz output I");
+    await p.locator('label:has-text("PSD") input').check();
+    await p.waitForTimeout(150);
+    const warn = await p.locator(".ez-alert").allTextContents();
+    check("Check reports nothing blocking for the smart columns", !(await p.locator(".ez-section").filter({ hasText: "Fix before generating" }).count()), warn);
+    await click(p, "Next");
+    await btn(p, "Generate 5").click();
+    await waitForResults(p);
+    await shot(p, "I04-results-offers-320-dark", "Results: 5 offer cards");
+    const dir = path.join(OUTS, "scenario-i");
+    await saveOutputs(p, "Elzoz output I", dir);
+    const psd = psdSummary(dir);
+    const one = psd["elzoz_1.psd"] && psd["elzoz_1.psd"].layers;
+    check("row 1: name tidied, discount, phone, description prefix (psd-tools)",
+        one && one["Name@Text"] === "Aurora Laptop 14" && one["Price@Text"] === "-13%" && one["Name@Footer"] === "+20 10 1234 5678" && String(one["Description@Text"]).startsWith("✓ "), one);
+    const vis = JSON.parse(execFileSync("python3", ["-c", "import json,sys,os\nfrom psd_tools import PSDImage\nout={}\nfor n in sorted(os.listdir(sys.argv[1])):\n  if n.endswith('.psd'):\n    p=PSDImage.open(os.path.join(sys.argv[1],n))\n    out[n]=[l.visible for l in p.descendants() if l.name=='Badge'][0]\nprint(json.dumps(out))", dir]).toString());
+    check("Badge hidden on the row without a discount (row 3), shown on the others", vis["elzoz_3.psd"] === false && vis["elzoz_1.psd"] === true && vis["elzoz_5.psd"] === true, vis);
+    check("Arabic prices with Arabic digits are understood (row 5: -17%)", psd["elzoz_5.psd"] && psd["elzoz_5.psd"].layers["Price@Text"] === "-17%", psd["elzoz_5.psd"] && psd["elzoz_5.psd"].layers);
+    const acct = await account(email);
+    check("5 rows charged", Number(acct.balance.balance) === 75, acct.balance);
+    await finishRecording(p, "SIMULATED-scenario-I-features", "Scenario I: new features 1-15 (simulated host)");
+});
+
 async function page_wait(p) {
     await p.waitForSelector(".ez-stats, .ez-alert", { timeout: 10000 });
     await p.waitForTimeout(150);

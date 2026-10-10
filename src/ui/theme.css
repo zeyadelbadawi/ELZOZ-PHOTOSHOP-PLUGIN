@@ -476,3 +476,22 @@ body {
     .ez-content { padding: var(--ez-s4) var(--ez-s5); }
     .ez-layer-picker { width: 40%; }
 }
+
+/* ---------- formatting & smart columns ---------- */
+.ez-accent {
+    color: var(--ez-accent);
+}
+.ez-warn {
+    color: #e8a33d;
+}
+.ez-format {
+    margin-top: 4px;
+    border-top: 1px solid var(--ez-border);
+    padding-top: 4px;
+}
+.ez-format-body {
+    padding: 4px 0 2px;
+}
+.ez-derived {
+    margin-bottom: 8px;
+}

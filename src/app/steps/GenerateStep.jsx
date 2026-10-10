@@ -27,7 +27,7 @@ export default function GenerateStep() {
         signal.current = { cancelled: false };
         dispatch({ type: "run-start", total: thePlan.items.length, plan: thePlan });
         try {
-            rememberMapping(window.localStorage, state.template, state.mapping);
+            rememberMapping(window.localStorage, state.template, state.mapping, Date.now(), state.derived);
         } catch (e) {
             /* storage unavailable: memory is a convenience only */
         }

@@ -5,6 +5,8 @@ import { Alert, Button, Card, Checkbox, Field, FileField, KindIcon, Section, Sel
 import { isImageLayer, isTextLayer } from "../../domain/layers.js";
 import { autoMap, createMapping, mappedCount, setImageMapping, setTextMapping, setTextOptions, setVisibilityMapping } from "../../domain/mapping.js";
 import { VISIBILITY_EMPTY } from "../../domain/visibility.js";
+import { effectiveTable } from "../state.js";
+import TextFormat from "./TextFormat.jsx";
 
 function LayerRow({ layer, rule, columns, firstRow, onColumn, children }) {
     const { t } = useI18n();
@@ -42,8 +44,9 @@ export default function MapStep() {
     const { data, template, mapping } = state;
     if (!data || !template) return <Alert tone="info">{t("data.empty")}</Alert>;
 
-    const columns = data.table.headers.map((h) => ({ value: h.key, label: h.key }));
-    const firstRow = data.table.rows.find((r) => !r.isEmpty);
+    const table = effectiveTable(state);
+    const columns = table.headers.map((h) => ({ value: h.key, label: h.key }));
+    const firstRow = table.rows.find((r) => !r.isEmpty);
     const textLayers = template.layers.filter(isTextLayer);
     const imageLayers = template.layers.filter(isImageLayer);
     const set = (m) => dispatch({ type: "mapping", mapping: m });
@@ -64,7 +67,7 @@ export default function MapStep() {
                 <div className="ez-grow">
                     <div className="ez-title">{t("map.title")}</div>
                 </div>
-                <Button quiet onClick={() => set(autoMap(mapping, data.table.headers, template.layers, data.table.rows))}>
+                <Button quiet onClick={() => set(autoMap(mapping, table.headers, template.layers, table.rows))}>
                     {t("map.auto")}
                 </Button>
             </div>
@@ -96,6 +99,7 @@ export default function MapStep() {
                                         <Select value={rule && rule.emptyPolicy} options={emptyOptions} onChange={(v) => set(setTextMapping(mapping, layer.id, rule.column, v))} />
                                     </Field>
                                     <Checkbox checked={rule && rule.shrinkToFit} onChange={(v) => set(setTextOptions(mapping, layer.id, { shrinkToFit: v }))} label={t("map.shrink")} />
+                                    <TextFormat format={rule && rule.format} sample={rule && firstRow ? firstRow.values[rule.column] : null} onChange={(f) => set(setTextOptions(mapping, layer.id, { format: f }))} />
                                 </LayerRow>
                             );
                         })}

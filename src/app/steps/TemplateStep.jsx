@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useApp } from "../AppContext.jsx";
-import { recallMapping } from "../state.js";
+import { recallMemory } from "../state.js";
 
 const storage = () => {
     try {
@@ -29,8 +29,11 @@ export default function TemplateStep() {
             if (result) {
                 dispatch({ type: "template", template: result });
                 // Offer the mapping last used with this template (folders are picked again).
-                const recalled = state.data ? recallMapping(storage(), result, state.data.table.headers) : null;
-                if (recalled) dispatch({ type: "mapping", mapping: recalled, restored: true });
+                const recalled = state.data ? recallMemory(storage(), result, state.data.table) : null;
+                if (recalled) {
+                    if (recalled.derived.length && !(state.derived || []).length) dispatch({ type: "derived", derived: recalled.derived });
+                    dispatch({ type: "mapping", mapping: recalled.mapping, restored: true });
+                }
             }
             else if (fn === services.useActiveDocument) setError(t("template.noActive"));
         } catch (e) {
