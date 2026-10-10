@@ -103,6 +103,7 @@ export async function restore() {
 
 const rpc = async (fn, args = {}) => call(`${URL_}/rest/v1/rpc/${fn}`, { body: args, token: await token() });
 const adminFn = async (body) => call(`${FUNCTIONS}/admin-users`, { body, token: await token() });
+const quiet = (notify) => (notify === false ? { p_notify: false } : {});
 const key = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 export const api = {
@@ -110,12 +111,13 @@ export const api = {
     listUsers: (search, limit, offset) => rpc("admin_list_users", { p_search: search || null, p_limit: limit, p_offset: offset }),
     userDetail: (id) => rpc("admin_user_detail", { p_user: id }),
     // One idempotency key per form submission: a double click or a retried request adds credits once.
-    // notify: tell the client on WhatsApp (the sales bot sends the message).
+    // notify: tell the client on WhatsApp (the sales bot sends the message). Sent only when false,
+    // so the default call also works against a database without the p_notify argument.
     grant: (id, amount, days, note, idemKey = key(), notify = true) =>
-        rpc("admin_grant_credits", { p_user: id, p_amount: amount, p_valid_days: days, p_note: note || null, p_idempotency_key: idemKey, p_notify: notify }),
+        rpc("admin_grant_credits", { p_user: id, p_amount: amount, p_valid_days: days, p_note: note || null, p_idempotency_key: idemKey, ...quiet(notify) }),
     remove: (id, amount, note, idemKey = key(), notify = true) =>
-        rpc("admin_remove_credits", { p_user: id, p_amount: amount, p_note: note, p_idempotency_key: idemKey, p_notify: notify }),
-    refund: (ledgerId, note, notify = true) => rpc("admin_refund_charge", { p_ledger_id: ledgerId, p_note: note, p_notify: notify }),
+        rpc("admin_remove_credits", { p_user: id, p_amount: amount, p_note: note, p_idempotency_key: idemKey, ...quiet(notify) }),
+    refund: (ledgerId, note, notify = true) => rpc("admin_refund_charge", { p_ledger_id: ledgerId, p_note: note, ...quiet(notify) }),
     setPrice: (unit, price) => rpc("admin_set_price", { p_unit: unit, p_price: price }),
     createUser: (input) => adminFn({ action: "create_user", ...input, idempotency_key: key() }),
     resetPassword: (userId, notify = true) => adminFn({ action: "reset_password", user_id: userId, notify }),
@@ -127,7 +129,7 @@ export const api = {
     botContacts: (search) => rpc("admin_bot_contacts", { p_search: search, p_limit: 100 }),
     botPayments: () => rpc("admin_bot_payments", { p_limit: 100 }),
     botApprove: (code) => rpc("admin_bot_approve", { p_code: code }),
-    botReject: (code, reason, notify = true) => rpc("admin_bot_reject", { p_code: code, p_reason: reason, p_notify: notify }),
+    botReject: (code, reason, notify = true) => rpc("admin_bot_reject", { p_code: code, p_reason: reason, ...quiet(notify) }),
     botPackages: () => rpc("admin_bot_packages"),
     botSavePackage: (p) =>
         rpc("admin_bot_save_package", { p_code: p.code, p_name: p.name, p_credits: p.credits, p_valid_days: p.valid_days, p_price_egp: p.price_egp, p_active: p.active, p_sort: p.sort }),

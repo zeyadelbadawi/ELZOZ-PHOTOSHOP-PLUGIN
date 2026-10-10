@@ -170,7 +170,7 @@ export async function handleAdminRequest(req, env) {
             if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(400, "invalid_user_id");
             const disabled = input.disabled === true;
             // Database first (blocks new jobs immediately), then sign-in.
-            await asCaller("admin_set_disabled", { p_user: id, p_disabled: disabled, p_notify: input.notify !== false });
+            await asCaller("admin_set_disabled", { p_user: id, p_disabled: disabled, ...(input.notify === false ? { p_notify: false } : {}) });
             await authAdmin("PUT", `/${id}`, { ban_duration: disabled ? BAN_FOREVER : "none" });
             return reply(200, { user_id: id, disabled });
         }
