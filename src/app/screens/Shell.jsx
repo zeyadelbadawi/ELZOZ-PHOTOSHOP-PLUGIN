@@ -5,6 +5,7 @@ import { Button } from "../../ui/components.jsx";
 import { stepBlocker, stepsFor, computePlan } from "../state.js";
 import Account from "./Account.jsx";
 import Projects from "./Projects.jsx";
+import { UpdateBanner } from "./Gate.jsx";
 import { Alert } from "../../ui/components.jsx";
 import DataStep from "../steps/DataStep.jsx";
 import TemplateStep from "../steps/TemplateStep.jsx";
@@ -128,6 +129,7 @@ export default function Shell() {
                     <Stepper />
                     <div className="ez-content">
                         {session.dev && state.step !== "generate" && <div className="ez-small ez-muted ez-mb2">{t("app.devMode")}</div>}
+                        <UpdateBanner />
                         {missing && (
                             <Alert tone={missing.length ? "warning" : "success"} action={<span className="ez-link" onClick={() => setMissing(null)}>✕</span>}>
                                 {missing.length

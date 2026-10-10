@@ -49,7 +49,7 @@ export async function runDesignJob({ port, billing, template, templateLayers, pl
         job = await billing.startJob({ kind: "design", itemKeys: items.map((i) => i.key) });
         result.jobId = job.jobId;
     } catch (e) {
-        result.fatal = { step: "billing", message: e.message };
+        result.fatal = { step: "billing", message: e.message, code: e.code || null };
         return finish(JOB.failed);
     }
     onEvent({ type: "started", jobId: job.jobId, total: items.length });

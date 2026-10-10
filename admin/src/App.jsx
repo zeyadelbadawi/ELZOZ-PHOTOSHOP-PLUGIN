@@ -308,7 +308,7 @@ function Clients({ open }) {
 
 // ------------------------------------------------------------------ client detail
 
-function ActionForm({ title, button, confirmText, fields, onSubmit, danger, notify }) {
+function ActionForm({ title, button, confirmText, fields, onSubmit, danger, notify, presets }) {
     const { lang } = useT();
     const [dialog, ask] = useConfirm();
     const [values, setValues] = useState(Object.fromEntries(fields.map((f) => [f.name, f.initial ?? ""])));
@@ -337,6 +337,24 @@ function ActionForm({ title, button, confirmText, fields, onSubmit, danger, noti
             {dialog}
             <h3>{title}</h3>
             {error && <div className="alert alert-error">{errorText(lang, error)}</div>}
+            {presets && presets.items.length > 0 && (
+                <div className="row gap wrap presets" data-testid="presets">
+                    <span className="muted small">{presets.label}</span>
+                    {presets.items.map((p) => (
+                        <button
+                            key={p.label}
+                            type="button"
+                            className="btn btn-small"
+                            onClick={() => {
+                                setValues({ ...values, ...p.values });
+                                setIdem(api.newKey());
+                            }}
+                        >
+                            {p.label}
+                        </button>
+                    ))}
+                </div>
+            )}
             <div className="row gap wrap">
                 {fields.map((f) => (
                     <label key={f.name} className={f.grow ? "grow" : ""}>
@@ -385,7 +403,7 @@ function ClientNotices({ id, refresh }) {
                                 <td className="nowrap">{fmtDate(n.created_at, lang, true)}</td>
                                 <td>
                                     {t(`notice_${n.kind}`)}
-                                    {n.data && n.data.amount ? ` (${num(n.data.amount)})` : ""}
+                                    {n.data && (n.data.amount || n.data.credits) ? ` (${num(n.data.amount || n.data.credits)})` : ""}
                                 </td>
                                 <td>
                                     <span className={`badge ${n.status === "sent" ? "badge-on" : n.status === "failed" ? "badge-off" : "badge-muted"}`} title={n.error || ""}>
@@ -401,9 +419,94 @@ function ClientNotices({ id, refresh }) {
     );
 }
 
+/** Computers this client's plugin runs on (feature 1): unlink one, change the limit. */
+function ClientDevices({ id }) {
+    const { t, lang } = useT();
+    const [{ data, error }, reload] = useAsync(() => api.userDevices(id), [id]);
+    const [dialog, ask] = useConfirm();
+    const [err, setErr] = useState(null);
+    const run = async (fn) => {
+        setErr(null);
+        try {
+            await fn();
+            await reload();
+        } catch (x) {
+            setErr(x);
+        }
+    };
+    if (error) return <ErrorBox error={error} />;
+    if (!data) return null;
+    const linked = data.devices.filter((d) => !d.unlinked_at);
+    const old = data.devices.filter((d) => d.unlinked_at).slice(0, 5);
+    const nextSwitch = data.next_switch_at && new Date(data.next_switch_at) > new Date() ? data.next_switch_at : null;
+    return (
+        <div className="card" data-testid="devices">
+            {dialog}
+            <div className="row gap wrap between">
+                <h3>
+                    {t("devices")} <span className="muted">({linked.length} / {data.limit})</span>
+                </h3>
+                <label className="check">
+                    {t("devLimit")}
+                    <select
+                        value={data.custom_limit ?? ""}
+                        onChange={(e) => run(() => api.setDeviceLimit(id, e.target.value === "" ? null : Number(e.target.value)))}
+                        data-testid="device-limit"
+                    >
+                        <option value="">{t("devDefault", { n: data.default_limit })}</option>
+                        {[1, 2, 3, 4, 5, 10].map((n) => (
+                            <option key={n} value={n}>
+                                {n}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+            </div>
+            {err && <div className="alert alert-error">{errorText(lang, err)}</div>}
+            {linked.length === 0 && <div className="muted">{t("devNone")}</div>}
+            {linked.length > 0 && (
+                <div className="table-wrap">
+                    <table className="table">
+                        <tbody>
+                            {linked.map((d) => (
+                                <tr key={d.id}>
+                                    <td dir="auto">{d.name || "—"}</td>
+                                    <td className="muted small hide-sm">
+                                        {t("devFirst")}: {fmtDate(d.first_seen, lang)}
+                                    </td>
+                                    <td className="small">
+                                        {t("devLast")}: {fmtDate(d.last_seen, lang, true)}
+                                    </td>
+                                    <td>
+                                        <button className="btn btn-link small" onClick={async () => (await ask(t("devUnlinkConfirm"), { danger: true })) && run(() => api.unlinkDevice(d.id))}>
+                                            {t("devUnlink")}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+            {old.length > 0 && (
+                <div className="muted small">
+                    {old.map((d) => (
+                        <div key={d.id}>
+                            <span dir="auto">{d.name || "—"}</span> · {t("devUnlinked", { date: fmtDate(d.unlinked_at, lang) })}
+                            {d.unlinked_by === "switch" ? ` · ${t("devBy_switch")}` : d.unlinked_by ? ` · ${String(d.unlinked_by).replace(/^admin:/, "")}` : ""}
+                        </div>
+                    ))}
+                </div>
+            )}
+            <div className="muted small">{nextSwitch ? t("devNextSwitch", { date: fmtDate(nextSwitch, lang, true) }) : t("devCanSwitch")}</div>
+        </div>
+    );
+}
+
 function ClientDetail({ id, back }) {
     const { t, lang } = useT();
     const [{ data, error }, reload] = useAsync(() => api.userDetail(id), [id]);
+    const [{ data: packages }] = useAsync(() => api.botPackages().catch(() => []), []);
     const [secret, setSecret] = useState(null);
     const [actionError, setActionError] = useState(null);
     const [dialog, ask] = useConfirm();
@@ -467,6 +570,12 @@ function ClientDetail({ id, back }) {
                         { name: "note", label: t("note"), grow: true }
                     ]}
                     notify
+                    presets={{
+                        label: t("presets"),
+                        items: (packages || [])
+                            .filter((p) => p.active)
+                            .map((p) => ({ label: t("presetLabel", { name: p.name, credits: num(p.credits), days: p.valid_days }), values: { amount: p.credits, days: p.valid_days, note: p.name } }))
+                    }}
                     confirmText={(v) => t("topUpConfirm", { n: v.amount, d: v.days })}
                     onSubmit={async (v, idem, notify) => {
                         await api.grant(id, Number(v.amount), Number(v.days), v.note, idem, notify);
@@ -506,6 +615,8 @@ function ClientDetail({ id, back }) {
                     </button>
                 )}
             </div>
+
+            <ClientDevices id={id} />
 
             <ClientNotices id={id} refresh={data} />
 
@@ -599,6 +710,94 @@ function ClientDetail({ id, back }) {
 
 // ------------------------------------------------------------------ settings
 
+const VERSION_RE = /^[0-9]+(\.[0-9]+){0,3}(-[A-Za-z0-9.]+)?$/;
+
+/** Forced update, update note and computers per account (features 1 and 2). */
+function PluginSettings() {
+    const { t, lang } = useT();
+    const [{ data, error }, reload] = useAsync(() => api.appConfig(), []);
+    const [form, setForm] = useState(null);
+    const [msg, setMsg] = useState(null);
+    const [err, setErr] = useState(null);
+    useEffect(() => {
+        if (data) setForm({ ...data });
+    }, [data]);
+    if (error) return <ErrorBox error={error} />;
+    if (!form) return null;
+    // Checked here first so the owner sees which field is wrong before anything is saved.
+    const invalid = {
+        min_plugin_version: !VERSION_RE.test(String(form.min_plugin_version || "")),
+        latest_plugin_version: !VERSION_RE.test(String(form.latest_plugin_version || "")),
+        update_url: !!form.update_url && !/^https:\/\/\S+$/.test(form.update_url),
+        device_limit: !(Number(form.device_limit) >= 1 && Number(form.device_limit) <= 20),
+        device_switch_days: !(Number(form.device_switch_days) >= 0 && Number(form.device_switch_days) <= 365)
+    };
+    const bad = Object.values(invalid).some(Boolean);
+    const save = async (e) => {
+        e.preventDefault();
+        setMsg(null);
+        setErr(null);
+        try {
+            for (const k of ["min_plugin_version", "latest_plugin_version", "update_url", "update_message"])
+                if ((form[k] ?? "") !== (data[k] ?? "")) await api.setAppConfig(k, String(form[k] ?? "").trim());
+            for (const k of ["device_limit", "device_switch_days"]) if (Number(form[k]) !== Number(data[k])) await api.setAppConfig(k, Number(form[k]));
+            if (!!form.require_device_id !== !!data.require_device_id) await api.setAppConfig("require_device_id", !!form.require_device_id);
+            setMsg(t("saved"));
+            reload();
+        } catch (x) {
+            setErr(x);
+        }
+    };
+    const text = (k, hint, extra = {}) => (
+        <label>
+            {t(extra.label || k)}
+            <input
+                type="text"
+                dir="ltr"
+                className={invalid[k] ? "invalid" : ""}
+                aria-invalid={invalid[k] || undefined}
+                value={form[k] ?? ""}
+                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+                placeholder={extra.placeholder}
+            />
+            {hint && <span className="muted small">{t(hint)}</span>}
+        </label>
+    );
+    return (
+        <form className="card narrow-wide" onSubmit={save} data-testid="plugin-settings">
+            <h3>{t("pluginSettings")}</h3>
+            {err && <div className="alert alert-error">{errorText(lang, err)}</div>}
+            {msg && <div className="alert alert-success">{msg}</div>}
+            <div className="grid2">
+                {text("min_plugin_version", invalid.min_plugin_version ? "err_invalid_version" : "minVersionHint", { label: "minVersion", placeholder: "1.0.0" })}
+                {text("latest_plugin_version", invalid.latest_plugin_version ? "err_invalid_version" : "latestVersionHint", { label: "latestVersion", placeholder: "1.2.0" })}
+            </div>
+            {text("update_url", invalid.update_url ? "err_invalid_url" : "updateUrlHint", { label: "updateUrl", placeholder: "https://…" })}
+            <label>
+                {t("updateMessage")}
+                <textarea rows="2" dir="auto" maxLength={500} value={form.update_message ?? ""} onChange={(e) => setForm({ ...form, update_message: e.target.value })} />
+            </label>
+            <div className="grid2">
+                <label>
+                    {t("deviceLimitDefault")}
+                    <input type="number" min="1" max="20" className={invalid.device_limit ? "invalid" : ""} value={form.device_limit ?? 2} onChange={(e) => setForm({ ...form, device_limit: e.target.value })} />
+                </label>
+                <label>
+                    {t("switchDays")}
+                    <input type="number" min="0" max="365" className={invalid.device_switch_days ? "invalid" : ""} value={form.device_switch_days ?? 7} onChange={(e) => setForm({ ...form, device_switch_days: e.target.value })} />
+                </label>
+            </div>
+            <label className="check">
+                <input type="checkbox" checked={!!form.require_device_id} onChange={(e) => setForm({ ...form, require_device_id: e.target.checked })} /> {t("requireDevice")}
+            </label>
+            <div className="muted small">{t("requireDeviceHint")}</div>
+            <button className="btn btn-primary" disabled={bad}>
+                {t("save")}
+            </button>
+        </form>
+    );
+}
+
 function Settings() {
     const { t, lang } = useT();
     const [{ data, error }, reload] = useAsync(() => api.stats(), []);
@@ -642,6 +841,108 @@ function Settings() {
                 <div className="muted small">{t("hdNote", { edge: video.hd_long_edge, mult: video.hd_multiplier })}</div>
                 <button className="btn btn-primary">{t("save")}</button>
             </form>
+            <PluginSettings />
+        </section>
+    );
+}
+
+// ------------------------------------------------------------------ expiring credits
+
+/** Clients whose credits expire soon (feature 4): remind through the bot, or open WhatsApp. */
+function Expiring({ open }) {
+    const { t, lang } = useT();
+    const [days, setDays] = useState(7);
+    const [{ data, error, loading }, reload] = useAsync(() => api.expiring(days), [days]);
+    const [done, setDone] = useState({});
+    const [err, setErr] = useState(null);
+    const [dialog, ask] = useConfirm();
+    const remind = async (r) => {
+        if (!(await ask(t("expRemindConfirm", { email: r.email, n: num(r.credits) })))) return;
+        setErr(null);
+        try {
+            await api.remindExpiring(r.user_id);
+            setDone({ ...done, [r.user_id]: true });
+            reload();
+        } catch (x) {
+            setErr(x);
+        }
+    };
+    const waLink = (r) => `https://wa.me/${r.wa_id}?text=${encodeURIComponent(t("expWaText", { n: num(r.credits), d: fmtDate(r.expires_at, lang) }))}`;
+    const total = (data || []).reduce((a, r) => a + Number(r.credits || 0), 0);
+    return (
+        <section data-testid="expiring">
+            {dialog}
+            <div className="row gap wrap between">
+                <h2>{t("expTitle")}</h2>
+                <label className="check">
+                    {t("expWithin")}
+                    <select value={days} onChange={(e) => setDays(Number(e.target.value))} data-testid="exp-days">
+                        {[3, 7, 14, 30].map((n) => (
+                            <option key={n} value={n}>
+                                {t("expDays", { n })}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+            </div>
+            <ErrorBox error={error} />
+            {err && <div className="alert alert-error">{errorText(lang, err)}</div>}
+            {Object.keys(done).length > 0 && <div className="alert alert-success">{t("expReminded_ok")}</div>}
+            {data && data.length === 0 && <div className="empty">{t("expEmpty")}</div>}
+            {data && data.length > 0 && (
+                <>
+                    <div className="muted small">
+                        {data.length} · {num(total)} {t("expCredits")}
+                    </div>
+                    <div className="table-wrap">
+                        <table className="table">
+                            <thead>
+                                <tr>
+                                    <th>{t("colEmail")}</th>
+                                    <th className="num">{t("expCredits")}</th>
+                                    <th>{t("expDate")}</th>
+                                    <th className="num hide-sm">{t("expAvailable")}</th>
+                                    <th className="hide-sm">{t("expLastTopup")}</th>
+                                    <th className="hide-sm">{t("expReminded")}</th>
+                                    <th />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.map((r) => (
+                                    <tr key={r.user_id}>
+                                        <td dir="ltr" className="email">
+                                            <button className="btn btn-link" onClick={() => open(r.user_id)}>
+                                                {r.email}
+                                            </button>
+                                        </td>
+                                        <td className="num strong">{num(r.credits)}</td>
+                                        <td>
+                                            <ExpiryCell iso={r.expires_at} />
+                                        </td>
+                                        <td className="num hide-sm">{num(r.available)}</td>
+                                        <td className="hide-sm muted">{fmtDate(r.last_topup_at, lang)}</td>
+                                        <td className="hide-sm muted">{r.reminded_at ? fmtDate(r.reminded_at, lang, true) : "—"}</td>
+                                        <td className="nowrap">
+                                            {r.wa_id ? (
+                                                <>
+                                                    <button className="btn btn-small btn-primary" disabled={loading || done[r.user_id]} onClick={() => remind(r)}>
+                                                        {t("expRemind")}
+                                                    </button>{" "}
+                                                    <a className="btn btn-small" href={waLink(r)} target="_blank" rel="noopener noreferrer" title={t("expWaMe")}>
+                                                        wa.me
+                                                    </a>
+                                                </>
+                                            ) : (
+                                                <span className="muted small">{t("expNoWa")}</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
+            )}
         </section>
     );
 }
@@ -649,7 +950,7 @@ function Settings() {
 // ------------------------------------------------------------------ shell
 
 function parseHash() {
-    const m = window.location.hash.match(/^#\/(overview|clients|sales|settings)(?:\/([0-9a-f-]{36}|[a-z]+))?$/);
+    const m = window.location.hash.match(/^#\/(overview|clients|expiring|sales|settings)(?:\/([0-9a-f-]{36}|[a-z]+))?$/);
     if (!m) return { tab: "clients", client: null, sub: null };
     const isClient = m[1] === "clients" && /^[0-9a-f-]{36}$/.test(m[2] || "");
     return { tab: m[1], client: isClient ? m[2] : null, sub: m[1] === "sales" ? m[2] || null : null };
@@ -718,7 +1019,7 @@ export default function App() {
                     <header className="topbar">
                         <div className="brand">{ctx.t("appName")}</div>
                         <nav className="tabs">
-                            {["overview", "clients", "sales", "settings"].map((tab) => (
+                            {["overview", "clients", "expiring", "sales", "settings"].map((tab) => (
                                 <button key={tab} className={`tab ${view.tab === tab && !view.client ? "tab-on" : ""}`} onClick={() => setView({ tab, client: null })}>
                                     {ctx.t(tab)}
                                 </button>
@@ -747,6 +1048,8 @@ export default function App() {
                             <Overview />
                         ) : view.tab === "sales" ? (
                             <Sales sub={view.sub} go={(sub) => setView({ tab: "sales", client: null, sub })} />
+                        ) : view.tab === "expiring" ? (
+                            <Expiring open={(id) => setView({ tab: "clients", client: id })} />
                         ) : view.tab === "settings" ? (
                             <Settings />
                         ) : (

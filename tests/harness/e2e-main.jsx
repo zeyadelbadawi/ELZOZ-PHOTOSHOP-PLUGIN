@@ -197,4 +197,4 @@ async function simulatedFetch(url) {
 }
 window.__harness.internet = internet;
 
-ReactDOM.render(<App services={createServices({ photoshop: host.photoshop, uxp: host.uxp, fetch: simulatedFetch })} />, document.getElementById("root"));
+ReactDOM.render(<App services={createServices({ photoshop: host.photoshop, uxp: host.uxp, os: { homedir: () => "/Users/demo" }, fetch: simulatedFetch })} />, document.getElementById("root"));

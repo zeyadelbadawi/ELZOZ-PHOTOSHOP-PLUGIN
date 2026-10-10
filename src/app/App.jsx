@@ -3,6 +3,7 @@ import { AppProvider, useApp } from "./AppContext.jsx";
 import { I18nProvider, useI18n } from "./i18n.jsx";
 import SignIn from "./screens/SignIn.jsx";
 import Shell from "./screens/Shell.jsx";
+import { DeviceLimit, UpdateRequired } from "./screens/Gate.jsx";
 import "../ui/theme.css";
 
 class ErrorBoundary extends Component {
@@ -32,11 +33,14 @@ class ErrorBoundary extends Component {
 }
 
 function Root() {
-    const { session } = useApp();
+    const { session, gate } = useApp();
     const { rtl } = useI18n();
+    const signedIn = session.status === "signedIn";
+    // A plugin that must update, or a computer over the account's limit, sees only what to do about it.
+    const blocked = signedIn && gate && (gate.update && gate.update.required ? <UpdateRequired /> : gate.device && gate.device.status === "limit" ? <DeviceLimit /> : null);
     return (
         <div className={`ez-app ${rtl ? "ez-rtl" : ""}`} dir={rtl ? "rtl" : "ltr"} lang={rtl ? "ar" : "en"}>
-            {session.status === "loading" ? <div className="ez-content ez-muted">…</div> : session.status === "signedIn" ? <Shell /> : <SignIn />}
+            {session.status === "loading" ? <div className="ez-content ez-muted">…</div> : blocked || (signedIn ? <Shell /> : <SignIn />)}
         </div>
     );
 }

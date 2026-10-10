@@ -36,7 +36,7 @@ export async function runVideoJob({ port, billing, template, templateLayers, pla
         });
         result.jobId = job.jobId;
     } catch (e) {
-        result.fatal = { step: "billing", message: e.message };
+        result.fatal = { step: "billing", message: e.message, code: e.code || null };
         return finish(JOB.failed);
     }
     onEvent({ type: "started", jobId: job.jobId, total: items.length, framesPerItem: tl.frameCount });

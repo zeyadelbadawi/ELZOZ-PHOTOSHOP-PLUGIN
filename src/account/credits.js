@@ -18,7 +18,10 @@ const USER_MESSAGES = {
     job_expired: "This job's credit reservation expired. Start the job again.",
     job_not_active: "This job is already finished.",
     not_authenticated: "Please sign in again.",
-    account_disabled: "This account is disabled. Contact us to reactivate it."
+    account_disabled: "This account is disabled. Contact us to reactivate it.",
+    update_required: "This version of Elzoz is too old. Update the plugin to keep generating.",
+    device_limit: "This account is already used on its maximum number of computers.",
+    switch_too_soon: "You moved your account to another computer recently. Try again later or contact us."
 };
 
 const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
@@ -79,6 +82,17 @@ export function createCreditsClient({ url, anonKey, auth, fetchImpl = globalThis
             const lots = (a.lots || []).map((l) => ({ remaining: Number(l.remaining), expiresAt: l.expires_at }));
             return { balance: Number(a.balance), reserved: Number(a.reserved), available: Number(a.available), disabled: !!a.disabled, lots, nextExpiry: lots[0] || null };
         },
+        /** Update status and this computer's status (features 1 and 2). */
+        async checkIn(clientInfo) {
+            return request("POST", "/rpc/check_in", { p_client_info: clientInfo });
+        },
+        /** Move the account to this computer (the least recently used one is unlinked). */
+        async switchDevice(clientInfo) {
+            return request("POST", "/rpc/switch_device", { p_client_info: clientInfo });
+        },
+        async myDevices() {
+            return request("POST", "/rpc/my_devices", {});
+        },
         async getPricing() {
             const rows = await request("GET", "/pricing_rules?select=unit,price,hd_long_edge,hd_multiplier");
             return Object.fromEntries((rows || []).map((r) => [r.unit, r]));
@@ -100,7 +114,9 @@ export function createBilling(credits, { clientInfo = {} } = {}) {
     return {
         async startJob({ kind, itemKeys, items }) {
             const payload = items || itemKeys.map((key) => ({ key }));
-            const r = await credits.startJob({ kind, items: payload, clientInfo });
+            // clientInfo may be a function: the device id is read from secure storage.
+            const info = typeof clientInfo === "function" ? await clientInfo() : clientInfo;
+            const r = await credits.startJob({ kind, items: payload, clientInfo: info });
             return { jobId: r.job_id, reserved: r.reserved, availableAfter: r.available_after };
         },
         async reportItem({ jobId, itemKey, status, evidence }) {

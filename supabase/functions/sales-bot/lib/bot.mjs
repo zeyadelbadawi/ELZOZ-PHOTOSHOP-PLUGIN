@@ -11,7 +11,7 @@ import { decide } from "./flow.mjs";
 import { MENU_ROWS, T, inWorkHours } from "./texts.mjs";
 import { extractForwarded, parsePayment, unreadMoneyMessage } from "./payments.mjs";
 import { verifyMetaSignature } from "./clients.mjs";
-import { clip, escapeHtml, formatMoney, generatePassword, localHour, safeEqual, sha256Hex } from "./util.mjs";
+import { clip, escapeHtml, formatDate, formatMoney, generatePassword, localHour, safeEqual, sha256Hex } from "./util.mjs";
 import * as UI from "./ownerui.mjs";
 
 const HUMAN_HOURS = 12;
@@ -100,6 +100,10 @@ export function createBot(deps) {
         list: async (c, body, label, rows) => {
             await whatsapp().list(c.wa_id, body, label, rows);
             await logOut(c.id, "list", body);
+        },
+        template: async (c, name, language, params) => {
+            await whatsapp().template(c.wa_id, name, language, params);
+            await logOut(c.id, "template", `[template ${name}] ${params.join(" | ")}`);
         }
     };
 
@@ -202,6 +206,21 @@ export function createBot(deps) {
         const text = T.notice(n);
         if (!text) return done("skipped", "unknown kind");
         if (!replying && !c.in_window) {
+            // Outside WhatsApp's 24-hour window only an approved template can be sent first.
+            // Expiry reminders use one when the owner has set it up; everything else waits.
+            const { s } = await settings();
+            const tpl = typeof s.expiry_template === "string" ? s.expiry_template.trim() : "";
+            if (n.kind === "expiry_reminder" && tpl) {
+                try {
+                    await send.template({ id: c.id, wa_id: c.wa_id }, tpl, s.expiry_template_lang || "ar", [c.name || "عميلنا", n.data?.credits ?? "", formatDate(n.data?.expires_at)]);
+                } catch (e) {
+                    log("error", "template notice failed", { id: n.id, error: e.message });
+                    await done("failed", e.message);
+                    return ownerCard({ text: UI.noticeResult(n, "failed", e.message) });
+                }
+                await done("sent");
+                return ownerCard({ text: UI.noticeResult(n, "sent_template") });
+            }
             await done("waiting");
             return ownerCard({ text: UI.noticeResult(n, "waiting") });
         }
@@ -877,9 +896,16 @@ export function createBot(deps) {
             const { s } = await settings();
             await ownerCard(UI.statusScreen(t.report, s.paused === true));
         }
+        // Automatic reminders before credits expire (bot setting expiry_reminder_days; 0 = off).
+        let reminders = 0;
+        try {
+            reminders = wa ? await db.rpc("bot_queue_expiry_reminders", {}) : 0;
+        } catch (e) {
+            log("warn", "expiry reminders failed", { error: e.message });
+        }
         const notices = wa ? await db.rpc("bot_claim_notifications", { p_limit: 20 }) : [];
         await deliverNotices(notices);
-        return ok({ fulfilled: (t.to_fulfill || []).length, expired: (t.expired || []).length, report: !!t.report, notices: notices.length });
+        return ok({ fulfilled: (t.to_fulfill || []).length, expired: (t.expired || []).length, report: !!t.report, notices: notices.length, reminders });
     }
 
     return { handleWhatsApp, handleTelegram, handlePayment, handleCron, fulfill, processMessage };

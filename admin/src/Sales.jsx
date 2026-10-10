@@ -398,6 +398,8 @@ function BotSettings() {
         try {
             for (const k of TEXT_SETTINGS) if (form[k] !== data[k]) await api.botSetSetting(k, String(form[k] ?? ""));
             for (const k of NUMBER_SETTINGS) if (Number(form[k]) !== Number(data[k])) await api.botSetSetting(k, Number(form[k]));
+            if (Number(form.expiry_reminder_days ?? 3) !== Number(data.expiry_reminder_days ?? 3)) await api.botSetSetting("expiry_reminder_days", Number(form.expiry_reminder_days));
+            for (const k of ["expiry_template", "expiry_template_lang"]) if ((form[k] ?? "") !== (data[k] ?? "")) await api.botSetSetting(k, String(form[k] ?? ""));
             if (form.auto_approve !== data.auto_approve) await api.botSetSetting("auto_approve", !!form.auto_approve);
             if (JSON.stringify(form.work_hours) !== JSON.stringify(data.work_hours))
                 await api.botSetSetting("work_hours", { start: Number(form.work_hours.start), end: Number(form.work_hours.end) });
@@ -440,6 +442,23 @@ function BotSettings() {
                     <input type="number" min="0" max="24" value={form.work_hours.end} onChange={(e) => setForm({ ...form, work_hours: { ...form.work_hours, end: e.target.value } })} />
                 </label>
             </div>
+            <h3>{t("expiring")}</h3>
+            <label>
+                {t("expAuto")}
+                <input type="number" min="0" max="30" value={form.expiry_reminder_days ?? 3} onChange={(e) => setForm({ ...form, expiry_reminder_days: e.target.value })} data-testid="expiry-days" />
+                <span className="muted small">{t("expAutoHint")}</span>
+            </label>
+            <div className="grid2">
+                <label>
+                    {t("expTemplate")}
+                    <input type="text" dir="ltr" placeholder="credits_expiring" value={form.expiry_template ?? ""} onChange={(e) => setForm({ ...form, expiry_template: e.target.value.trim() })} />
+                </label>
+                <label>
+                    {t("expTemplateLang")}
+                    <input type="text" dir="ltr" placeholder="ar" value={form.expiry_template_lang ?? "ar"} onChange={(e) => setForm({ ...form, expiry_template_lang: e.target.value.trim() })} />
+                </label>
+            </div>
+            <div className="muted small">{t("expTemplateHint")}</div>
             <h3>{t("faqTitle")}</h3>
             {form.faq.map((f, i) => (
                 <div key={i} className="card">

@@ -18,7 +18,7 @@ export function fileStamp(d = new Date()) {
 }
 
 export function useRunner() {
-    const { state, dispatch, services, session, refreshAccount } = useApp();
+    const { state, dispatch, services, session, refreshAccount, recheck } = useApp();
 
     const common = (thePlan) => ({
         port: services.port,
@@ -53,6 +53,8 @@ export function useRunner() {
         };
         const result = video ? await runVideoJob(args) : await runDesignJob(args);
         dispatch({ type: "run-done", result });
+        // The server refused to start: show the update / computers screen right away.
+        if (result.fatal && ["update_required", "device_limit"].includes(result.fatal.code)) recheck();
         // Open project: remember the rows that were generated, and the job's latest settings.
         if (state.project) {
             const done = markDone(state.project.done, succeededKeys(result, thePlan));

@@ -94,6 +94,8 @@ export const T = {
                 return `🔑 باسورد حسابك${acc.email ? ` (${acc.email})` : ""} اتغيّر من فريق الدعم.\nلو إنت اللي طلبت، هيوصلك الباسورد الجديد مننا. لو مش إنت، كلمنا فوراً: اكتب الدعم`;
             case "order_rejected":
                 return T.rejected(d.code || "");
+            case "expiry_reminder":
+                return `⏳ *تذكير:* عندك *${d.credits}* كريدت هتنتهي يوم ${formatDate(d.expires_at)}.\nاستخدمهم في تصميماتك قبل ما يخلصوا 🎨\n\nعايز تجدد أو تزوّد رصيدك؟ اكتب: *تجديد*${balance}`;
             default:
                 return null;
         }

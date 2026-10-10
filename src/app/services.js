@@ -3,6 +3,7 @@
 import { createPhotoshopPort } from "../ps/port.js";
 import { createAuthClient } from "../account/auth.js";
 import { createBilling, createCreditsClient } from "../account/credits.js";
+import { secureUuid } from "../account/random.js";
 import { createDevBilling } from "../account/devBilling.js";
 import { runSelfTest } from "../dev/selfTest.js";
 import { supabaseConfig } from "../config/supabase-config.js";
@@ -30,7 +31,7 @@ export function base64(bytes) {
 
 export const PREVIEW_MAX = 640;
 
-export function createServices({ photoshop, uxp, fetch: fetchImpl = typeof fetch === "function" ? fetch.bind(globalThis) : null }) {
+export function createServices({ photoshop, uxp, os = null, fetch: fetchImpl = typeof fetch === "function" ? fetch.bind(globalThis) : null }) {
     const port = createPhotoshopPort({ photoshop, uxp });
     const fs = uxp.storage.localFileSystem;
     const binary = uxp.storage.formats.binary;
@@ -43,6 +44,53 @@ export function createServices({ photoshop, uxp, fetch: fetchImpl = typeof fetch
         const entries = await folder.getEntries();
         return entries.filter((e) => e.isFile).map((e) => e.name);
     }
+
+    // This computer's id (feature 1): random, made once, kept in the plugin's secure storage.
+    const DEVICE_KEY = "elzoz.device.v1";
+    let deviceId = null;
+    async function ensureDevice() {
+        if (deviceId) return deviceId;
+        const store = uxp.storage.secureStorage;
+        try {
+            const v = store && (await store.getItem(DEVICE_KEY));
+            if (v) deviceId = typeof v === "string" ? v : new TextDecoder().decode(v);
+        } catch (e) {
+            deviceId = null;
+        }
+        if (!deviceId) {
+            deviceId = secureUuid();
+            try {
+                if (store) await store.setItem(DEVICE_KEY, deviceId);
+            } catch (e) {
+                /* not stored: this computer counts as new next time */
+            }
+        }
+        return deviceId;
+    }
+    const platformName = () => {
+        try {
+            const p = (typeof navigator !== "undefined" && navigator.platform) || "";
+            return /mac/i.test(p) ? "Mac" : /win/i.test(p) ? "Windows" : p || "computer";
+        } catch (e) {
+            return "computer";
+        }
+    };
+    // The computer's user folder name ("mona" from C:\Users\mona) tells two computers apart in the list.
+    const userName = () => {
+        try {
+            const home = os && typeof os.homedir === "function" ? os.homedir() : "";
+            return String(home || "").split(/[\\/]/).filter(Boolean).pop() || "";
+        } catch (e) {
+            return "";
+        }
+    };
+    const clientInfo = async () => ({
+        plugin: uxp.versions.plugin,
+        photoshop: port.caps.photoshopVersion,
+        uxp: port.caps.uxpVersion,
+        device_id: await ensureDevice(),
+        device_name: [userName(), platformName(), `Photoshop ${port.caps.photoshopVersion || ""}`.trim()].filter(Boolean).join(" · ").replace(/\s+/g, " ")
+    });
 
     // Loaders shared by the pickers and by reopening a saved project.
     const loadSpreadsheet = async (entry) => {
@@ -93,7 +141,18 @@ export function createServices({ photoshop, uxp, fetch: fetchImpl = typeof fetch
         billing({ dev = false } = {}) {
             if (dev && typeof __ELZOZ_DEV__ !== "undefined" && __ELZOZ_DEV__) return createDevBilling();
             if (!credits) throw new Error("Server not configured.");
-            return createBilling(credits, { clientInfo: { plugin: uxp.versions.plugin, photoshop: port.caps.photoshopVersion, uxp: port.caps.uxpVersion } });
+            return createBilling(credits, { clientInfo: clientInfo });
+        },
+
+        clientInfo,
+        pluginVersion: uxp.versions.plugin,
+        /** Startup check: is this plugin version allowed, and is this computer one of the account's? */
+        async checkIn() {
+            if (!credits) return null;
+            return credits.checkIn(await clientInfo());
+        },
+        async switchDevice() {
+            return credits.switchDevice(await clientInfo());
         },
 
         async pickSpreadsheet() {

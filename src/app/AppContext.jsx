@@ -18,6 +18,8 @@ export function AppProvider({ services, children }) {
     const [session, setSession] = useState({ status: "loading", user: null, dev: false, error: null });
     const [account, setAccount] = useState(null);
     const [pricing, setPricing] = useState({});
+    // Update and device status from the server (features 1 and 2); null until checked.
+    const [gate, setGate] = useState(null);
 
     // Remember preferences (never files, tokens or data).
     useEffect(() => {
@@ -64,6 +66,22 @@ export function AppProvider({ services, children }) {
         if (session.status === "signedIn") refreshAccount();
     }, [session.status, refreshAccount]);
 
+    const recheck = useCallback(async () => {
+        if (!services.checkIn || session.dev) return null;
+        try {
+            const g = await services.checkIn();
+            setGate(g);
+            return g;
+        } catch (e) {
+            return null; // offline: the server still checks when a job starts
+        }
+    }, [services, session.dev]);
+
+    useEffect(() => {
+        if (session.status === "signedIn") recheck();
+        else setGate(null);
+    }, [session.status, recheck]);
+
     const value = useMemo(
         () => ({
             state,
@@ -73,6 +91,13 @@ export function AppProvider({ services, children }) {
             account,
             pricing,
             refreshAccount,
+            gate,
+            recheck,
+            async switchDevice() {
+                const r = await services.switchDevice();
+                await recheck();
+                return r;
+            },
             async signIn(email, password) {
                 const s = await services.auth.signIn(email, password);
                 setSession({ status: "signedIn", user: s.user, dev: false, error: null });
@@ -86,7 +111,7 @@ export function AppProvider({ services, children }) {
                 if (services.devAvailable) setSession({ status: "signedIn", user: { email: "developer" }, dev: true, error: null });
             }
         }),
-        [state, services, session, account, pricing, refreshAccount]
+        [state, services, session, account, pricing, refreshAccount, gate, recheck]
     );
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

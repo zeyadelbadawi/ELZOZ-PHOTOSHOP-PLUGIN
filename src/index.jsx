@@ -9,6 +9,14 @@ import App from "./app/App.jsx";
 import { createServices } from "./app/services.js";
 
 let root = null;
+// Optional: only used to name this computer in the account's list.
+const os = (() => {
+    try {
+        return require("os"); // eslint-disable-line no-undef
+    } catch (e) {
+        return null;
+    }
+})();
 
 entrypoints.setup({
     panels: {
@@ -17,7 +25,7 @@ entrypoints.setup({
                 root = document.createElement("div");
                 root.style.height = "100%";
                 rootNode.appendChild(root);
-                ReactDOM.render(<App services={createServices({ photoshop, uxp })} />, root);
+                ReactDOM.render(<App services={createServices({ photoshop, uxp, os })} />, root);
             },
             destroy() {
                 if (root) {

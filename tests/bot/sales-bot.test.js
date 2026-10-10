@@ -194,6 +194,7 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
                 text: async (to, body) => wa.sent.push({ to, kind: "text", body }),
                 buttons: async (to, body, buttons) => wa.sent.push({ to, kind: "buttons", body, ids: buttons.map((b) => b.id) }),
                 list: async (to, body, label, rows) => wa.sent.push({ to, kind: "list", body, ids: rows.map((r) => r.id) }),
+                template: async (to, name, language, params) => wa.sent.push({ to, kind: "template", name, language, params }),
                 media: async () => ({ bytes: new Uint8Array([1, 2, 3]), mime: "image/jpeg" })
             },
             tg: {
@@ -513,6 +514,41 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
         await cron();
         expect(tg.sent.some((m) => /مش مربوط برقم واتساب/.test(m.text || ""))).toBe(true);
         expect((await statusOf(lonely))[0].status).toBe("no_contact");
+    });
+
+    it("credits about to expire: reminded inside 24h, by template outside it (if set up), and automatically once", async () => {
+        const cron = () => bot.handleCron({ method: "POST", query: {}, headers: { "x-cron-key": CRON_KEY } });
+        const uid = crypto.randomUUID();
+        await pgc.query("insert into auth.users (id, email) values ($1, $2)", [uid, `exp.${uid}@example.com`]);
+        await pgc.query("select public.grant_credits($1, 25, 'grant', null, 'test', null, now() + interval '2 days')", [uid]);
+        const me = phone();
+        await say(me, "اهلا");
+        await pgc.query("update public.bot_contacts set user_id = $1 where wa_id = $2", [uid, me]);
+        // Automatic reminder (default: 3 days before), sent at once inside the window.
+        const r1 = await cron();
+        expect(r1.body.reminders).toBeGreaterThanOrEqual(1);
+        expect(lastTo(me).body).toMatch(/تذكير.*25.*كريدت هتنتهي/s);
+        expect(lastTo(me).body).toMatch(/تجديد/);
+        expect(tg.sent.at(-1).text).toMatch(/تذكير بانتهاء الكريدت \(25 كريدت\)/);
+        expect((await cron()).body.reminders).toBe(0); // not twice
+        // Outside the window, with an approved template set up by the owner: sent as a template.
+        await pgc.query("update public.bot_contacts set last_inbound_at = now() - interval '3 days' where wa_id = $1", [me]);
+        await pgc.query("update public.bot_settings set value = '\"credits_expiring\"' where key = 'expiry_template'");
+        try {
+            const fresh = createBot(deps);
+            await pgc.query("select private.queue_expiry_reminder($1, 'admin:owner@test')", [uid]);
+            await fresh.handleCron({ method: "POST", query: {}, headers: { "x-cron-key": CRON_KEY } });
+            expect(lastTo(me)).toMatchObject({ kind: "template", name: "credits_expiring", language: "ar" });
+            expect(String(lastTo(me).params[1])).toBe("25");
+            expect(tg.sent.at(-1).text).toMatch(/رسالة قالب/);
+        } finally {
+            await pgc.query("update public.bot_settings set value = '\"\"' where key = 'expiry_template'");
+        }
+        // Without a template it waits for the client, like other notices.
+        const fresh2 = createBot(deps);
+        await pgc.query("select private.queue_expiry_reminder($1, 'admin:owner@test')", [uid]);
+        await fresh2.handleCron({ method: "POST", query: {}, headers: { "x-cron-key": CRON_KEY } });
+        expect(tg.sent.at(-1).text).toMatch(/مستني العميل/);
     });
 
     it("when paused, replies once and forwards everything to the owner", async () => {

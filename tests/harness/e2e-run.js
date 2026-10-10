@@ -1308,6 +1308,150 @@ scenario("I", "Features 1-15: smart prices, formatting (more added per feature)"
     await finishRecording(p, "SIMULATED-scenario-I-features", "Scenario I: new features 1-15 (simulated host)");
 });
 
+scenario("J", "Features 1, 2, 4: forced update, computers per account, expiring credits reminders (plugin + dashboard)", async () => {
+    const pg = require("pg");
+    const db = new pg.Client({ connectionString: process.env.ELZOZ_TEST_DATABASE_URL });
+    await db.connect();
+    const saved = (await db.query("select key, value from public.app_config")).rows;
+    const adminEmail = `devices-owner-${RUN}@e2e.test`;
+    const email = `devices-${RUN}@e2e.test`;
+    await post("/__e2e/users", { email: adminEmail, password: "owner pass 123", admin: true });
+    const client = await post("/__e2e/users", { email, password: "correct horse", credits: 30 });
+    try {
+        // --- dashboard: forced update + update note
+        const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, deviceScaleFactor: 1 });
+        const adm = await ctx.newPage();
+        adm.on("pageerror", (e) => report.errors.push({ scenario: "J", kind: "pageerror", message: e.message }));
+        adm.on("console", (m) => m.type() === "error" && report.errors.push({ scenario: "J", kind: "console", message: m.text() }));
+        const ashot = async (id, title) => {
+            await adm.waitForTimeout(250);
+            await adm.screenshot({ path: path.join(SHOTS, `${id}.png`), fullPage: true });
+            report.screenshots.push({ file: `${id}.png`, title, scenario: "J", width: 1280, theme: "system-light", lang: "ar", layoutProblems: [] });
+        };
+        await adm.goto(`${ORIGIN}/admin/`);
+        await adm.fill("input[type=email]", adminEmail);
+        await adm.fill("input[type=password]", "owner pass 123");
+        await adm.click("button.btn-primary");
+        await adm.waitForSelector(".tabs");
+        await adm.goto(`${ORIGIN}/admin/#/settings`);
+        const ps = adm.locator("[data-testid=plugin-settings]");
+        await ps.waitFor();
+        const inputs = ps.locator("input[type=text]");
+        await inputs.nth(0).fill("latest");
+        check("dashboard: a wrong version is flagged and Save is disabled before anything is sent", (await ps.locator("button.btn-primary").isDisabled()) && (await ps.textContent()).includes("1.2.0"));
+        await inputs.nth(0).fill("1.1.0");
+        await inputs.nth(1).fill("1.2.0");
+        await inputs.nth(2).fill("https://example.com/elzoz-1.2.0.ccx");
+        await ps.locator("textarea").fill("فلتر جديد للصور وتصدير أسرع");
+        await ps.locator("button.btn-primary").click();
+        await ps.locator(".alert-success").waitFor();
+        const cfg = Object.fromEntries((await db.query("select key, value from public.app_config")).rows.map((r) => [r.key, r.value]));
+        check("dashboard saved the plugin settings", cfg.min_plugin_version === "1.1.0" && cfg.latest_plugin_version === "1.2.0" && cfg.update_url === "https://example.com/elzoz-1.2.0.ccx", cfg);
+        await ashot("J01-admin-plugin-settings-ar", "Settings: minimum version (forced update), latest version, download link, computers per account");
+
+        // --- plugin (version 1.0.0-e2e) below the minimum: update screen, nothing charged
+        let p = await open({ width: 320 });
+        await p.locator("input[type=text]").first().fill(email);
+        await p.locator("input[type=password]").fill("correct horse");
+        await click(p, "Sign in");
+        await p.waitForSelector(".ez-gate");
+        const gateText = await p.textContent(".ez-gate");
+        check("plugin below the minimum version shows the update screen with the download button", /Update Elzoz to continue/.test(gateText) && /1\.1\.0/.test(gateText) && /Download the update/.test(gateText), gateText.slice(0, 120));
+        await shot(p, "J02-plugin-update-required-320-dark", "Plugin: forced update screen (version below the minimum)");
+        await btn(p, "Download the update").click();
+        await p.ctx.close();
+
+        // Back to "update available" only.
+        await inputs.nth(0).fill("0.0.0");
+        await ps.locator("button.btn-primary").click();
+        await adm.waitForTimeout(500);
+        p = await open({ width: 320 });
+        await signIn(p, email);
+        await p.waitForSelector("text=Elzoz 1.2.0 is available");
+        check("an optional update shows a banner and the plugin keeps working", (await p.locator(".ez-stepper").count()) === 1);
+        await shot(p, "J03-plugin-update-banner-320-dark", "Plugin: \"update available\" banner (not forced)");
+        const firstDevice = p;
+
+        // --- computers: limit 1 for this client, set from the dashboard
+        await adm.goto(`${ORIGIN}/admin/#/clients/${client.id}`);
+        const dev = adm.locator("[data-testid=devices]");
+        await dev.waitFor();
+        await adm.waitForSelector("[data-testid=devices] tbody tr");
+        check("dashboard lists the computer the client signed in from", (await dev.locator("tbody tr").count()) === 1);
+        await dev.locator("[data-testid=device-limit]").selectOption("1");
+        await adm.waitForTimeout(500);
+        check("limit saved for this client only", Number((await db.query("select max_devices from public.credit_accounts where user_id = $1", [client.id])).rows[0].max_devices) === 1);
+
+        // A second computer (new device id): refused with the list, then moves the account.
+        const p2 = await open({ width: 320 });
+        await p2.locator("input[type=text]").first().fill(email);
+        await p2.locator("input[type=password]").fill("correct horse");
+        await click(p2, "Sign in");
+        await p2.waitForSelector(".ez-gate");
+        check("a second computer over the limit sees which computers use the account", (await p2.locator("[data-testid=gate-device]").count()) === 1 && /in use on other computers/.test(await p2.textContent(".ez-gate")));
+        await shot(p2, "J04-plugin-device-limit-320-dark", "Plugin: account in use on another computer, with the option to move it here");
+        await btn(p2, "Use Elzoz on this computer").click();
+        await p2.waitForSelector(".ez-stepper", { timeout: 10000 });
+        check("moving the account opens the app on the new computer", true);
+        await p2.ctx.close();
+        // The first computer was unlinked: its next job is refused before any credit is touched.
+        const devices = (await db.query("select unlinked_by from public.user_devices where user_id = $1 order by id", [client.id])).rows.map((r) => r.unlinked_by);
+        check("the least recently used computer was unlinked (by the client's move)", JSON.stringify(devices) === JSON.stringify(["switch", null]), devices);
+        await firstDevice.ctx.close();
+
+        await adm.reload();
+        await adm.waitForSelector("[data-testid=devices] tbody tr");
+        check("dashboard shows the moved account and when it can move again", /switch|نقل/.test(await dev.textContent()) && (await dev.textContent()).includes("بعد"));
+        await ashot("J05-admin-client-devices-ar", "Client detail: computers, per-client limit, unlink, history of moves");
+
+        // --- top-up from a package preset, then expiring credits
+        const presets = adm.locator("[data-testid=presets] button");
+        check("top-up form offers the bot's packages as one-click presets", (await presets.count()) > 0);
+        await presets.first().click();
+        const topup = adm.locator("form.card").first();
+        const amount = await topup.locator("input[type=number]").nth(0).inputValue();
+        check("a preset fills credits, days and note", Number(amount) > 0 && (await topup.locator("input").nth(2).inputValue()).length > 0, amount);
+        await ashot("J06-admin-topup-presets-ar", "Top-up: one click on a package fills credits, validity and note");
+        // 40 credits that expire in 2 days, and a WhatsApp contact for the client.
+        await db.query("begin");
+        await db.query("set local role service_role");
+        await db.query("select public.grant_credits($1, 40, 'grant', null, 'e2e', null, now() + interval '2 days')", [client.id]);
+        await db.query("commit");
+        const wa = "2010" + String(Date.now()).slice(-8);
+        await db.query("insert into public.bot_contacts (wa_id, name, user_id, last_inbound_at) values ($1, 'Client J', $2, now())", [wa, client.id]);
+        await adm.goto(`${ORIGIN}/admin/#/expiring`);
+        const ex = adm.locator("[data-testid=expiring]");
+        await adm.waitForSelector("[data-testid=expiring] tbody tr");
+        const row = ex.locator("tr", { hasText: email });
+        check("expiring tab lists the client with the credits about to expire", (await row.count()) === 1 && (await row.textContent()).includes("40"));
+        const href = await row.locator("a").getAttribute("href");
+        check("wa.me button opens WhatsApp with a ready message", href.startsWith(`https://wa.me/${wa}?text=`) && decodeURIComponent(href).includes("40"), href.slice(0, 40));
+        await ashot("J07-admin-expiring-ar", "Expiring credits: who, how many, when; remind through the bot or open WhatsApp");
+        await row.locator("button.btn-primary").click();
+        await adm.locator(".modal button.btn-primary").click();
+        await ex.locator(".alert-success").waitFor();
+        const n = (await db.query("select kind, data, actor from public.bot_notifications where user_id = $1 and kind = 'expiry_reminder'", [client.id])).rows;
+        check("the reminder is queued for the bot to send", n.length === 1 && Number(n[0].data.credits) === 40 && /^admin:/.test(n[0].actor), n);
+        await ashot("J08-admin-expiring-reminded-ar", "After reminding: queued for the bot, the last-reminder date is filled in");
+
+        // --- bot settings: automatic reminders
+        await adm.goto(`${ORIGIN}/admin/#/sales/bot`);
+        await adm.waitForSelector("[data-testid=expiry-days]");
+        await adm.fill("[data-testid=expiry-days]", "5");
+        await adm.click("form.card button.btn-primary >> nth=-1");
+        await adm.waitForSelector(".alert-success");
+        const days = (await db.query("select value from public.bot_settings where key = 'expiry_reminder_days'")).rows[0].value;
+        check("automatic reminder days saved from the bot settings", Number(days) === 5, days);
+        await adm.locator("[data-testid=expiry-days]").scrollIntoViewIfNeeded();
+        await ashot("J09-admin-bot-reminder-settings-ar", "Bot settings: automatic reminder N days before expiry, approved template name");
+        await db.query("update public.bot_settings set value = '3' where key = 'expiry_reminder_days'");
+        await ctx.close();
+    } finally {
+        for (const r of saved) await db.query("update public.app_config set value = $2 where key = $1", [r.key, JSON.stringify(r.value)]);
+        await db.end();
+    }
+});
+
 async function page_wait(p) {
     await p.waitForSelector(".ez-stats, .ez-alert", { timeout: 10000 });
     await p.waitForTimeout(150);

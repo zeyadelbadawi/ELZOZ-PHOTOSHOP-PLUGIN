@@ -87,6 +87,12 @@ export function whatsappClient({ token, phoneNumberId, version = "v23.0", fetch:
                     }
                 }
             }),
+        /** An approved message template: the only way to write first outside the 24-hour window. */
+        template: (to, name, language, params = []) =>
+            send(to, {
+                type: "template",
+                template: { name, language: { code: language }, ...(params.length ? { components: [{ type: "body", parameters: params.map((p) => ({ type: "text", text: String(p) })) }] } : {}) }
+            }),
         media: async (mediaId) => {
             const meta = await f(`${base}/${mediaId}`, { headers: { Authorization: `Bearer ${token}` } });
             const info = await readJson(meta);

@@ -303,15 +303,18 @@ const NOTICE_AR = {
     disabled: "إيقاف الحساب",
     enabled: "تفعيل الحساب",
     password_reset: "تغيير الباسورد",
-    order_rejected: "رفض طلب"
+    order_rejected: "رفض طلب",
+    expiry_reminder: "تذكير بانتهاء الكريدت"
 };
 
 /** Result of telling a client about a dashboard change. */
 export function noticeResult(n, status, error) {
-    const what = `${NOTICE_AR[n.kind] || n.kind}${n.data?.amount ? ` (${n.data.amount} كريدت)` : ""}`;
+    const amount = n.data?.amount ?? n.data?.credits;
+    const what = `${NOTICE_AR[n.kind] || n.kind}${amount ? ` (${amount} كريدت)` : ""}`;
     const who = [n.account?.email ? code(n.account.email) : null, n.contact ? code("#C" + n.contact.id) : null].filter(Boolean).join("  ·  ");
     const rows = [`📝 ${escapeHtml(what)}`, who ? `👤 ${who}` : null];
     if (status === "sent") return card("📩", "اتبعت للعميل على واتساب", rows);
+    if (status === "sent_template") return card("📩", "اتبعت للعميل على واتساب (رسالة قالب)", rows);
     if (status === "waiting")
         return card("⏳", "إشعار مستني العميل", rows, "عدّى 24 ساعة من آخر رسالة منه، وواتساب مش بيسمح نبعتله دلوقتي. هيوصله أول ما يكلم البوت.");
     if (status === "no_contact") return card("📵", "العميل ماوصلوش إشعار", rows, "الحساب ده مش مربوط برقم واتساب (اتعمل من الداشبورد، مش من البوت). بلغه بنفسك.");

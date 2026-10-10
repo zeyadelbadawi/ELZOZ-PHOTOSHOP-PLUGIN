@@ -135,6 +135,14 @@ export const api = {
         rpc("admin_bot_save_package", { p_code: p.code, p_name: p.name, p_credits: p.credits, p_valid_days: p.valid_days, p_price_egp: p.price_egp, p_active: p.active, p_sort: p.sort }),
     botSettings: () => rpc("admin_bot_settings"),
     botSetSetting: (key, value) => rpc("admin_bot_set_setting", { p_key: key, p_value: value }),
+    // Features 1, 2 and 4
+    userDevices: (id) => rpc("admin_user_devices", { p_user: id }),
+    unlinkDevice: (deviceId) => rpc("admin_unlink_device", { p_device: deviceId }),
+    setDeviceLimit: (id, limit) => rpc("admin_set_device_limit", { p_user: id, p_limit: limit }),
+    appConfig: () => rpc("admin_app_config"),
+    setAppConfig: (key, value) => rpc("admin_set_app_config", { p_key: key, p_value: value }),
+    expiring: (days) => rpc("admin_expiring", { p_days: days }),
+    remindExpiring: (id) => rpc("admin_remind_expiring", { p_user: id }),
     botContactUpdate: (id, blocked, release) => rpc("admin_bot_contact_update", { p_contact: id, p_blocked: blocked, p_release: !!release }),
     newKey: key
 };

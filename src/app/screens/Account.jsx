@@ -28,10 +28,12 @@ export default function Account({ onClose }) {
     const [ledger, setLedger] = useState(null);
     const [jobs, setJobs] = useState(null);
     const [error, setError] = useState(null);
+    const [devices, setDevices] = useState(null);
 
     useEffect(() => {
         if (session.dev || !services.credits) return;
         refreshAccount();
+        services.credits.myDevices().then(setDevices).catch(() => setDevices(null));
         Promise.all([services.credits.getLedger(30), services.credits.getJobs(10)])
             .then(([l, j]) => {
                 setLedger(l);
@@ -72,6 +74,19 @@ export default function Account({ onClose }) {
                 </Section>
             )}
             {account && account.lots.length === 0 && !session.dev && <Alert tone="info">{t("account.noCredits")}</Alert>}
+            {devices && devices.devices && (
+                <Section title={t("account.devices", { n: devices.devices.length, limit: devices.limit })}>
+                    <Card>
+                        {devices.devices.map((d) => (
+                            <div key={d.id} className="ez-small ez-mb2" data-testid="account-device">
+                                <span className="ez-strong">{d.name || "—"}</span>
+                                <span className="ez-muted"> · {new Date(d.last_seen).toLocaleDateString(lang === "ar" ? "ar" : "en")}</span>
+                            </div>
+                        ))}
+                        <div className="ez-small ez-muted">{t("account.devicesHint", { limit: devices.limit })}</div>
+                    </Card>
+                </Section>
+            )}
             {contactUrl && !session.dev && (
                 <div className="ez-mb3">
                     <Button variant="primary" onClick={() => services.openExternal(contactUrl)}>
