@@ -6,7 +6,7 @@ import { IMAGE_EXTENSIONS, extensionOf } from "./imageFiles.js";
 import { linkShare } from "./linkImages.js";
 
 export const EMPTY_POLICIES = ["blank", "keepTemplate", "skipRow"];
-export const FIT_MODES = ["fit", "fill", "none"];
+export const FIT_MODES = ["fit", "fill", "subject", "none"];
 
 export function createMapping() {
     return { text: {}, images: {}, visibility: {}, colors: {} };
@@ -59,7 +59,8 @@ export function setImageMapping(mapping, layerId, rule) {
             addExtension: rule.addExtension !== false,
             // images downloaded from links, or QR codes / barcodes made from the cell
             ...(["link", "qr", "ean13", "code128"].includes(rule.source) ? { source: rule.source } : {}),
-            ...(rule.aspect ? { aspect: rule.aspect } : {}) // frame height / width, for barcodes
+            ...(rule.aspect ? { aspect: rule.aspect } : {}), // frame height / width, for barcodes
+            ...(rule.removeBg ? { removeBg: true, bgFail: rule.bgFail === "skip" ? "skip" : "keep" } : {}) // remove background (feature 7)
         };
     }
     return { ...mapping, images };

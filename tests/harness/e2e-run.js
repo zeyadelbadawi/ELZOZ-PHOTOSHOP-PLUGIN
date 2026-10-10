@@ -1224,6 +1224,45 @@ scenario("I", "Features 1-15: smart prices, formatting (more added per feature)"
     await shot(p, "I26-results-codes-320-dark", "Results: 5 offer cards from Google Sheets with QR + barcode");
     acct = await account(email);
     check("5 rows charged (62 → 57)", Number(acct.balance.balance) === 57, acct.balance);
+
+    // ---- F7 + F12: smart crop on the subject + remove background (Photoshop's Select Subject / Remove Background, simulated)
+    await click(p, "New job");
+    await queue(p, { file: "spreadsheets/offers.xlsx" });
+    await click(p, "Choose file");
+    await click(p, "Next");
+    await queue(p, { file: "templates/offer-card-1080x1350.psd" });
+    await click(p, "Choose PSD");
+    await page_wait(p);
+    await click(p, "Next");
+    await click(p, "Auto-map by name");
+    await pickLayerFolder(p, "Photo", "images/products");
+    await pickLayerFolder(p, "Logo", "images/logos");
+    const photo = layerRow(p, "Photo");
+    await (await fieldIn(photo, "Fit")).selectOption("subject");
+    await photo.locator('label:has-text("Remove the background") input').check();
+    await p.waitForTimeout(150);
+    const photoText = await photo.textContent();
+    check("smart crop and remove background explain themselves (and the failure choice)", /Select Subject finds the product or person/.test(photoText) && /If the background can't be removed/.test(photoText), photoText.slice(0, 200));
+    await photo.scrollIntoViewIfNeeded();
+    await shot(p, "I27-map-smart-crop-remove-bg-320-dark", "Map: Photo fills the frame centred on the subject, background removed", { scroll: null });
+    await click(p, "Next");
+    await field(p, "File names").fill("subject_{SKU}");
+    await field(p, "Rows to generate").fill("2, 6");
+    await p.waitForTimeout(200);
+    await click(p, "Next");
+    await btn(p, "Generate 2").click();
+    await waitForResults(p);
+    const dir7 = path.join(OUTS, "scenario-i-subject");
+    await saveOutputs(p, "Elzoz output I", dir7);
+    const bbox = JSON.parse(execFileSync("python3", ["-c", "import json,sys,os\nfrom psd_tools import PSDImage\nout={}\nfor n in ('subject_ELZ-0001.psd','subject_ELZ-0005.psd'):\n  p=PSDImage.open(os.path.join(sys.argv[1],n))\n  out[n]=[list(l.bbox) for l in p.descendants() if l.name=='Photo'][0]\nprint(json.dumps(out))", dir7]).toString());
+    // Frame 140..940 × 150..770. The laptop (subject right of centre) moves left as far as the frame allows (-96 px);
+    // the speaker's subject is centred, so it stays centred.
+    check("smart crop moves the photo towards its subject without uncovering the frame (psd-tools)", bbox["subject_ELZ-0001.psd"][0] === -52 && bbox["subject_ELZ-0005.psd"][0] === 75, bbox); // left edges: laptop pulled left, speaker centred (540 − 930/2)
+    const psCalls = await p.evaluate(() => window.__harness.host.env.calls.filter((c) => c.op === "batchPlay" && ["autoCutout", "removeBackground"].includes(c._obj)).map((c) => c._obj));
+    check("Select Subject and Remove Background ran once per row", psCalls.filter((c) => c === "autoCutout").length >= 2 && psCalls.filter((c) => c === "removeBackground").length >= 2, psCalls);
+    await shot(p, "I28-results-subject-320-dark", "Results: 2 designs with smart crop + background removed (simulated)");
+    acct = await account(email);
+    check("2 rows charged (57 → 55)", Number(acct.balance.balance) === 55, acct.balance);
     await finishRecording(p, "SIMULATED-scenario-I-features", "Scenario I: new features 1-15 (simulated host)");
 });
 

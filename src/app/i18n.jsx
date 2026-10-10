@@ -410,6 +410,13 @@ const en = {
     "gsheet.reload": "Reload from Google Sheets",
     "gsheet.reloadHint": "Gets the latest rows; your settings stay.",
     "projects.missing.gsheet": "the Google Sheet (check it's still shared)",
+    "map.fit.subject": "Fill, centred on the subject (smart crop)",
+    "map.fit.subjectHint": "Photoshop's Select Subject finds the product or person and keeps it in the frame; a tall subject keeps its top (faces) in view. Adds a few seconds per row.",
+    "map.removeBg": "Remove the background (Photoshop's Remove Background)",
+    "map.removeBgHint": "Works best on product and people photos. Adds a few seconds per row. The original photos aren't changed.",
+    "map.bgFail": "If the background can't be removed",
+    "map.bgFail.keep": "Use the photo as it is (noted in the results)",
+    "map.bgFail.skip": "Skip the row (not charged)",
     "error.generic": "Something went wrong: {message}"
 };
 
@@ -812,6 +819,13 @@ const ar = {
     "gsheet.reload": "حدّث من Google Sheets",
     "gsheet.reloadHint": "بيجيب آخر الصفوف؛ إعداداتك زي ما هي.",
     "projects.missing.gsheet": "شيت جوجل (اتأكد إنه لسه متشارك)",
+    "map.fit.subject": "يملا الإطار ويركّز على المنتج/الشخص (قص ذكي)",
+    "map.fit.subjectHint": "خاصية Select Subject في فوتوشوب بتلاقي المنتج أو الشخص وتخليه جوه الإطار؛ ولو أطول من الإطار بيحافظ على الجزء اللي فوق (الوشوش). بتزود كام ثانية في كل صف.",
+    "map.removeBg": "شيل الخلفية (Remove Background بتاع فوتوشوب)",
+    "map.removeBgHint": "بيشتغل أحسن مع صور المنتجات والأشخاص. بيزود كام ثانية في كل صف. الصور الأصلية مش بتتغير.",
+    "map.bgFail": "لو الخلفية متشالتش",
+    "map.bgFail.keep": "استخدم الصورة زي ما هي (هيتكتب في النتايج)",
+    "map.bgFail.skip": "تخطى الصف (مش هيتحسب)",
     "error.generic": "حدث خطأ: {message}"
 };
 

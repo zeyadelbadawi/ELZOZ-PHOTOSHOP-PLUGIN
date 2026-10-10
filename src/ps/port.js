@@ -210,6 +210,7 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 layerFor,
                 /** Apply one plan item (text + images) as a single history state. */
                 async applyItem(item, folders) {
+                    const notes = []; // things worth telling the user about this row (it still succeeded)
                     await doc.suspendHistory(async () => {
                         for (const t of item.text) {
                             const layer = layerFor(t.layerId);
@@ -225,7 +226,10 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                             } catch (e) {
                                 throw new StepError("image", `Image "${img.file}" is no longer in "${folder.name}".`, { layerId: img.layerId });
                             }
-                            await asStep("image", img.layerId, () => placeImage({ photoshop, fs, doc, layer: layerFor(img.layerId), kind: kinds.get(img.layerId), file, fit: img.fit }));
+                            const placed = await asStep("image", img.layerId, () =>
+                                placeImage({ photoshop, fs, doc, layer: layerFor(img.layerId), kind: kinds.get(img.layerId), file, fit: img.fit, removeBg: !!img.removeBg, bgFail: img.bgFail || "keep" })
+                            );
+                            if (placed && placed.notes) notes.push(...placed.notes);
                         }
                         for (const c of item.colors || []) {
                             await asStep("color", c.layerId, () => setLayerColor({ photoshop, layer: layerFor(c.layerId), kind: kinds.get(c.layerId), rgb: c.rgb }));
@@ -238,6 +242,7 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                             });
                         }
                     }, "Elzoz: apply row");
+                    return { notes };
                 },
                 /** baseName may contain subfolders ("Shoes/12_Name"); they are created as needed. */
                 async exportItem(folder, baseName, formats, options) {

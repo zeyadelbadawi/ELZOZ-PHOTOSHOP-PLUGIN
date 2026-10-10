@@ -4,7 +4,7 @@
 // This approximates Photoshop rendering (no blend modes, effects or real text
 // engine); it exists to make placement, text and animation visible.
 
-export function createCanvasRenderer({ pixelStore, fileBytes, stamp = "SIMULATED — not Photoshop" }) {
+export function createCanvasRenderer({ pixelStore, fileBytes, subjectOf = null, stamp = "SIMULATED — not Photoshop" }) {
     const bitmaps = new Map();
     const pixelCanvases = new Map();
 
@@ -58,7 +58,16 @@ export function createCanvasRenderer({ pixelStore, fileBytes, stamp = "SIMULATED
             ctx.fillRect(b.left, b.top, w, h);
         } else if (l.kind === "smartObject" && l.content) {
             const bm = await bitmap(l.content);
-            if (bm) ctx.drawImage(bm, b.left, b.top, w, h);
+            if (bm && l.mask === "subject" && subjectOf) {
+                // Simulated Remove Background: only the subject box stays visible.
+                const r = subjectOf(l.content) || { l: 0, t: 0, r: 1, b: 1 };
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(b.left + r.l * w, b.top + r.t * h, (r.r - r.l) * w, (r.b - r.t) * h);
+                ctx.clip();
+                ctx.drawImage(bm, b.left, b.top, w, h);
+                ctx.restore();
+            } else if (bm) ctx.drawImage(bm, b.left, b.top, w, h);
         } else if (l.pixels) {
             const c = pixelCanvas(l.pixels);
             if (c && w > 0 && h > 0) ctx.drawImage(c, b.left, b.top, w, h);

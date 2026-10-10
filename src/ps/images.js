@@ -7,6 +7,8 @@
 //   layer's bounds and hide the original. The row revert restores everything.
 // Then the result is fitted into the original frame (fit = contain, fill = cover).
 import { assertBatchPlayOk, StepError } from "./text.js";
+import { removeBackground, subjectBounds } from "./subject.js";
+import { subjectShift, usableSubject } from "../domain/subjectCrop.js";
 
 const DONT_DISPLAY = { dialogOptions: "dontDisplay" };
 
@@ -37,6 +39,35 @@ export async function fitLayerToFrame({ photoshop, layer, frame, mode }) {
     if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) await layer.translate(dx, dy);
 }
 
+/** Fit (and, if asked, centre on the subject and remove the background). Returns notes for the results. */
+async function finish({ photoshop, doc, target, frame, fit, removeBg, bgFail, name }) {
+    const notes = [];
+    await fitLayerToFrame({ photoshop, layer: target, frame, mode: fit === "subject" ? "fill" : fit });
+    if (fit === "subject") {
+        const image = bounds(target);
+        let subject = null;
+        try {
+            subject = await subjectBounds({ photoshop, doc, layer: target });
+        } catch (e) {
+            subject = null;
+        }
+        if (usableSubject(subject, image)) {
+            const { dx, dy, keptTop } = subjectShift(frame, image, subject);
+            if (dx || dy) await target.translate(dx, dy);
+            if (keptTop) notes.push(`"${name}": the subject is taller than the frame; its top is kept in view.`);
+        } else notes.push(`"${name}": no clear subject found; the photo is centred.`);
+    }
+    if (removeBg) {
+        try {
+            await removeBackground({ photoshop, layer: target });
+        } catch (e) {
+            if (bgFail === "skip") throw e;
+            notes.push(`${e.message} The photo is used with its background.`);
+        }
+    }
+    return notes;
+}
+
 async function selectOnly(photoshop, layer) {
     const r = await photoshop.action.batchPlay(
         [{ _obj: "select", _target: [{ _ref: "layer", _id: layer.id }], makeVisible: false, layerID: [layer.id], _options: DONT_DISPLAY }],
@@ -53,9 +84,12 @@ async function selectOnly(photoshop, layer) {
  * @param {object} p.layer      target layer in the working copy
  * @param {string} p.kind       'smartObject' | 'pixel'
  * @param {object} p.file       UXP File entry
- * @param {string} p.fit        'fit' | 'fill' | 'none'
+ * @param {string} p.fit        'fit' | 'fill' | 'subject' (fill, centred on the subject) | 'none'
+ * @param {boolean} [p.removeBg] hide the photo's background (Remove Background)
+ * @param {string} [p.bgFail]    'keep' (place it as is, with a note) | 'skip' (the row fails)
+ * @returns {Promise<{method, notes: string[]}>}
  */
-export async function placeImage({ photoshop, fs, doc, layer, kind, file, fit = "fit" }) {
+export async function placeImage({ photoshop, fs, doc, layer, kind, file, fit = "fit", removeBg = false, bgFail = "keep" }) {
     const frame = bounds(layer);
     const token = await fs.createSessionToken(file);
     await selectOnly(photoshop, layer);
@@ -66,8 +100,8 @@ export async function placeImage({ photoshop, fs, doc, layer, kind, file, fit = 
             {}
         );
         assertBatchPlayOk(r, "image", layer);
-        await fitLayerToFrame({ photoshop, layer, frame, mode: fit });
-        return { method: "replaceContents" };
+        const notes = await finish({ photoshop, doc, target: layer, frame, fit, removeBg, bgFail, name: file.name });
+        return { method: "replaceContents", notes };
     }
 
     if (kind === "pixel") {
@@ -84,9 +118,9 @@ export async function placeImage({ photoshop, fs, doc, layer, kind, file, fit = 
         assertBatchPlayOk(r, "image", layer);
         const placed = doc.activeLayers && doc.activeLayers[0];
         if (!placed || placed.id === layer.id) throw new StepError("image", `Photoshop did not place the image above "${layer.name}".`, { layerId: layer.id });
-        await fitLayerToFrame({ photoshop, layer: placed, frame, mode: fit === "none" ? "fit" : fit });
+        const notes = await finish({ photoshop, doc, target: placed, frame, fit: fit === "none" ? "fit" : fit, removeBg, bgFail, name: file.name });
         layer.visible = false;
-        return { method: "placeAbove" };
+        return { method: "placeAbove", notes };
     }
 
     throw new StepError("image", `"${layer.name}" can't receive images.`, { layerId: layer.id });

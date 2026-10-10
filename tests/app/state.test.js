@@ -82,7 +82,7 @@ describe("app state", () => {
 
     it("writes a CSV report with escaped fields", () => {
         const csv = reportCsv({ items: [{ sourceRow: 2, status: "failed", files: [], error: { step: "image", message: 'Not "found"' } }] });
-        expect(csv).toBe('row,status,files,error_step,error\r\n"2","failed","","image","Not ""found"""\r\n');
+        expect(csv).toBe('row,status,files,error_step,error,notes\r\n"2","failed","","image","Not ""found""",""\r\n');
     });
 
     it("keeps preferences but not files on a new job", () => {
@@ -127,6 +127,9 @@ describe("folder-backed image mapping in state", () => {
         expect(back.text).toEqual(s0.mapping.text);
         expect(back.images[5]).toMatchObject({ column: "Photo", folderKey: null });
         expect(back.colors[3]).toMatchObject({ column: "Name" }); // color rules are remembered too
+        // A QR / barcode layer comes back as a code (not as a folder of files).
+        rememberMapping(storage, s0.template, { ...withFolder, images: { 5: { layerId: 5, column: "Photo", source: "qr", fit: "fit" } } });
+        expect(recallMapping(storage, s0.template, headers).images[5]).toMatchObject({ source: "qr" });
         // A different template (other layers) gets nothing; a sheet without the column drops that rule.
         const other = { ...s0.template, layers: s0.template.layers.slice(0, 2) };
         expect(templateSignature(other)).not.toBe(templateSignature(s0.template));

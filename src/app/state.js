@@ -6,6 +6,7 @@ import { runVideoPreflight } from "../domain/video/preflight.js";
 import { buildTimeline } from "../domain/video/timeline.js";
 import { applyDerived, validateDerived } from "../domain/derived.js";
 import { linkShare } from "../domain/linkImages.js";
+import { CODE_KINDS } from "../domain/codes.js";
 
 export const DESIGN_STEPS = ["data", "template", "map", "check", "generate"];
 export const VIDEO_STEPS = ["data", "template", "map", "animate", "check", "generate"];
@@ -270,9 +271,9 @@ export function retryKeys(result) {
 
 export function reportCsv(result) {
     const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const lines = [["row", "status", "files", "error_step", "error"].join(",")];
+    const lines = [["row", "status", "files", "error_step", "error", "notes"].join(",")];
     for (const it of result.items) {
-        lines.push([it.sourceRow, it.status, (it.files || []).map((f) => f.name).join(" | "), it.error ? it.error.step : "", it.error ? it.error.message : ""].map(esc).join(","));
+        lines.push([it.sourceRow, it.status, (it.files || []).map((f) => f.name).join(" | "), it.error ? it.error.step : "", it.error ? it.error.message : "", (it.notes || []).join(" | ")].map(esc).join(","));
     }
     return lines.join("\r\n") + "\r\n";
 }
@@ -332,6 +333,7 @@ export function recallMemory(storage, template, table) {
     // Folder or links follows what this spreadsheet's column holds now.
     const images = Object.fromEntries(
         Object.entries(pruned.images).map(([id, r]) => {
+            if (CODE_KINDS.includes(r.source)) return [id, r]; // QR / barcode stays as it was
             const links = linkShare(table.rows || [], r.column) >= 0.6;
             const { source, ...rest } = r;
             return [id, links ? { ...rest, source: "link" } : rest];

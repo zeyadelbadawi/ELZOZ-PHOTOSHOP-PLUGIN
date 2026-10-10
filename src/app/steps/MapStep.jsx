@@ -150,9 +150,23 @@ export default function MapStep() {
                                             />
                                         </Field>
                                     )}
-                                    <Field label={t("map.fit")}>
-                                        <Select value={rule && rule.fit} onChange={(v) => update({ fit: v })} options={["fit", "fill", "none"].map((v) => ({ value: v, label: t(`map.fit.${v}`) }))} />
+                                    <Field label={t("map.fit")} hint={rule && rule.fit === "subject" ? t("map.fit.subjectHint") : null}>
+                                        <Select
+                                            value={rule && rule.fit}
+                                            onChange={(v) => update({ fit: v })}
+                                            options={(rule && CODE_KINDS.includes(rule.source) ? ["fit", "fill", "none"] : ["fit", "fill", "subject", "none"]).map((v) => ({ value: v, label: t(`map.fit.${v}`) }))}
+                                        />
                                     </Field>
+                                    {!(rule && CODE_KINDS.includes(rule.source)) && (
+                                        <>
+                                            <Checkbox checked={rule && rule.removeBg} onChange={(v) => update({ removeBg: v })} label={t("map.removeBg")} />
+                                            {rule && rule.removeBg && (
+                                                <Field label={t("map.bgFail")} hint={t("map.removeBgHint")}>
+                                                    <Select value={rule.bgFail || "keep"} onChange={(v) => update({ bgFail: v })} options={["keep", "skip"].map((v) => ({ value: v, label: t(`map.bgFail.${v}`) }))} />
+                                                </Field>
+                                            )}
+                                        </>
+                                    )}
                                     <Field label={t("map.empty")}>
                                         <Select value={rule && rule.emptyPolicy} options={imageEmptyOptions} onChange={(v) => update({ emptyPolicy: v })} />
                                     </Field>

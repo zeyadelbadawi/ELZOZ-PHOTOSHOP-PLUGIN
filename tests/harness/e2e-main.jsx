@@ -48,7 +48,9 @@ const host = createFakeHost({
         const bytes = templateBytes.get(entry.nativePath);
         return bytes ? templateFromPsd(bytes, pixelStore, entry.name) : null;
     },
-    render: createCanvasRenderer({ pixelStore, fileBytes }),
+    // Select Subject results for the simulator (relative boxes): the laptop sits right of centre.
+    subjects: { "laptop.jpg": { l: 0.5, t: 0.2, r: 0.95, b: 0.85 } },
+    render: createCanvasRenderer({ pixelStore, fileBytes, subjectOf: (name) => (name in host.env.subjects ? host.env.subjects[name] : host.env.defaultSubject) }),
     writePsd: (doc) => writeSimulatedPsd(doc, { pixelStore, fileBytes })
 });
 

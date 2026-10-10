@@ -87,7 +87,8 @@ export async function runDesignJob({ port, billing, template, templateLayers, pl
                     onEvent({ type: "item-start", index: i, key: state.key });
 
                     try {
-                        await session.applyItem(planItem, folders);
+                        const applied = await session.applyItem(planItem, folders);
+                        if (applied && applied.notes && applied.notes.length) state.notes = applied.notes;
                         // Rendered before the files, so a failure here leaves nothing behind for this row.
                         const printBytes = print ? await session.renderJpeg(12) : null;
                         state.files = await session.exportItem(output.entry, planItem.baseName, plan.formats, options);

@@ -158,6 +158,11 @@ export default function GenerateStep() {
                                     {t("gen.row", { row: it.sourceRow })} · {it.files && it.files.length ? it.files.map((f) => f.name).join(", ") : it.baseName}
                                 </div>
                                 {it.error && <div className="ez-small ez-muted">{`${it.error.step}: ${it.error.message}`}</div>}
+                                {(it.notes || []).map((n, k) => (
+                                    <div key={k} className="ez-small ez-warn" data-testid="item-note">
+                                        {n}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ))}

@@ -123,6 +123,7 @@ class FakeLayer {
         this.fontSize = spec.fontSize ?? null;
         this.color = spec.color ?? null; // text color, "rgb(r,g,b)"
         this.fillColor = spec.fillColor ?? null; // color fill / shape layers, "rgb(r,g,b)"
+        this.mask = spec.mask ?? null; // "subject": a layer mask that shows only the subject
         // Text scales with its box: remember the designed box height.
         this.baseHeight = spec.baseHeight ?? this.b.bottom - this.b.top;
         this.layers = spec.layers ? spec.layers.map((s) => new FakeLayer(doc, s)) : null;
@@ -197,6 +198,7 @@ class FakeLayer {
             fontSize: this.fontSize,
             color: this.color,
             fillColor: this.fillColor,
+            mask: this.mask,
             baseHeight: this.baseHeight,
             text: this._text,
             layers: this.layers ? this.layers.map((l) => l.toSpec(keepIds)) : undefined
@@ -268,6 +270,7 @@ class FakeDocument {
             layer.content = spec.content;
             layer.color = spec.color;
             layer.fillColor = spec.fillColor;
+            layer.mask = spec.mask ?? null;
             if (spec.kind === "text") layer._text = spec.text;
             layer.layers = spec.layers ? spec.layers.map(build) : null;
             return layer;
@@ -371,7 +374,10 @@ export function createFakeHost(cfg = {}) {
         zeroByteFormats: [],
         failReplace: new Set(),
         cancelAfterItems: null,
-        tokens: new Map()
+        tokens: new Map(),
+        subjects: cfg.subjects || {}, // image name -> {l, t, r, b} (0..1) or null (no subject)
+        defaultSubject: cfg.defaultSubject === undefined ? { l: 0.3, t: 0.2, r: 0.7, b: 0.8 } : cfg.defaultSubject,
+        removeBackgroundUnavailable: !!cfg.removeBackgroundUnavailable
     };
     const app = {
         version: cfg.version || "26.11.0",
@@ -459,6 +465,43 @@ export function createFakeHost(cfg = {}) {
                     const cy = (layer.b.top + layer.b.bottom) / 2;
                     layer.b = { left: cx - file.image.width / 2, top: cy - file.image.height / 2, right: cx + file.image.width / 2, bottom: cy + file.image.height / 2 };
                     layer.content = file.name;
+                    out.push({});
+                } else if (d._obj === "autoCutout") {
+                    // Select Subject: the subject box of the active layer's image (env.subjects, relative 0..1).
+                    const layer = doc.activeLayers[0];
+                    const rel = layer && layer.content ? (layer.content in env.subjects ? env.subjects[layer.content] : env.defaultSubject) : null;
+                    if (!rel) {
+                        doc.selection = null;
+                        out.push({});
+                        continue;
+                    }
+                    const w = layer.b.right - layer.b.left;
+                    const h = layer.b.bottom - layer.b.top;
+                    doc.selection = { left: layer.b.left + rel.l * w, top: layer.b.top + rel.t * h, right: layer.b.left + rel.r * w, bottom: layer.b.top + rel.b * h };
+                    doc.selectionLayer = layer.id;
+                    out.push({});
+                } else if (d._obj === "get" && d._target[0]._property === "selection") {
+                    const sel = doc.selection;
+                    const u = (v) => ({ _unit: "pixelsUnit", _value: v });
+                    out.push(sel ? { selection: { _obj: "rectangle", left: u(sel.left), top: u(sel.top), right: u(sel.right), bottom: u(sel.bottom) } } : {});
+                } else if (d._obj === "set" && d._target[0]._ref === "channel" && d._target[0]._property === "selection") {
+                    doc.selection = null;
+                    out.push({});
+                } else if (d._obj === "removeBackground") {
+                    const layer = doc.activeLayers[0];
+                    if (env.removeBackgroundUnavailable || !layer || layer.mask || !(layer.content in env.subjects ? env.subjects[layer.content] : env.defaultSubject)) {
+                        out.push({ _obj: "error", result: -25920, message: "The command “Remove Background” is not currently available." });
+                        continue;
+                    }
+                    layer.mask = "subject";
+                    out.push({});
+                } else if (d._obj === "make" && d.new && d.new._class === "channel" && d.using && d.using._value === "revealSelection") {
+                    const layer = doc.activeLayers[0];
+                    if (!doc.selection || !layer || layer.mask) {
+                        out.push({ _obj: "error", result: -25920, message: "The command “Make” is not currently available." });
+                        continue;
+                    }
+                    layer.mask = "subject";
                     out.push({});
                 } else if (d._obj === "make" && d._target[0]._ref === "textLayer") {
                     if (env.failMakeText) {

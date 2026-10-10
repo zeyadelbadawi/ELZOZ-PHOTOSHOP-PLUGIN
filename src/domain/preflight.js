@@ -17,6 +17,9 @@ export const FORMATS = ["jpg", "png", "psd"];
 
 const issue = (severity, code, message, extra = {}) => ({ severity, code, message, ...extra });
 
+// Remove background is only sent when asked for (codes never need it).
+const bgOptions = (rule) => (rule.removeBg ? { removeBg: true, bgFail: rule.bgFail === "skip" ? "skip" : "keep" } : {});
+
 /** Resolve one row against the mapping. Shared by design and video preflight. */
 export function resolveRow(row, mapping, folders) {
     const text = [];
@@ -73,7 +76,7 @@ export function resolveRow(row, mapping, folders) {
                 problems.push({ code: d && d.error ? "link_failed" : "link_pending", column: rule.column, layerId: rule.layerId, value: url, reason: d && d.error });
                 continue;
             }
-            images.push({ layerId: rule.layerId, folderKey: LINK_FOLDER_KEY, file: d.file, fit: rule.fit });
+            images.push({ layerId: rule.layerId, folderKey: LINK_FOLDER_KEY, file: d.file, fit: rule.fit, ...bgOptions(rule) });
             continue;
         }
         const folder = folders[rule.folderKey];
@@ -87,7 +90,7 @@ export function resolveRow(row, mapping, folders) {
             continue;
         }
         if (res.ambiguous) notes.push({ code: "image_ambiguous", column: rule.column, value: String(value).trim(), chosen: res.file, candidates: res.ambiguous });
-        images.push({ layerId: rule.layerId, folderKey: rule.folderKey, file: res.file, fit: rule.fit });
+        images.push({ layerId: rule.layerId, folderKey: rule.folderKey, file: res.file, fit: rule.fit, ...bgOptions(rule) });
     }
 
     const visibility = [];
