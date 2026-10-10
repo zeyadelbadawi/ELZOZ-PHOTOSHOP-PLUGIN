@@ -308,7 +308,7 @@ scenario("B", "Missing asset found in Check, fixed before spending; corrupt file
     await finishRecording(p, "SIMULATED-scenario-B-missing-asset-recovery", "Scenario B: missing and corrupt asset recovery (simulated host)");
 });
 
-scenario("C", "Video: 3 reels, 2 s @ 24 fps, real MOV files", async () => {
+scenario("C", "Video: 3 reels, 2 s @ 24 fps, real MP4 (H.264) files", async () => {
     const email = `scenario-c-${RUN}@e2e.test`;
     await post("/__e2e/users", { email, password: "correct horse", credits: 30 });
     const p = await open({ width: 320, record: true });
@@ -350,20 +350,23 @@ scenario("C", "Video: 3 reels, 2 s @ 24 fps, real MOV files", async () => {
     await waitForResults(p, 600000);
     await shot(p, "C07-video-results-320-dark", "Video results");
     const names = await saveOutputs(p, "Elzoz output C", path.join(OUTS, "scenario-c"));
-    const movs = names.filter((n) => n.endsWith(".mov"));
-    check("3 MOV files", movs.length === 3, names);
+    const movs = names.filter((n) => n.endsWith(".mp4"));
+    check("3 MP4 files (the default video format)", movs.length === 3, names);
     for (const m of movs) {
         const s = movSummary(path.join(OUTS, "scenario-c", m));
-        check(`${m}: ffprobe mjpeg 1080x1920, 48 frames, 24 fps, 2.0 s`, s.codec === "mjpeg" && s.width === 1080 && s.height === 1920 && s.frames === 48 && s.fps === "24/1" && Math.abs(s.durationSec - 2) < 0.01, s);
+        check(`${m}: ffprobe h264 1080x1920, 48 frames, 24 fps, 2.0 s (encoded by the plugin)`, s.codec === "h264" && s.width === 1080 && s.height === 1920 && s.frames === 48 && s.fps === "24/1" && Math.abs(s.durationSec - 2) < 0.01, s);
     }
+    // ffmpeg decodes every frame without a single error.
+    const decodeLog = execFileSync("ffmpeg", ["-v", "error", "-i", path.join(OUTS, "scenario-c", movs[0]), "-f", "null", "-"], { stdio: ["ignore", "pipe", "pipe"] }).toString();
+    check("the MP4 decodes cleanly (ffmpeg reports no errors)", decodeLog.trim() === "", decodeLog);
     // Contact sheet of one video (frames at 0, 0.5, 1, 1.5 s) for visual inspection.
     const first = path.join(OUTS, "scenario-c", movs[0]);
     execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", first, "-vf", "fps=2,scale=270:-1,tile=4x1", "-frames:v", "1", path.join(SHOTS, "C08-video-frames-contact-sheet.png")]);
-    report.screenshots.push({ file: "C08-video-frames-contact-sheet.png", title: "Frames 0/0.5/1/1.5 s decoded from the rendered MOV by ffmpeg", scenario: "C", width: null, theme: null, lang: null, layoutProblems: [] });
-    execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", first, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", path.join(RECS, "SIMULATED-scenario-C-rendered-video-row1.mp4")]);
+    report.screenshots.push({ file: "C08-video-frames-contact-sheet.png", title: "Frames 0/0.5/1/1.5 s decoded from the plugin's MP4 by ffmpeg", scenario: "C", width: null, theme: null, lang: null, layoutProblems: [] });
+    fs.copyFileSync(first, path.join(RECS, "SIMULATED-scenario-C-rendered-video-row1.mp4")); // the plugin's own MP4, not re-encoded
     const acct = await account(email);
     check("3 videos x 1 unit charged", acct.ledger.filter((l) => l.kind === "charge").length === 3 && Number(acct.balance.balance) === 27, acct.balance);
-    await finishRecording(p, "SIMULATED-scenario-C-video", "Scenario C: video mode (simulated host, real MOV output, real credits)");
+    await finishRecording(p, "SIMULATED-scenario-C-video", "Scenario C: video mode (simulated host, real MP4 output, real credits)");
 });
 
 scenario("D", "Billing failures: lost response, server outage at start, insufficient credits", async () => {

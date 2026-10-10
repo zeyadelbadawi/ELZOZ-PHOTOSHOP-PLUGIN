@@ -13,7 +13,7 @@ export const DESIGN_STEPS = ["data", "template", "map", "check", "generate"];
 export const VIDEO_STEPS = ["data", "template", "map", "animate", "check", "generate"];
 export const stepsFor = (mode) => (mode === "video" ? VIDEO_STEPS : DESIGN_STEPS);
 
-export const initialSettings = { formats: ["jpg"], jpgQuality: 10, namePattern: "elzoz_{row}", keepFrames: false, rowSelection: "", outputWidth: null, print: DEFAULT_PRINT, proof: { perPage: 6, saveImages: true } };
+export const initialSettings = { formats: ["jpg"], jpgQuality: 10, namePattern: "elzoz_{row}", keepFrames: false, rowSelection: "", outputWidth: null, print: DEFAULT_PRINT, proof: { perPage: 6, saveImages: true }, videoFormat: "mp4", videoQuality: "standard" };
 /** Settings that belong to one job and are not remembered between sessions. */
 export const JOB_ONLY_SETTINGS = ["rowSelection"];
 export const initialVideo = { format: "reel", fps: 30, durationMs: 6000, fadeOutMs: 500, tracks: {} };
@@ -202,6 +202,7 @@ export function computePlan(state, { balance = null, pricing = {} } = {}) {
             ...input,
             template: state.template ? { width: state.template.width, height: state.template.height } : null,
             timelineSpec: timelineSpec(state),
+            videoFormat: state.settings.videoFormat,
             pricing: { unitPrice: video.price ?? 1, hdLongEdge: video.hd_long_edge, hdMultiplier: video.hd_multiplier }
         });
     }

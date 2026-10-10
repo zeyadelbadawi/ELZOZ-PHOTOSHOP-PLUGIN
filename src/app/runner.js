@@ -48,7 +48,7 @@ export function useRunner() {
         const args = {
             ...common(thePlan),
             billing: services.billing({ dev: session.dev }),
-            options: { jpgQuality: state.settings.jpgQuality, keepFrames: state.settings.keepFrames },
+            options: { jpgQuality: state.settings.jpgQuality, keepFrames: state.settings.keepFrames, videoFormat: state.settings.videoFormat, videoQuality: state.settings.videoQuality },
             print
         };
         const result = video ? await runVideoJob(args) : await runDesignJob(args);

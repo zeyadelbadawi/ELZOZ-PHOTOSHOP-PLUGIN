@@ -13,7 +13,7 @@ import { setLayerColor } from "./color.js";
 import { splitOutputPath } from "../domain/naming.js";
 import { exportDocument, saveOptionsFor } from "./export.js";
 import { addProofOverlay } from "./proof.js";
-import { applyFrameState, exportFrame, writeAndVerifyMovie } from "./video.js";
+import { applyFrameState, exportFrame, writeAndVerifyMovie, writeAndVerifyMp4 } from "./video.js";
 
 // Label any Photoshop exception with the step and layer it happened on.
 async function asStep(step, layerId, fn) {
@@ -174,8 +174,9 @@ export function createPhotoshopPort({ photoshop, uxp }) {
             };
         },
 
+        /** MOV (Photo-JPEG) or MP4 (H.264), verified on disk. */
         async writeMovie(args) {
-            return writeAndVerifyMovie({ uxp, ...args });
+            return args.format === "mp4" ? writeAndVerifyMp4({ uxp, ...args }) : writeAndVerifyMovie({ uxp, ...args });
         },
 
         async removeFolder(folder) {

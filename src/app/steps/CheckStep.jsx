@@ -131,6 +131,18 @@ export default function CheckStep() {
                             <NumberInput value={state.settings.jpgQuality} min={0} max={12} onChange={(n) => setSettings({ jpgQuality: Math.max(0, Math.min(12, Math.round(n))) })} />
                         </Field>
                     )}
+                    {video && (
+                        <>
+                            <Field label={t("video.format")} hint={t(`video.format.${state.settings.videoFormat === "mov" ? "mov" : "mp4"}Hint`)}>
+                                <Select value={state.settings.videoFormat === "mov" ? "mov" : "mp4"} options={["mp4", "mov"].map((v) => ({ value: v, label: t(`video.format.${v}`) }))} onChange={(v) => setSettings({ videoFormat: v })} />
+                            </Field>
+                            {state.settings.videoFormat !== "mov" && (
+                                <Field label={t("video.quality")}>
+                                    <Select value={state.settings.videoQuality || "standard"} options={["high", "standard", "small"].map((v) => ({ value: v, label: t(`video.quality.${v}`) }))} onChange={(v) => setSettings({ videoQuality: v })} />
+                                </Field>
+                            )}
+                        </>
+                    )}
                     {video && <Checkbox checked={state.settings.keepFrames} onChange={(v) => setSettings({ keepFrames: v })} label={t("check.keepFrames")} />}
                     <Field label={t("check.pattern")} hint={t("check.patternHint")}>
                         <TextInput value={state.settings.namePattern} onChange={(v) => setSettings({ namePattern: v })} />
@@ -192,7 +204,7 @@ export default function CheckStep() {
                         <div className="ez-label">{t("check.names")}</div>
                         {plan.items.slice(0, 3).map((it) => (
                             <div key={it.key} className="ez-small ez-ellipsis">
-                                {(video ? ["mov"] : plan.formats).map((f) => `${it.baseName}.${f}`).join(", ")}
+                                {plan.formats.map((f) => `${it.baseName}.${f}`).join(", ")}
                             </div>
                         ))}
                         {!video && state.settings.print.enabled && <div className="ez-small ez-accent">{t("print.plusPdf")}</div>}

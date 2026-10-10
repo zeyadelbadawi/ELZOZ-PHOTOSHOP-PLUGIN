@@ -35,7 +35,8 @@ export function runVideoPreflight(input) {
     }
 
     const unitsPerItem = tl.ok ? videoUnits(tl.timeline.durationMs, tl.timeline.width, tl.timeline.height, { hdLongEdge: pricing.hdLongEdge, hdMultiplier: pricing.hdMultiplier }) : 1;
-    const base = runPreflight({ ...input, formats: ["mov"], allowedFormats: ["mov"], unitsPerItem, pricing: { unitPrice: pricing.unitPrice ?? 1 } });
+    const fmt = input.videoFormat === "mp4" ? "mp4" : "mov";
+    const base = runPreflight({ ...input, formats: [fmt], allowedFormats: [fmt], unitsPerItem, pricing: { unitPrice: pricing.unitPrice ?? 1 } });
 
     const all = { blocking: [...blocking, ...base.blocking], warnings: [...warnings, ...base.warnings] };
     if (tl.ok && base.units) {

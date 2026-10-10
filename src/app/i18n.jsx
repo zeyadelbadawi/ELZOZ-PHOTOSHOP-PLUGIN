@@ -425,6 +425,15 @@ const en = {
     "artboards.sizes": "Sizes (artboards)",
     "artboards.summary": "{rows} row(s) × {sizes} size(s) = {n} design(s)",
     "artboards.naming": "File names get “_” + the artboard name, or put {artboard} where you want it (e.g. {artboard}/{Name} makes a folder per size).",
+    "video.format": "Video file",
+    "video.format.mp4": "MP4 (H.264) — recommended",
+    "video.format.mov": "MOV (Photo-JPEG) — for editing",
+    "video.format.mp4Hint": "Plays everywhere: Instagram, TikTok, WhatsApp, Facebook, phones and browsers. Small files.",
+    "video.format.movHint": "Every frame at full quality, for editing in Premiere / After Effects. Much bigger files; most social apps don't accept it.",
+    "video.quality": "MP4 quality",
+    "video.quality.high": "High (bigger file)",
+    "video.quality.standard": "Standard (recommended)",
+    "video.quality.small": "Small file (for WhatsApp status)",
     "error.generic": "Something went wrong: {message}"
 };
 
@@ -842,6 +851,15 @@ const ar = {
     "artboards.sizes": "المقاسات (الآرت بوردات)",
     "artboards.summary": "{rows} صف × {sizes} مقاس = {n} تصميم",
     "artboards.naming": "اسم الملف بيتضاف له “_” + اسم الآرت بورد، أو حط {artboard} في المكان اللي تحبه (مثلًا {artboard}/{Name} بيعمل فولدر لكل مقاس).",
+    "video.format": "نوع ملف الفيديو",
+    "video.format.mp4": "MP4 (H.264) — المُوصى به",
+    "video.format.mov": "MOV (Photo-JPEG) — للمونتاج",
+    "video.format.mp4Hint": "بيشتغل في كل حتة: إنستجرام وتيك توك وواتساب وفيسبوك والموبايلات والمتصفحات. ملفات صغيرة.",
+    "video.format.movHint": "كل فريم بجودة كاملة، للمونتاج في Premiere / After Effects. ملفات أكبر بكتير ومعظم تطبيقات السوشيال مش بتقبله.",
+    "video.quality": "جودة الـ MP4",
+    "video.quality.high": "عالية (ملف أكبر)",
+    "video.quality.standard": "عادية (المُوصى بها)",
+    "video.quality.small": "ملف صغير (لحالة واتساب)",
     "error.generic": "حدث خطأ: {message}"
 };
 

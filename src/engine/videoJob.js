@@ -80,8 +80,19 @@ export async function runVideoJob({ port, billing, template, templateLayers, pla
                             ctx.progress(done / totalFrames, `Video ${i + 1} of ${items.length} · frame ${f + 1} of ${tl.frameCount}`);
                             onEvent({ type: "frame", index: i, frame: f + 1, frames: tl.frameCount });
                         }
-                        const movie = await port.writeMovie({ folder: target.folder, name: `${target.name}.mov`, frames, width: tl.width, height: tl.height, fps: tl.fps });
-                        state.files = [{ format: "mov", ...movie }];
+                        const format = options.videoFormat === "mp4" ? "mp4" : "mov";
+                        const movie = await port.writeMovie({
+                            folder: target.folder,
+                            name: `${target.name}.${format}`,
+                            frames,
+                            width: tl.width,
+                            height: tl.height,
+                            fps: tl.fps,
+                            format,
+                            quality: options.videoQuality,
+                            onProgress: (k, n) => ctx.progress(((i + 1) * tl.frameCount) / totalFrames, `Video ${i + 1} of ${items.length} · making the MP4 (${k}/${n})`)
+                        });
+                        state.files = [{ format, ...movie }];
                         state.status = ITEM.succeeded;
                     } catch (e) {
                         if (e.cancelled) {
