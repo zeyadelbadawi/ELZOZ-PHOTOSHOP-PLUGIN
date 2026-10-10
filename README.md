@@ -52,13 +52,15 @@ Load in Photoshop with the **UXP Developer Tool**: *Add Plugin* → `dist/manife
 ## Testing
 
 - `bash scripts/qa-all.sh` runs everything automated: unit and simulator tests, credits DB over HTTP, browser scenarios with screenshots and recordings, the production build with a secret scan, and the audit. Results and artifacts: `test-artifacts/INDEX.md`.
-- Testing in real Photoshop: `npm run qa:kit`, then `docs/PHOTOSHOP_TESTING.md` (in-plugin self-test, about 10 minutes per version).
+- Testing in real Photoshop: `npm run qa:kit`, then `docs/PHOTOSHOP_TESTING.md` (in-plugin self-test, about 15 minutes per version).
 - The browser runs use a **simulated** Photoshop host. They verify Elzoz's logic and UI flow, not Photoshop itself.
 
 ## Deploy and operate
 
 - **`docs/DEPLOYMENT.md`**: Supabase (migrations, `admin-users` function, sign-ups off, first admin), dashboard hosting, plugin build and packaging.
-- **`docs/ADMIN_GUIDE_AR.md`**: the daily routine in Arabic: create a client, top up, reset a password, disable, refunds, prices.
+- **`docs/ADMIN_GUIDE_AR.md`**: the daily routine in Arabic: create a client, top up (package presets), reset a password, disable, refunds, prices, computers per account, forced updates, expiring-credit reminders.
+- **`docs/FEATURES_GUIDE_AR.md`**: the designer's guide (Arabic) to features 1–15: Google Sheets, store files, image links, smart columns, formatting, colors and brand kits, QR codes and barcodes, smart crop, background removal, artboards, approval sheet, print PDF, MP4, saved projects.
+- `docs/ROADMAP_AR.md`: feature roadmap and status (1–15 built, awaiting the owner's review).
 - `docs/SECURITY.md`: threat model and secrets checklist.
 
 ## Compatibility

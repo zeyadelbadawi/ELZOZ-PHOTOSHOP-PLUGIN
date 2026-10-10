@@ -66,7 +66,9 @@ const account = (email) => api(`/__e2e/account?email=${encodeURIComponent(email)
 
 // ---------- browser helpers ----------
 let browser;
-async function open({ width = 320, height = 720, theme = "dark", lang = "en", ps, record } = {}) {
+// Each browser context is a new "computer" to the server (feature 1). By default all pages of a
+// scenario share one computer id, like one designer's Photoshop; `newComputer: true` makes another.
+async function open({ width = 320, height = 720, theme = "dark", lang = "en", ps, record, newComputer = false } = {}) {
     const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, ...(record ? { recordVideo: { dir: path.join(RECS, ".raw"), size: { width, height } } } : {}) });
     const page = await ctx.newPage();
     if (current) current.page = page; // for the failure screenshot
@@ -79,6 +81,7 @@ async function open({ width = 320, height = 720, theme = "dark", lang = "en", ps
         else report.errors.push(entry);
     });
     await page.addInitScript((l) => localStorage.setItem("elzoz.lang", l), lang);
+    if (!newComputer) await page.addInitScript((d) => localStorage.getItem("secure:elzoz.device.v1") || localStorage.setItem("secure:elzoz.device.v1", d), `e2e-${RUN}-${current ? current.id : "x"}-computer`);
     const q = new URLSearchParams({ theme, ...(ps ? { ps } : {}) });
     await page.goto(`${ORIGIN}/?${q}`);
     await page.waitForSelector(".ez-content");
@@ -1350,7 +1353,7 @@ scenario("J", "Features 1, 2, 4: forced update, computers per account, expiring 
         await ashot("J01-admin-plugin-settings-ar", "Settings: minimum version (forced update), latest version, download link, computers per account");
 
         // --- plugin (version 1.0.0-e2e) below the minimum: update screen, nothing charged
-        let p = await open({ width: 320 });
+        let p = await open({ width: 320, newComputer: true });
         await p.locator("input[type=text]").first().fill(email);
         await p.locator("input[type=password]").fill("correct horse");
         await click(p, "Sign in");
@@ -1365,7 +1368,7 @@ scenario("J", "Features 1, 2, 4: forced update, computers per account, expiring 
         await inputs.nth(0).fill("0.0.0");
         await ps.locator("button.btn-primary").click();
         await adm.waitForTimeout(500);
-        p = await open({ width: 320 });
+        p = await open({ width: 320, newComputer: true });
         await signIn(p, email);
         await p.waitForSelector("text=Elzoz 1.2.0 is available");
         check("an optional update shows a banner and the plugin keeps working", (await p.locator(".ez-stepper").count()) === 1);
@@ -1383,7 +1386,7 @@ scenario("J", "Features 1, 2, 4: forced update, computers per account, expiring 
         check("limit saved for this client only", Number((await db.query("select max_devices from public.credit_accounts where user_id = $1", [client.id])).rows[0].max_devices) === 1);
 
         // A second computer (new device id): refused with the list, then moves the account.
-        const p2 = await open({ width: 320 });
+        const p2 = await open({ width: 320, newComputer: true });
         await p2.locator("input[type=text]").first().fill(email);
         await p2.locator("input[type=password]").fill("correct horse");
         await click(p2, "Sign in");

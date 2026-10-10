@@ -16,6 +16,7 @@
 | Sales bot | Edge Function `sales-bot` (verify JWT: off, each route checks its own secret); cron `elzoz-bot-tick` every 5 min (key in Vault); Storage bucket `releases` (private). Setup: [`SALES_BOT_SETUP_AR.md`](SALES_BOT_SETUP_AR.md) |
 | Sales bot status (2026-10-10) | WhatsApp Cloud API live on Meta's **test number** (app "Elzoz Sales Bot" in Live mode, WABA subscribed via `POST /<WABA_ID>/subscribed_apps`, permanent System User token in `WA_TOKEN`). Tested end to end: menu → order → approval → account delivered. Telegram owner bot live. Client notifications for dashboard changes live (`bot_notifications`, migrations `20261012000001`, `20261013000001`). **Not done yet:** real business number, payment forwarder phone (`PAY_WEBHOOK_KEY`), `releases/elzoz.ccx` upload |
 | Applied by hand | `20261013000001_notify_option.sql` was run in the SQL editor (the connector's approval prompt for its `DROP FUNCTION`s timed out) |
+| Features 1, 2, 4 (2026-10-10) | `20261014000001_devices_updates_reminders.sql` applied through the connector as `devices_updates_reminders` (app_config, user_devices, check_in / switch_device / my_devices, start_job with client checks, admin device / config / expiring RPCs, expiry reminders). `sales-bot` redeployed as version 16 (expiry reminders, approved-template delivery, one-time explanation of WhatsApp error 131030). Defaults: forced update off (`min_plugin_version` 0.0.0), 2 computers per account, `require_device_id` off |
 | Created | 2026-10-09 via the Supabase connector |
 
 Never store the secret / service_role key here or anywhere in the repository.
@@ -40,7 +41,7 @@ On this project the migration history holds the connector's step names (`credits
 
 ```bash
 supabase link --project-ref qxclgvmqeztonhdntvni
-supabase migration repair --status applied 20261009000001 20261009000002 20261010000001 20261011000001
+supabase migration repair --status applied 20261009000001 20261009000002 20261010000001 20261011000001 20261012000001 20261013000001 20261014000001
 ```
 
 After that, new migration files are pushed normally.

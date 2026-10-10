@@ -3,7 +3,7 @@
 Everything in `test-artifacts/` was produced on a **simulated** Photoshop host
 (Chromium + a behavioural fake). Only a run inside Adobe Photoshop can show
 that the Photoshop API calls work. This guide keeps your part as short as
-possible: **about 10 minutes per Photoshop version.**
+possible: **about 15 minutes per Photoshop version.**
 
 ## What you need
 
@@ -19,12 +19,12 @@ No Elzoz account, Supabase project or credits are needed. The kit is a developer
 2. Start Photoshop, then UDT. In UDT, click **Add Plugin** and select `plugin/manifest.json`. Then use **••• → Load** on the Elzoz row.
 3. In Photoshop, open **Plugins → Elzoz**. The panel says the build has no server. Click **Continue in developer mode**.
 4. Click the **DEV** chip in the top-right corner of the panel to open Account. Click **Run self-test**, then choose the `kit/` folder.
-5. Wait for all 10 steps to finish (typically under a minute).
+5. Wait for all 15 steps to finish (typically 2–4 minutes; Select Subject and Remove Background take a few seconds per row).
 6. Send back:
    - `kit/selftest-<date>/elzoz-selftest-report.json` (always send this, pass or fail)
    - a screenshot of the panel showing the step list
    - UDT's log if anything failed (*UDT → Elzoz row → ••• → Debug → Console*)
-7. Do the 6 visual checks printed in the report under `manualChecks`, and note anything odd. These checks are things only a human can judge, for example whether the text sits nicely.
+7. Do the 12 visual checks printed in the report under `manualChecks`, and note anything odd. These checks are things only a human can judge, for example whether the text sits nicely.
 
 ### What the self-test does
 
@@ -40,8 +40,15 @@ The self-test calls the same code paths as a real job (`src/dev/selfTest.js`):
 | outputs | Each file exists and is non-empty; the JPG and PNG files are 1080×1350; the PSD has a valid header |
 | features | Rows 2–3 and 5 only, Badge shown/hidden from the Badge column, Description shrink-to-fit, files in `NEW/` and `HOT/` subfolders, 540 px output width |
 | integrity-after | Template file is byte-identical, and no extra documents are left open |
-| video | One 2 s, 24 fps Reel is rendered (slide-up text, Ken Burns photo). The writer re-reads the MOV and verifies its codec, size, frame count and duration |
+| video | One 2 s, 24 fps Reel is rendered as **MP4 (H.264)** (slide-up text, Ken Burns photo). The writer re-reads the MP4 and verifies its codec, size, frame count and duration |
 | integrity-video | No documents are left open after the video |
+| artboards | Feature 5. `social-sizes-artboards.psd` is read through batchPlay (`artboardEnabled`, `artboardRect`): Post 1080², Story 1080×1920, Banner 1200×628. Two rows × 3 artboards are exported, each cropped to its artboard, into one folder per size |
+| print-pdf | Feature 13. A 2-row job with the print PDF on: `Print.pdf` is written with 2 pages |
+| proof | Feature 14. Free approval sheet for 3 rows: the PROOF watermark (a text layer made with batchPlay), the label strip (`resizeCanvas`), the PDF and the proof images. No documents are left open |
+| subject | Features 7 + 12. Smart crop with **Select Subject**, then the same with **Remove Background**. It fails if Photoshop finds no subject or can't remove the background |
+| colors | Feature 11. The product name's text color comes from a column (#E63946 and #1D4ED8) |
+
+All outputs of these 5 steps are in `kit/selftest-<date>/new/`, one folder per feature.
 
 ## Version matrix
 

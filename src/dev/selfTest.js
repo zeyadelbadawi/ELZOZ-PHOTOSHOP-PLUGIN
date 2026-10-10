@@ -10,12 +10,15 @@
 // In Photoshop this is the evidence that the integration works; in the test
 // simulator it only proves the self-test itself is wired correctly.
 import { readTable, readWorkbook } from "../domain/excel.js";
-import { autoMap, createMapping, setImageMapping, setTextOptions, setVisibilityMapping } from "../domain/mapping.js";
+import { autoMap, createMapping, setColorMapping, setImageMapping, setTextOptions, setVisibilityMapping } from "../domain/mapping.js";
 import { buildFolderIndex } from "../domain/imageFiles.js";
 import { runPreflight } from "../domain/preflight.js";
 import { runVideoPreflight } from "../domain/video/preflight.js";
 import { runDesignJob } from "../engine/designJob.js";
 import { runVideoJob } from "../engine/videoJob.js";
+import { runProofJob } from "../engine/proofJob.js";
+import { leadLayers, artboardSize } from "../domain/artboards.js";
+import { DEFAULT_PRINT } from "../domain/imposition.js";
 import { createDevBilling } from "../account/devBilling.js";
 import { imageInfo } from "../media/imageInfo.js";
 
@@ -23,6 +26,7 @@ export const SELF_TEST_MARKER = "elzoz-dev-selftest";
 
 const CARD = "product-card-1080x1350.psd";
 const REEL = "reel-1080x1920.psd";
+const ARTBOARDS = "social-sizes-artboards.psd";
 const EXPECTED_CARD_LAYERS = [
     "Footer:group", "Footer/Name:text",
     "Card:group", "Card/Text:group", "Card/Text/Description:text", "Card/Text/Price:text", "Card/Text/Name:text", "Card/Badge:pixel",
@@ -66,7 +70,13 @@ export async function runSelfTest({ photoshop, uxp, port, kit, onStep = () => {}
             "Play the MOV in QuickTime or VLC: 2 s, text slides up, photo slowly zooms.",
             "Photoshop's History panel for the template shows no Elzoz changes, and the template file was not saved.",
             "features/: the files in NEW/ and HOT/ show the yellow badge; features/4_Orbit Watch.jpg (no badge in the sheet) has none.",
-            "features/: every image is 540 px wide; long descriptions are scaled down to fit their original width."
+            "features/: every image is 540 px wide; long descriptions are scaled down to fit their original width.",
+            "new/artboards/: Post 1080×1080, Story 1080×1920, Banner 1200×628, each showing only its own artboard.",
+            "new/print/Print.pdf: opens in Acrobat, one page per design at the template's size with crop marks.",
+            "new/proof/Approval sheet.pdf: every design has the diagonal PROOF watermark and a #number label under it.",
+            "new/subject/: the product is inside the frame (not cut off); with background removal the original background is gone.",
+            "new/colors/: the product name is red (#E63946) on row 2 and blue (#1D4ED8) on row 3.",
+            "The video is an .mp4 that plays in WhatsApp, a phone and VLC."
         ]
     };
     const ctx = {};
@@ -243,15 +253,148 @@ export async function runSelfTest({ photoshop, uxp, port, kit, onStep = () => {}
                 timelineSpec: { format: "reel", fps: 24, durationMs: 2000, fadeOutMs: 0, tracks }
             });
             need(plan.ok, `video preflight blocked: ${plan.blocking.map((b) => b.message).join("; ")}`);
-            const result = await runVideoJob({ port, billing: createDevBilling(), template: { entry: ctx.reel }, templateLayers: info.layers, plan, folders: jobFolders(), output: { entry: ctx.out } });
+            const result = await runVideoJob({
+                port,
+                billing: createDevBilling(),
+                template: { entry: ctx.reel },
+                templateLayers: info.layers,
+                plan,
+                folders: jobFolders(),
+                output: { entry: ctx.out },
+                options: { videoFormat: "mp4", videoQuality: "standard" }
+            });
             const item = result.items[0];
             need(item.status === "succeeded", item.error ? `${item.error.step}: ${item.error.message}` : item.status);
-            // The writer already re-read and verified the MOV (codec, size, frames, duration).
+            need((item.files || []).some((f) => /\.mp4$/i.test(f.name || f)), `no .mp4 written: ${JSON.stringify(item.files)}`);
+            // The writer already re-read and verified the MP4 (codec, size, frames, duration).
             return { status: result.status, files: item.files };
         });
         await step("integrity-video", "No documents left open after video", async () => {
             need(photoshop.app.documents.length === ctx.docCount, `open documents: ${ctx.docCount} before, ${photoshop.app.documents.length} after`);
             return { openDocuments: photoshop.app.documents.length };
+        });
+    }
+
+    // ---------------------------------------------------------------- features 1-15 in the real host
+    // Each step uses a Photoshop call the simulator can only imitate (batchPlay descriptors,
+    // artboards, Select Subject / Remove Background, crop, text layers, fills).
+    if (ctx.table && ctx.out && ctx.info) {
+        const newDir = await ctx.out.createFolder("new");
+        const designJob = async (folderName, planArgs, extra = {}) => {
+            const folder = await newDir.createFolder(folderName);
+            const plan = runPreflight({
+                table: onlyRows(ctx.table, [2, 3]),
+                folders: planFolders(),
+                output: { name: folder.name, existingFileNames: [] },
+                formats: ["jpg"],
+                namePattern: "{row}_{Name}",
+                pricing: { unitPrice: 1 },
+                balance: null,
+                ...planArgs
+            });
+            need(plan.ok, `preflight blocked: ${plan.blocking.map((b) => b.message).join("; ")}`);
+            const before = photoshop.app.documents.length;
+            const result = await runDesignJob({ port, billing: createDevBilling(), templateLayers: planArgs.layers, plan, folders: jobFolders(), output: { entry: folder }, ...extra });
+            const failed = result.items.filter((i) => i.status !== "succeeded");
+            need(!failed.length, failed.map((i) => `row ${i.sourceRow}: ${i.error ? `${i.error.step}: ${i.error.message}` : i.status}`).join("; "));
+            need(photoshop.app.documents.length === before, `open documents: ${before} before, ${photoshop.app.documents.length} after`);
+            return { folder, plan, result };
+        };
+        const jpgSize = async (folder, baseName) => {
+            const target = await port.outputTarget(folder, baseName);
+            const info = imageInfo(toU8(await (await target.folder.getEntry(`${target.name}.jpg`)).read({ format: binary })));
+            return info ? [info.width, info.height] : null;
+        };
+        const fileBytes = async (folder, name) => toU8(await (await folder.getEntry(name)).read({ format: binary }));
+
+        await step("artboards", "Feature 5: one design per artboard, cropped to its size", async () => {
+            const entry = await child(kit, "templates", ARTBOARDS);
+            const info = await port.inspectTemplate({ entry });
+            const sizes = (info.artboards || []).map((a) => [a.name, artboardSize(a).width, artboardSize(a).height]);
+            need(JSON.stringify(sizes) === JSON.stringify([["Post", 1080, 1080], ["Story", 1080, 1920], ["Banner", 1200, 628]]), `artboards read as ${JSON.stringify(sizes)}`);
+            const lead = leadLayers(info.layers, info.artboards);
+            const mapping = mapFor(lead);
+            const { folder, plan } = await designJob("artboards", { layers: info.layers, mapping, artboards: info.artboards, namePattern: "{artboard}/{row}_{Name}" }, { template: { entry } });
+            const got = [];
+            for (const it of plan.items) got.push([it.baseName, ...(await jpgSize(folder, it.baseName))]);
+            const want = { Post: [1080, 1080], Story: [1080, 1920], Banner: [1200, 628] };
+            for (const [name, w, h] of got) {
+                const ab = name.split("/")[0];
+                need(want[ab] && want[ab][0] === w && want[ab][1] === h, `${name}.jpg is ${w}x${h}, expected ${want[ab]}`);
+            }
+            return { designs: got };
+        });
+
+        await step("print-pdf", "Feature 13: print PDF written during a job", async () => {
+            const print = { options: { ...DEFAULT_PRINT, enabled: true, marks: true }, fileName: "Print.pdf" };
+            const { folder, result } = await designJob("print", { layers: ctx.info.layers, mapping: mapFor(ctx.info.layers) }, { template: { entry: ctx.card }, print });
+            need(result.print && result.print.pages === 2, `print result ${JSON.stringify(result.print)}`);
+            const bytes = await fileBytes(folder, result.print.file);
+            need(String.fromCharCode(...bytes.subarray(0, 5)) === "%PDF-", "Print.pdf is not a PDF");
+            return { file: result.print.file, pages: result.print.pages, bytes: bytes.length };
+        });
+
+        await step("proof", "Feature 14: approval sheet (watermark text layer + label strip, free)", async () => {
+            const folder = await newDir.createFolder("proof");
+            const plan = runPreflight({
+                table: onlyRows(ctx.table, [2, 3, 8]),
+                layers: ctx.info.layers,
+                mapping: mapFor(ctx.info.layers),
+                folders: planFolders(),
+                output: { name: folder.name, existingFileNames: [] },
+                formats: ["jpg"],
+                namePattern: "{row}_{Name}",
+                pricing: { unitPrice: 1 },
+                balance: null
+            });
+            const before = photoshop.app.documents.length;
+            const result = await runProofJob({
+                port,
+                template: { entry: ctx.card },
+                templateLayers: ctx.info.layers,
+                plan,
+                folders: jobFolders(),
+                output: { entry: folder },
+                proof: { perPage: 4, saveImages: true, fileName: "Approval sheet.pdf", folderName: "Proofs", title: "Self-test", dateText: new Date(now()).toISOString().slice(0, 10), templateSize: { width: 1080, height: 1350 } }
+            });
+            need(result.status === "completed", result.fatal ? result.fatal.message : result.status);
+            need(result.proof && result.proof.designs === 3, `proof result ${JSON.stringify(result.proof)}`);
+            need(photoshop.app.documents.length === before, `open documents: ${before} before, ${photoshop.app.documents.length} after`);
+            const pdf = await fileBytes(folder, result.proof.file);
+            need(String.fromCharCode(...pdf.subarray(0, 5)) === "%PDF-", "approval sheet is not a PDF");
+            return result.proof;
+        });
+
+        await step("subject", "Features 7 + 12: smart crop on the subject, then remove the background", async () => {
+            const photo = ctx.info.layers.find((l) => l.name === "Photo");
+            let mapping = mapFor(ctx.info.layers);
+            mapping = setImageMapping(mapping, photo.id, { ...mapping.images[photo.id], fit: "subject" });
+            const crop = await designJob("subject", { layers: ctx.info.layers, mapping }, { template: { entry: ctx.card } });
+            const notesCrop = crop.result.items.flatMap((i) => i.notes || []);
+            mapping = setImageMapping(mapping, photo.id, { ...mapping.images[photo.id], fit: "subject", removeBg: true, bgFail: "keep" });
+            const bg = await designJob("subject-nobg", { layers: ctx.info.layers, mapping }, { template: { entry: ctx.card } });
+            const notesBg = bg.result.items.flatMap((i) => i.notes || []);
+            // "No clear subject" or "used with its background" means Select Subject / Remove Background
+            // didn't work in this Photoshop (the row still exported). "Top kept in view" is normal.
+            const problems = [...notesCrop, ...notesBg].filter((n) => /no clear subject|with its background/.test(n));
+            need(!problems.length, `Photoshop: ${problems.join(" | ")}`);
+            return { cropped: crop.plan.items.length, backgroundRemoved: bg.plan.items.length, notes: [...notesCrop, ...notesBg] };
+        });
+
+        await step("colors", "Feature 11: text color from a column", async () => {
+            const colors = { 2: "#E63946", 3: "#1D4ED8" };
+            const table = { ...ctx.table, headers: [...ctx.table.headers, { key: "Color", label: "Color" }], rows: ctx.table.rows.map((r) => ({ ...r, values: { ...r.values, Color: colors[r.sourceRow] || "" } })) };
+            const name = ctx.info.layers.find((l) => l.path.join("/") === "Card/Text/Name");
+            const mapping = setColorMapping(mapFor(ctx.info.layers), name.id, "Color");
+            const keep = ctx.table;
+            ctx.table = table;
+            try {
+                const { plan } = await designJob("colors", { layers: ctx.info.layers, mapping }, { template: { entry: ctx.card } });
+                need(plan.items.every((i) => (i.colors || []).length === 1), "colors missing from the plan");
+                return { rows: plan.items.map((i) => [i.sourceRow, colors[i.sourceRow]]) };
+            } finally {
+                ctx.table = keep;
+            }
         });
     }
 

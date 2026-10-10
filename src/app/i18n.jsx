@@ -95,7 +95,7 @@ const en = {
     "easing.backOut": "Overshoot",
     "animate.previewAt": "Time",
     "animate.previewNote": "Rendered by Photoshop from row 1 on a temporary copy.",
-    "animate.output": "Output: QuickTime MOV (Photo-JPEG). Plays in QuickTime and VLC and imports into Premiere, After Effects and DaVinci. MP4 export is not available yet.",
+    "animate.output": "Output: MP4 (H.264) by default: plays on Instagram, TikTok, WhatsApp and phones. Choose QuickTime MOV in the Check step if you edit in Premiere, After Effects or DaVinci.",
 
     "check.output": "Output",
     "check.folder": "Output folder",
@@ -545,7 +545,7 @@ const ar = {
     "easing.backOut": "ارتداد",
     "animate.previewAt": "الوقت",
     "animate.previewNote": "يرسمه فوتوشوب من الصف الأول على نسخة مؤقتة.",
-    "animate.output": "الناتج: ‏QuickTime MOV ‏(Photo-JPEG). يعمل في QuickTime وVLC ويُستورد في Premiere وAfter Effects وDaVinci. التصدير إلى MP4 غير متاح بعد.",
+    "animate.output": "الناتج: ‏MP4 ‏(H.264) تلقائيًا، بيشتغل على إنستجرام وتيك توك وواتساب والموبايلات. لو هتعدّل في Premiere أو After Effects أو DaVinci اختار QuickTime MOV من خطوة المراجعة.",
     "check.output": "المخرجات",
     "check.folder": "مجلد الحفظ",
     "check.folderPick": "اختيار مجلد",
