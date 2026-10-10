@@ -262,6 +262,17 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
         expect(tg.sent.some((m) => /WA_TOKEN/.test(m.text))).toBe(true);
         expect(tg.sent.at(-1).text).toMatch(/WhatsApp is not configured/);
 
+        // Meta's test number can only reply to its allowed list (131030): one explanation, not an error per message.
+        const allowErr = Object.assign(new Error("whatsapp 400: (#131030) Recipient phone number not in allowed list"), { status: 400 });
+        const failWa = { ...deps.wa, text: async () => { throw allowErr; }, list: async () => { throw allowErr; }, buttons: async () => { throw allowErr; } };
+        const testNumber = createBot({ ...deps, wa: failWa, log: () => {} });
+        const tgBefore = tg.sent.length;
+        for (const p of [phone(), phone(), phone()]) await run(testNumber.handleWhatsApp(waMsg(p, { type: "text", text: { body: "hi" } })));
+        const alerts = tg.sent.slice(tgBefore).filter((m) => /131030/.test(m.text));
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0].text).toMatch(/الرقم التجريبي/);
+        expect(tg.sent.slice(tgBefore).some((m) => /خطأ في معالجة رسالة/.test(m.text))).toBe(false);
+
         // App secret missing: every webhook is rejected and the owner is told.
         const noSecret = createBot({ ...deps, config: { ...deps.config, waAppSecret: "" } });
         expect((await noSecret.handleWhatsApp(waMsg(me, { type: "text", text: { body: "hi" } }))).status).toBe(401);

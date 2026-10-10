@@ -326,5 +326,11 @@ const CHANNELS = { vodafone_cash: "📱 فودافون كاش", instapay: "🏦 
 export const say = {
     ok: (t) => lines(`✅ ${t}`),
     info: (t) => lines(`ℹ️ ${t}`),
-    error: (t) => lines(`⛔ ${t}`)
+    error: (t) => lines(`⛔ ${t}`),
+    // Meta error 131030 (sent at most once per ALERT_EVERY_MS, not per message).
+    waTestNumber:
+        "واتساب رفض رد البوت على رقم مش في «القائمة المسموحة» (خطأ 131030). السبب: البوت لسه شغال على <b>الرقم التجريبي</b> بتاع Meta، " +
+        "والرقم ده مبيقدرش يرد غير على الأرقام اللي ضفتها بإيدك في خانة To (لحد 5). مش مشكلة في البوت، والعميل ده ماوصلوش رد.\n" +
+        "الحل: ضيف رقم البيزنس الحقيقي (WhatsApp ← API Setup ← Add phone number) وحط الـ Phone number ID بتاعه في WA_PHONE_NUMBER_ID. " +
+        "الخطوات في docs/SALES_BOT_SETUP_AR.md (جزء 2، خطوة 8). لحد ما تعمل كده، ضيف رقم العميل اللي بتجرب بيه في خانة To."
 };

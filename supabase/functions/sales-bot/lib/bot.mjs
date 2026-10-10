@@ -321,7 +321,10 @@ export function createBot(deps) {
                     await w();
                 } catch (e) {
                     log("error", "message failed", { error: e.message });
-                    await owner(UI.say.error(`خطأ في معالجة رسالة: ${escapeHtml(e.message)}`));
+                    // 131030: the WhatsApp number is Meta's test number (or the app isn't live),
+                    // so it can only reply to the numbers in Meta's allowed list. Explain once.
+                    if (/131030/.test(e.message)) await alertOnce("wa_allowed_list", UI.say.waTestNumber);
+                    else await owner(UI.say.error(`خطأ في معالجة رسالة: ${escapeHtml(e.message)}`));
                 }
             }
         })();
