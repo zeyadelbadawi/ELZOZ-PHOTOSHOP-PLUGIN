@@ -3,7 +3,7 @@
 // Supabase Auth admin API are replaced by recording fakes: no message leaves this machine.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import crypto from "node:crypto";
-import { parsePayment, extractForwarded, parseAllowedSenders } from "../../supabase/functions/sales-bot/lib/payments.mjs";
+import { parsePayment, extractForwarded, parseAllowedSenders, unreadMoneyMessage } from "../../supabase/functions/sales-bot/lib/payments.mjs";
 import { decide, keywordIntent } from "../../supabase/functions/sales-bot/lib/flow.mjs";
 import { createBot } from "../../supabase/functions/sales-bot/lib/bot.mjs";
 import { supabaseClient, verifyMetaSignature } from "../../supabase/functions/sales-bot/lib/clients.mjs";
@@ -43,6 +43,18 @@ describe("payment notification parser", () => {
         const p = parsePayment({ text: "تم استلام مبلغ 297.00 جنيه من رقم 01012345678", sender: "+201012345678" }, ALLOWED);
         expect(p.trusted).toBe(false);
         expect(parsePayment({ text: "تم استلام مبلغ 297 جنيه" }, ALLOWED).trusted).toBe(false);
+    });
+    it("flags money messages from trusted senders that it cannot read, nothing else", () => {
+        expect(unreadMoneyMessage({ text: "حوالة واردة بقيمة 297 جنيه", sender: "VF-Cash" }, ALLOWED)).toBe(true);
+        expect(unreadMoneyMessage({ text: "حوالة واردة بقيمة 297 جنيه", sender: "+201012345678" }, ALLOWED)).toBe(false);
+        expect(unreadMoneyMessage({ text: "رصيدك الحالي 300 جنيه", sender: "VF-Cash" }, ALLOWED)).toBe(false);
+        expect(unreadMoneyMessage({ text: "تم تحويل مبلغ 200 جنيه إلى رقم 0101", sender: "VF-Cash" }, ALLOWED)).toBe(false);
+        expect(unreadMoneyMessage({ text: "كود التحقق الخاص بك 123456", sender: "VF-Cash" }, ALLOWED)).toBe(false);
+    });
+    // The default JSON of "SMS to URL Forwarder" (the app in the setup guide).
+    it("reads the SMS to URL Forwarder default payload", () => {
+        const body = JSON.stringify({ from: "VF-Cash", text: "تم استلام مبلغ 50 جنيه", sentStamp: "1760000000000", receivedStamp: "1760000001000", sim: "sim1" });
+        expect(extractForwarded(body, "application/json")).toMatchObject({ sender: "VF-Cash", text: "تم استلام مبلغ 50 جنيه", at: "1760000001000" });
     });
     it("understands the body formats of common forwarder apps", () => {
         expect(extractForwarded(JSON.stringify({ from: "VF-Cash", text: "hi", receivedStamp: 1700000000000 }), "application/json")).toMatchObject({ sender: "VF-Cash", text: "hi" });
@@ -218,6 +230,40 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
         expect((await bot.handleWhatsApp({ ...req, rawBody: req.rawBody.replace("hi", "ho") })).status).toBe(401);
     });
 
+    it("reports instead of silently dropping: other phone number, failed deliveries, missing config", async () => {
+        const logs = [];
+        const logged = createBot({ ...deps, log: (level, msg, extra) => logs.push({ level, msg, extra }) });
+        const me = phone();
+        const sentBefore = wa.sent.length;
+
+        // A message for a phone number this bot does not own (Meta's dashboard "Test" does this too).
+        const other = signed({ entry: [{ changes: [{ value: { metadata: { phone_number_id: "OTHER" }, messages: [{ from: me, id: `wamid.${crypto.randomUUID()}`, type: "text", text: { body: "hi" } }] } }] }] });
+        expect((await run(logged.handleWhatsApp(other))).status).toBe(200);
+        expect(wa.sent.length).toBe(sentBefore);
+        expect(await contact(me)).toBeUndefined();
+        expect(logs.find((l) => l.msg === "wa webhook").extra).toMatchObject({ messages: 0, other_number: 1 });
+        expect(tg.sent.at(-1).text).toMatch(/WA_PHONE_NUMBER_ID/);
+
+        // A failed delivery status: logged with the error code only, owner alerted.
+        const failed = signed({ entry: [{ changes: [{ value: { metadata: { phone_number_id: "PNID" }, statuses: [{ id: "wamid.x", status: "failed", recipient_id: me, errors: [{ code: 131047, title: "Re-engagement message" }] }] } }] }] });
+        await run(logged.handleWhatsApp(failed));
+        const fail = logs.find((l) => l.msg === "wa delivery failed");
+        expect(fail.extra).toEqual({ code: 131047, title: "Re-engagement message" });
+        expect(JSON.stringify(logs)).not.toContain(me);
+        expect(tg.sent.at(-1).text).toMatch(/ما اتسلمتش/);
+
+        // WhatsApp credentials missing: the owner is told why, not a TypeError.
+        const noWa = createBot({ ...deps, wa: null, log: (level, msg, extra) => logs.push({ level, msg, extra }) });
+        await run(noWa.handleWhatsApp(waMsg(me, { type: "text", text: { body: "hi" } })));
+        expect(tg.sent.some((m) => /WA_TOKEN/.test(m.text))).toBe(true);
+        expect(tg.sent.at(-1).text).toMatch(/WhatsApp is not configured/);
+
+        // App secret missing: every webhook is rejected and the owner is told.
+        const noSecret = createBot({ ...deps, config: { ...deps.config, waAppSecret: "" } });
+        expect((await noSecret.handleWhatsApp(waMsg(me, { type: "text", text: { body: "hi" } }))).status).toBe(401);
+        expect(tg.sent.at(-1).text).toMatch(/WA_APP_SECRET/);
+    });
+
     it("new customer → order → screenshot → payment SMS → account created and delivered, automatically", async () => {
         const me = phone();
         await say(me, "السلام عليكم [IG-BIO]");
@@ -381,6 +427,14 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
         await say(me, "اهلا");
         await say(me, "ممكن تفاصيل اكتر عن البرنامج");
         expect(lastTo(me).body).toMatch(/الباقات/);
+    });
+
+    it("a money SMS from a trusted sender in an unknown wording reaches the owner, is not stored", async () => {
+        const text = `حوالة واردة بقيمة 61 جنيه ${crypto.randomUUID()}`;
+        const r = await sms(text);
+        expect(r.body).toMatchObject({ ignored: true, unread: true });
+        expect(tg.sent.at(-1).text).toMatch(/مفهمهاش/);
+        expect((await pgc.query("select count(*)::int n from public.bot_payment_events where raw_text = $1", [text])).rows[0].n).toBe(0);
     });
 
     it("an unmatched trusted payment asks the owner; untrusted senders are flagged, never matched", async () => {

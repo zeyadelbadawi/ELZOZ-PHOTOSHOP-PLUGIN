@@ -9,7 +9,7 @@
 
 import { decide } from "./flow.mjs";
 import { MENU_ROWS, T, inWorkHours } from "./texts.mjs";
-import { extractForwarded, parsePayment } from "./payments.mjs";
+import { extractForwarded, parsePayment, unreadMoneyMessage } from "./payments.mjs";
 import { verifyMetaSignature } from "./clients.mjs";
 import { clip, escapeHtml, formatMoney, generatePassword, localHour, safeEqual, sha256Hex } from "./util.mjs";
 import * as UI from "./ownerui.mjs";
@@ -21,6 +21,11 @@ const DOWNLOAD_LINK_SECONDS = 7 * 24 * 3600;
 const ok = (body = { ok: true }) => ({ status: 200, body });
 const STATUS_AR = { awaiting_payment: "مستني الدفع", paid: "اتدفع", fulfilling: "بيتجهز", fulfilled: "اتسلم", rejected: "مرفوض", expired: "انتهت مهلته", cancelled: "ملغي" };
 const deny = (status = 401) => ({ status, body: { error: "unauthorized" } });
+
+// Owner alerts about configuration problems: at most one per reason every 10 minutes per worker,
+// so a misconfiguration is reported without flooding Telegram on every webhook.
+const ALERT_EVERY_MS = 10 * 60 * 1000;
+const lastAlert = new Map();
 
 /**
  * @param {object} deps
@@ -53,10 +58,22 @@ export function createBot(deps) {
         try {
             await tg.send(text, buttons);
         } catch (e) {
-            log("warn", "telegram send failed", { error: e.message });
+            log("error", "telegram send failed", { error: e.message });
         }
     }
     const ownerCard = (v) => owner(v.text, v.buttons);
+
+    async function alertOnce(reason, text) {
+        const t = now().getTime();
+        if (t - (lastAlert.get(reason) || 0) < ALERT_EVERY_MS) return;
+        lastAlert.set(reason, t);
+        await owner(UI.say.error(text));
+    }
+
+    function whatsapp() {
+        if (!wa) throw new Error("WhatsApp is not configured: WA_TOKEN or WA_PHONE_NUMBER_ID is missing");
+        return wa;
+    }
 
     async function setContact(id, patch) {
         await db.update("bot_contacts", `id=eq.${id}`, { ...patch, updated_at: now().toISOString() });
@@ -73,15 +90,15 @@ export function createBot(deps) {
     // Send helpers. `secret: true` keeps the body out of the message log.
     const send = {
         text: async (c, body, opts = {}) => {
-            await wa.text(c.wa_id, body);
+            await whatsapp().text(c.wa_id, body);
             await logOut(c.id, "text", opts.secret ? "[credentials]" : body);
         },
         buttons: async (c, body, buttons) => {
-            await wa.buttons(c.wa_id, body, buttons);
+            await whatsapp().buttons(c.wa_id, body, buttons);
             await logOut(c.id, "buttons", body);
         },
         list: async (c, body, label, rows) => {
-            await wa.list(c.wa_id, body, label, rows);
+            await whatsapp().list(c.wa_id, body, label, rows);
             await logOut(c.id, "list", body);
         }
     };
@@ -136,6 +153,10 @@ export function createBot(deps) {
                         await send.text(contact, T.newAccount(o, o.email, password, link, s, done.account) + T.refCode(ref[0]?.ref_code || ""), {
                             secret: true
                         });
+                        if (!link) {
+                            log("warn", "no download link: releases/ccx_path missing and download_url empty", { order: o.code });
+                            await owner(UI.say.error(`العميل (طلب <code>${escapeHtml(o.code)}</code>) اتقاله "هنبعتلك الملف حالاً": ابعتله ملف البلجن يدوي، وارفع <code>${escapeHtml(s.ccx_path || "elzoz.ccx")}</code> في Storage → releases عشان اللينك يتبعت تلقائي.`));
+                        }
                     } else {
                         await send.text(contact, T.renewed(o, done.account));
                     }
@@ -149,7 +170,7 @@ export function createBot(deps) {
             await owner(UI.saleAlert({ ...o, approved_by: o.approved_by }, delivered, !!password));
             if (done.referral && wa) {
                 try {
-                    await wa.text(done.referral.wa_id, T.referral(done.referral.credits));
+                    await whatsapp().text(done.referral.wa_id, T.referral(done.referral.credits));
                 } catch {
                     /* outside the 24h window: the owner is told below */
                 }
@@ -185,7 +206,15 @@ export function createBot(deps) {
             }
             return deny(403);
         }
-        if (!(await verifyMetaSignature(req.rawBody, req.headers["x-hub-signature-256"], config.waAppSecret))) return deny();
+        if (!config.waAppSecret) {
+            log("error", "wa webhook rejected: WA_APP_SECRET is not set");
+            await alertOnce("wa_secret", "واتساب: WA_APP_SECRET مش متسجل، فكل رسايل واتساب بتترفض. ضيفه في أسرار الـ Edge Function.");
+            return deny();
+        }
+        if (!(await verifyMetaSignature(req.rawBody, req.headers["x-hub-signature-256"], config.waAppSecret))) {
+            log("warn", "wa webhook rejected: bad signature", { signed: Boolean(req.headers["x-hub-signature-256"]) });
+            return deny();
+        }
         let payload;
         try {
             payload = JSON.parse(req.rawBody);
@@ -193,13 +222,36 @@ export function createBot(deps) {
             return { status: 400, body: { error: "bad_json" } };
         }
         const work = [];
+        const seen = { messages: 0, statuses: 0, failed: 0, other_number: 0 };
         for (const entry of payload.entry || []) {
             for (const change of entry.changes || []) {
                 const value = change.value || {};
-                if (config.waPhoneNumberId && value.metadata?.phone_number_id && value.metadata.phone_number_id !== config.waPhoneNumberId) continue;
+                if (config.waPhoneNumberId && value.metadata?.phone_number_id && value.metadata.phone_number_id !== config.waPhoneNumberId) {
+                    seen.other_number += (value.messages || []).length;
+                    continue;
+                }
                 const names = Object.fromEntries((value.contacts || []).map((c) => [c.wa_id, c.profile?.name]));
                 for (const m of value.messages || []) work.push(() => processMessage(m, names[m.from]));
+                seen.messages += (value.messages || []).length;
+                for (const st of value.statuses || []) {
+                    seen.statuses++;
+                    if (st.status !== "failed") continue;
+                    seen.failed++;
+                    // Error code and title only: no recipient number or message content.
+                    const err = (st.errors || [])[0] || {};
+                    log("error", "wa delivery failed", { code: err.code ?? null, title: clip(String(err.title || err.message || ""), 120) });
+                }
             }
+        }
+        log("info", "wa webhook", seen);
+        if (seen.other_number) {
+            log("warn", "wa messages ignored: phone_number_id does not match WA_PHONE_NUMBER_ID", { count: seen.other_number });
+            await alertOnce("wa_number", `واتساب: وصلت ${seen.other_number} رسالة لرقم غير الرقم المتسجل في WA_PHONE_NUMBER_ID، والبوت تجاهلها. راجع Phone Number ID في Meta. (زرار Test في لوحة Meta بيعمل ده كمان، عادي.)`);
+        }
+        if (seen.failed) await alertOnce("wa_failed", `واتساب: ${seen.failed} رسالة من البوت ما اتسلمتش للعميل. التفاصيل (كود الخطأ) في سجلات sales-bot.`);
+        if (work.length && !wa) {
+            log("error", "wa messages received but WhatsApp is not configured: WA_TOKEN or WA_PHONE_NUMBER_ID is missing");
+            await alertOnce("wa_config", "واتساب: رسايل بتوصل لكن البوت مش قادر يرد: WA_TOKEN أو WA_PHONE_NUMBER_ID مش متسجل.");
         }
         // Meta wants a fast 200; the caller keeps the promise alive (EdgeRuntime.waitUntil).
         const done = (async () => {
@@ -387,7 +439,7 @@ export function createBot(deps) {
         if (!tg || !tg.chatId) return;
         if (msg.type === "image" && msg.mediaId && wa) {
             try {
-                const media = await wa.media(msg.mediaId);
+                const media = await whatsapp().media(msg.mediaId);
                 await tg.photo(media.bytes, media.mime, UI.messageAlert(c, msg.text || "صورة", "image"));
                 return;
             } catch (e) {
@@ -425,7 +477,7 @@ export function createBot(deps) {
         let media = null;
         let read = null;
         try {
-            media = await wa.media(msg.mediaId);
+            media = await whatsapp().media(msg.mediaId);
         } catch (e) {
             log("warn", "media download failed", { error: e.message });
         }
@@ -712,7 +764,17 @@ export function createBot(deps) {
         if (!config.payKey || config.payKey.length < 24 || !safeEqual(key, config.payKey)) return deny();
         const fwd = extractForwarded(req.rawBody, req.headers["content-type"] || "");
         const p = parsePayment(fwd, config.allowedSenders);
-        if (!p) return ok({ ignored: true }); // not a received-money message: not stored
+        if (!p) {
+            // Not a received-money message: not stored. A money message from a trusted sender that
+            // could not be read is shown to the owner instead of being dropped silently.
+            if (unreadMoneyMessage(fwd, config.allowedSenders)) {
+                log("warn", "payment message from a trusted sender not understood");
+                await owner(UI.say.error(`💸 رسالة فلوس من <b>${escapeHtml(fwd.sender || fwd.app || "")}</b> البوت مفهمهاش. لو دي فلوس واصلة، وافق على الطلب يدوي من /orders، وابعتلي صيغة الرسالة (من غير أرقام) عشان أضيفها:\n<code>${escapeHtml(clip(fwd.text, 600))}</code>`));
+                return ok({ ignored: true, unread: true });
+            }
+            log("info", "pay: not a received payment, ignored");
+            return ok({ ignored: true });
+        }
         const at = fwd.at && !Number.isNaN(Number(fwd.at)) ? new Date(Number(fwd.at) > 1e12 ? Number(fwd.at) : Number(fwd.at) * 1000) : now();
         const receivedAt = Math.abs(at - now()) < 7 * 86400e3 ? at : now();
         const fingerprint = await sha256Hex(`${fwd.sender || fwd.app || ""}|${fwd.text}|${fwd.at || ""}`);

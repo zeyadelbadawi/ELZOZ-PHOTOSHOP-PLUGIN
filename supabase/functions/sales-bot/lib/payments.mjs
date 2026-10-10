@@ -34,7 +34,7 @@ export function parseAllowedSenders(value) {
  * @returns {null | {channel, amount, payer, reference, trusted, sender}}  null when it is not a received payment
  */
 export function parsePayment(msg, allowed = DEFAULT_ALLOWED_SENDERS) {
-    const text = normalizeDigits(String(msg.text || "")).replace(/‏|‎/g, "").trim();
+    const text = normalizeDigits(String(msg.text || "")).replace(/\u200f|\u200e/g, "").trim();
     if (!text) return null;
     const credit = text.search(CREDIT_RE);
     if (credit < 0) return null;
@@ -78,6 +78,23 @@ export function parsePayment(msg, allowed = DEFAULT_ALLOWED_SENDERS) {
         trusted,
         sender: (msg.sender || msg.app || "").slice(0, 120) || null
     };
+}
+
+/**
+ * A message from a trusted sender that mentions an amount (not a balance) and is not about money
+ * sent, but that parsePayment could not read: the bank may have changed its wording. The owner is
+ * told so a real payment is not missed silently.
+ */
+export function unreadMoneyMessage(msg, allowed = DEFAULT_ALLOWED_SENDERS) {
+    const source = `${msg.sender || ""} ${msg.app || ""}`.toLowerCase();
+    if (!source.trim() || !allowed.some((a) => a && source.includes(a))) return false;
+    const text = normalizeDigits(String(msg.text || "")).replace(/\u200f|\u200e/g, "");
+    if (DEBIT_RE.test(text)) return false;
+    AMOUNT_RE.lastIndex = 0;
+    for (let m; (m = AMOUNT_RE.exec(text)); ) {
+        if (!BALANCE_RE.test(text.slice(Math.max(0, m.index - 25), m.index))) return true;
+    }
+    return false;
 }
 
 /**

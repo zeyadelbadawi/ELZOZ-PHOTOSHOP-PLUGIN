@@ -8,7 +8,7 @@
 
 import { clip, escapeHtml, formatMoney } from "./util.mjs";
 
-const RLM = "‏";
+const RLM = "\u200f";
 const LINE = "━━━━━━━━━━━━━━";
 
 /** Joins lines and makes each one right-to-left. Empty strings become blank lines; null/false are dropped. */
