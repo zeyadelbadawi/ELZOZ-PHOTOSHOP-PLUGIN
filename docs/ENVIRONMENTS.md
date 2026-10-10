@@ -14,6 +14,8 @@
 | Admin account | the owner's account, in `private.admins` |
 | Contact link in the plugin | WhatsApp (`ELZOZ_CONTACT_URL` in the local `.env`) |
 | Sales bot | Edge Function `sales-bot` (verify JWT: off, each route checks its own secret); cron `elzoz-bot-tick` every 5 min (key in Vault); Storage bucket `releases` (private). Setup: [`SALES_BOT_SETUP_AR.md`](SALES_BOT_SETUP_AR.md) |
+| Sales bot status (2026-10-10) | WhatsApp Cloud API live on Meta's **test number** (app "Elzoz Sales Bot" in Live mode, WABA subscribed via `POST /<WABA_ID>/subscribed_apps`, permanent System User token in `WA_TOKEN`). Tested end to end: menu → order → approval → account delivered. Telegram owner bot live. Client notifications for dashboard changes live (`bot_notifications`, migrations `20261012000001`, `20261013000001`). **Not done yet:** real business number, payment forwarder phone (`PAY_WEBHOOK_KEY`), `releases/elzoz.ccx` upload |
+| Applied by hand | `20261013000001_notify_option.sql` was run in the SQL editor (the connector's approval prompt for its `DROP FUNCTION`s timed out) |
 | Created | 2026-10-09 via the Supabase connector |
 
 Never store the secret / service_role key here or anywhere in the repository.
