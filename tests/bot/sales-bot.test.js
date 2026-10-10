@@ -170,6 +170,8 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
         await pgc.query("create table if not exists vault.decrypted_secrets (name text primary key, decrypted_secret text)");
         await pgc.query("insert into vault.decrypted_secrets values ('elzoz_bot_cron_key', $1) on conflict (name) do update set decrypted_secret = excluded.decrypted_secret", [CRON_KEY]);
         await pgc.query("update public.bot_settings set value = 'false' where key = 'paused'");
+        // Payments match open orders by amount: orders left open by earlier runs must not compete.
+        await pgc.query("update public.bot_orders set status = 'cancelled', note = 'test reset' where status = 'awaiting_payment'");
 
         const restFetch = (url, opts) => fetch(url.replace(`${env.rest}/rest/v1`, env.rest), opts);
         const db = supabaseClient({ url: env.rest, key: signJwt({ role: "service_role" }, env.secret, 3600), fetch: restFetch });

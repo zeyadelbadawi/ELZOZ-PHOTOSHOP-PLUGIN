@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useApp } from "../AppContext.jsx";
-import { recallMemory } from "../state.js";
+import { effectiveTable, recallMemory } from "../state.js";
+import { mappedCount, pruneMapping } from "../../domain/mapping.js";
 
 const storage = () => {
     try {
@@ -28,8 +29,11 @@ export default function TemplateStep() {
             const result = await fn();
             if (result) {
                 dispatch({ type: "template", template: result });
-                // Offer the mapping last used with this template (folders are picked again).
-                const recalled = state.data ? recallMemory(storage(), result, state.data.table) : null;
+                // The current mapping survives when the same template is picked again (e.g. a
+                // moved file of an open project): keep it, with its folders. Otherwise offer
+                // the mapping last used with this template (folders are picked again).
+                const kept = state.data ? pruneMapping(state.mapping, effectiveTable(state).headers, result.layers) : null;
+                const recalled = state.data && !(kept && mappedCount(kept) > 0) ? recallMemory(storage(), result, state.data.table) : null;
                 if (recalled) {
                     if (recalled.derived.length && !(state.derived || []).length) dispatch({ type: "derived", derived: recalled.derived });
                     dispatch({ type: "mapping", mapping: recalled.mapping, restored: true });

@@ -12,6 +12,9 @@ d("sales bot (database)", () => {
         db = await connect();
         admin = await createUser(db);
         await db.query("insert into private.admins (user_id) values ($1)", [admin]);
+        // Payments match open orders by amount: orders left open by earlier runs must not compete.
+        await db.query("update public.bot_orders set status = 'cancelled', note = 'test reset' where status = 'awaiting_payment'");
+        await db.query("update public.bot_settings set value = 'true' where key = 'auto_approve'");
     });
     afterAll(async () => db && db.end());
 

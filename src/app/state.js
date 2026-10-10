@@ -1,4 +1,5 @@
 // Job state for the guided flow. Pure reducer + selectors (unit-tested).
+import { checkPrint, DEFAULT_PRINT } from "../domain/imposition.js";
 import { createMapping, mappedCount, pruneMapping } from "../domain/mapping.js";
 import { runPreflight } from "../domain/preflight.js";
 import { runVideoPreflight } from "../domain/video/preflight.js";
@@ -9,7 +10,7 @@ export const DESIGN_STEPS = ["data", "template", "map", "check", "generate"];
 export const VIDEO_STEPS = ["data", "template", "map", "animate", "check", "generate"];
 export const stepsFor = (mode) => (mode === "video" ? VIDEO_STEPS : DESIGN_STEPS);
 
-export const initialSettings = { formats: ["jpg"], jpgQuality: 10, namePattern: "elzoz_{row}", keepFrames: false, rowSelection: "", outputWidth: null };
+export const initialSettings = { formats: ["jpg"], jpgQuality: 10, namePattern: "elzoz_{row}", keepFrames: false, rowSelection: "", outputWidth: null, print: DEFAULT_PRINT, proof: { perPage: 6, saveImages: true } };
 /** Settings that belong to one job and are not remembered between sessions. */
 export const JOB_ONLY_SETTINGS = ["rowSelection"];
 export const initialVideo = { format: "reel", fps: 30, durationMs: 6000, fadeOutMs: 500, tracks: {} };
@@ -25,11 +26,17 @@ export function initialState(saved = {}) {
         project: null, // open saved project: { id, name, keyColumn, onlyNew, done } (src/domain/projects.js)
         folders: {}, // key -> { name, entry, index }
         output: null, // { entry, name, path, existingFileNames }
-        settings: { ...initialSettings, ...(saved.settings || {}), rowSelection: "" },
+        settings: mergeSettings(saved.settings),
         restoredMapping: false,
         video: { ...initialVideo, ...(saved.video || {}), tracks: {} },
         run: idleRun()
     };
+}
+
+/** Saved settings over the defaults; nested option groups are merged too (older saves lack new keys). */
+export function mergeSettings(saved = {}) {
+    const s = saved || {};
+    return { ...initialSettings, ...s, print: { ...DEFAULT_PRINT, ...(s.print || {}) }, proof: { ...initialSettings.proof, ...(s.proof || {}) }, rowSelection: "" };
 }
 
 export const idleRun = () => ({ status: "idle", jobId: null, total: 0, done: 0, label: "", items: [], result: null, cancelling: false, plan: null });
@@ -95,7 +102,7 @@ export function reducer(state, action) {
             return { ...state, video: { ...state.video, tracks } };
         }
         case "run-start":
-            return { ...state, step: "generate", run: { ...idleRun(), status: "running", total: action.total, plan: action.plan } };
+            return { ...state, step: "generate", run: { ...idleRun(), status: "running", kind: action.kind || "job", total: action.total, plan: action.plan } };
         case "run-event":
             return { ...state, run: applyRunEvent(state.run, action.event) };
         case "run-cancel":
@@ -182,13 +189,24 @@ export function computePlan(state, { balance = null, pricing = {} } = {}) {
             pricing: { unitPrice: video.price ?? 1, hdLongEdge: video.hd_long_edge, hdMultiplier: video.hd_multiplier }
         });
     }
-    return runPreflight({
+    const plan = runPreflight({
         ...input,
         outputWidth: state.settings.outputWidth,
         templateSize: state.template ? { width: state.template.width, height: state.template.height } : null,
         pricing: { unitPrice: (pricing.design && pricing.design.price) ?? 1 }
     });
+    // Print PDF (feature 13): validated against the size the designs will have.
+    const size = plan.outputSize || (state.template ? { width: state.template.width, height: state.template.height } : null);
+    const print = checkPrint(state.settings.print, size, plan.items.length);
+    for (const message of print.blocking) plan.blocking.push({ severity: "error", code: "print", message, fix: { step: "check" } });
+    for (const message of print.warnings) plan.warnings.push({ severity: "warning", code: "print_warning", message, fix: { step: "check" } });
+    plan.print = print;
+    plan.ok = plan.blocking.length === 0;
+    return plan;
 }
+
+/** Blocking issues that don't stop a free approval sheet (it needs no credits). */
+export const proofBlocking = (plan) => plan.blocking.filter((b) => !["insufficient_credits", "print"].includes(b.code));
 
 /**
  * Plan used by the Animate preview. Output settings do not affect how row 1
@@ -271,7 +289,7 @@ export function rememberMapping(storage, template, mapping, now = Date.now(), de
     if (!storage || !template || mappedCount(mapping) === 0) return;
     const all = readMemory(storage);
     const images = Object.fromEntries(Object.entries(mapping.images).map(([id, r]) => [id, { ...r, folderKey: null }]));
-    all[templateSignature(template)] = { text: mapping.text, images, visibility: mapping.visibility || {}, derived: derived || [], savedAt: now };
+    all[templateSignature(template)] = { text: mapping.text, images, visibility: mapping.visibility || {}, colors: mapping.colors || {}, derived: derived || [], savedAt: now };
     const keep = Object.entries(all).sort((a, b) => b[1].savedAt - a[1].savedAt).slice(0, MEMORY_MAX);
     try {
         storage.setItem(MEMORY_KEY, JSON.stringify(Object.fromEntries(keep)));
@@ -296,6 +314,6 @@ export function recallMemory(storage, template, table) {
     if (!saved) return null;
     const derived = (saved.derived || []).filter((d) => validateDerived(d, table.headers).length === 0);
     const headers = derived.length ? applyDerived({ ...table, rows: [] }, derived).headers : table.headers;
-    const mapping = pruneMapping({ text: saved.text || {}, images: saved.images || {}, visibility: saved.visibility || {} }, headers, template.layers);
+    const mapping = pruneMapping({ text: saved.text || {}, images: saved.images || {}, visibility: saved.visibility || {}, colors: saved.colors || {} }, headers, template.layers);
     return mappedCount(mapping) > 0 ? { mapping, derived } : null;
 }

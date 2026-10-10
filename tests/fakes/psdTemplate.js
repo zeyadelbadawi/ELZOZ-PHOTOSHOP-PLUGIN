@@ -66,5 +66,6 @@ export function templateFromPsd(bytes, pixelStore, title = "template.psd") {
         }
         return { ...base, kind: "pixel", bounds, pixels };
     };
-    return { title, width: psd.width, height: psd.height, layers: (psd.children || []).slice().reverse().map(convert) };
+    const res = psd.imageResources && psd.imageResources.resolutionInfo;
+    return { title, width: psd.width, height: psd.height, resolution: res ? Math.round(res.horizontalResolution) : 72, layers: (psd.children || []).slice().reverse().map(convert) };
 }

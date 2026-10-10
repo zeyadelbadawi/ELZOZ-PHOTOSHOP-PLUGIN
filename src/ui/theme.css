@@ -532,3 +532,19 @@ body {
 .ez-chip { flex-shrink: 0; }
 .ez-project { margin-bottom: var(--ez-s2); }
 .ez-project-active { border-color: var(--ez-accent); }
+
+/* ---------- print sheet preview ---------- */
+.ez-sheet-summary { align-items: flex-start; margin-top: var(--ez-s2); }
+.ez-sheet {
+    position: relative;
+    flex-shrink: 0;
+    background: #fff;
+    border: 1px solid var(--ez-border);
+    margin-right: var(--ez-s3);
+}
+.ez-sheet-cell {
+    position: absolute;
+    background: var(--ez-accent);
+    opacity: 0.75;
+    outline: 1px solid rgba(0, 0, 0, 0.35);
+}

@@ -1,5 +1,9 @@
 import { defineConfig } from "vitest/config";
 
+// Tests that share the local test database run one file at a time (they reset
+// shared tables and bot settings); everything else runs in parallel.
+const SHARED_DB = ["tests/db/**/*.test.js", "tests/bot/**/*.test.js", "tests/e2e/**/*.test.js", "tests/admin/**/*.test.js"];
+
 export default defineConfig({
     define: {
         __ELZOZ_SUPABASE_URL__: JSON.stringify(""),
@@ -9,6 +13,9 @@ export default defineConfig({
     },
     test: {
         environment: "node",
-        include: ["tests/**/*.test.js"]
+        projects: [
+            { extends: true, test: { name: "unit", include: ["tests/**/*.test.js"], exclude: SHARED_DB } },
+            { extends: true, test: { name: "database", include: SHARED_DB, fileParallelism: false } }
+        ]
     }
 });

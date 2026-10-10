@@ -200,9 +200,11 @@ class FakeLayer {
 }
 
 class FakeDocument {
-    constructor(env, { title, path, width = 1000, height = 1000, layers }) {
+    constructor(env, { title, path, width = 1000, height = 1000, resolution = 72, layers }) {
         this.env = env;
         this.id = nextId++;
+        this.resolution = resolution;
+        this.canvasFill = null; // color of canvas added by resizeCanvas (Photoshop: the background color)
         this.title = title;
         this.path = path;
         this.width = width;
@@ -298,7 +300,7 @@ class FakeDocument {
     }
     async duplicate(name) {
         this.requireModal();
-        const copy = new FakeDocument(this.env, { title: name, path: "", width: this.width, height: this.height, layers: this.layers.map((l) => l.toSpec(false)) });
+        const copy = new FakeDocument(this.env, { title: name, path: "", width: this.width, height: this.height, resolution: this.resolution, layers: this.layers.map((l) => l.toSpec(false)) });
         this.env.app.documents.push(copy);
         this.env.calls.push({ op: "duplicate", from: this.id, to: copy.id });
         return copy;
@@ -315,6 +317,21 @@ class FakeDocument {
         this.history.push(this.serialize());
         this.historyIndex = this.history.length - 1;
         this.env.calls.push({ op: "resizeImage", doc: this.id, width, height });
+    }
+    /** Canvas Size, anchored at the top centre (the only anchor the plugin uses). */
+    async resizeCanvas(width, height, anchor) {
+        this.requireModal();
+        if (anchor !== "topCenter") throw new Error("test: resizeCanvas anchor not modelled");
+        if (this.originalHeight == null) this.originalHeight = this.height;
+        const dx = (width - this.width) / 2;
+        if (dx) for (const l of this.allLayers()) l.b = { left: l.b.left + dx, top: l.b.top, right: l.b.right + dx, bottom: l.b.bottom };
+        this.width = width;
+        this.height = height;
+        this.canvasFill = "#ffffff";
+        this.history = this.history.slice(0, this.historyIndex + 1);
+        this.history.push(this.serialize());
+        this.historyIndex = this.history.length - 1;
+        this.env.calls.push({ op: "resizeCanvas", doc: this.id, width, height });
     }
     async save() {
         this.saveCalls++;
@@ -438,6 +455,34 @@ export function createFakeHost(cfg = {}) {
                     layer.b = { left: cx - file.image.width / 2, top: cy - file.image.height / 2, right: cx + file.image.width / 2, bottom: cy + file.image.height / 2 };
                     layer.content = file.name;
                     out.push({});
+                } else if (d._obj === "make" && d._target[0]._ref === "textLayer") {
+                    if (env.failMakeText) {
+                        out.push({ _obj: "error", result: -25920, message: "The command “Make” is not currently available." });
+                        continue;
+                    }
+                    const u = d.using;
+                    const st = u.textStyleRange[0].textStyle;
+                    const sizePx = (st.size._value * doc.resolution) / 72;
+                    const x = u.textClickPoint.horizontal._value;
+                    const y = u.textClickPoint.vertical._value;
+                    const width = String(u.textKey).length * sizePx * 0.71;
+                    const center = u.paragraphStyleRange && u.paragraphStyleRange[0].paragraphStyle.align._value === "center";
+                    const left = center ? x - width / 2 : x;
+                    const made = new FakeLayer(doc, {
+                        name: u.textKey,
+                        kind: "text",
+                        text: u.textKey,
+                        fontSize: sizePx,
+                        color: `rgb(${st.color.red},${st.color.grain},${st.color.blue})`,
+                        bounds: { left, top: y - sizePx, right: left + width, bottom: y }
+                    });
+                    doc.layers.unshift(made);
+                    doc.activeLayers = [made];
+                    // Like Photoshop: each command outside suspendHistory is its own history state.
+                    doc.history = doc.history.slice(0, doc.historyIndex + 1);
+                    doc.history.push(doc.serialize());
+                    doc.historyIndex = doc.history.length - 1;
+                    out.push({});
                 } else if (d._obj === "placeEvent") {
                     const file = env.tokens.get(d.null._path);
                     if (!file || !file.image || env.failReplace.has(file.name)) throw new Error("Could not complete the Place command because the file is not compatible.");
@@ -484,7 +529,7 @@ export function createFakeHost(cfg = {}) {
         action,
         constants: {
             LayerKind: { TEXT: "text", SMARTOBJECT: "smartObject", NORMAL: "pixel", GROUP: "group", SOLIDCOLOR: "solidColor" },
-            AnchorPosition: { MIDDLECENTER: "middleCenter" }
+            AnchorPosition: { MIDDLECENTER: "middleCenter", TOPCENTER: "topCenter" }
         }
     };
     const tempRoot = new FakeFolder("temp");

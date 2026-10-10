@@ -7,6 +7,8 @@
 //  * an item succeeds only if every operation succeeded and every file was verified
 //  * billing is told the truth about each item; failed items are never charged
 //  * the working copy is closed even when the job fails or is cancelled
+//  * the optional print PDF only contains designs whose files were written
+import { createPrintPdf } from "../domain/printPdf.js";
 
 export const ITEM = { succeeded: "succeeded", failed: "failed", cancelled: "cancelled", notStarted: "not_started" };
 export const JOB = { completed: "completed", completedWithErrors: "completed_with_errors", cancelled: "cancelled", failed: "failed" };
@@ -27,8 +29,9 @@ function describeError(e) {
  * @param {object} [p.options]         { jpgQuality, pngCompression }
  * @param {{cancelled: boolean}} [p.signal]  set cancelled = true from the UI
  * @param {Function} [p.onEvent]       ({type, ...}) progress callback for the UI
+ * @param {object} [p.print]           { options: DEFAULT_PRINT-shaped, fileName } → one print PDF of all designs
  */
-export async function runDesignJob({ port, billing, template, templateLayers, plan, folders, output, options = {}, signal = {}, onEvent = () => {} }) {
+export async function runDesignJob({ port, billing, template, templateLayers, plan, folders, output, options = {}, signal = {}, onEvent = () => {}, print = null }) {
     if (!plan || !plan.ok) throw new Error("runDesignJob requires a plan without blocking issues.");
     const startedAt = new Date().toISOString();
     const items = plan.items.map((it) => ({ key: it.key, sourceRow: it.sourceRow, baseName: it.baseName, status: ITEM.notStarted, files: [], error: null }));
@@ -56,6 +59,22 @@ export async function runDesignJob({ port, billing, template, templateLayers, pl
         await port.runModal("Elzoz: generating designs", async (ctx) => {
             // Optional output size: the working copy is resized once, before any row is applied.
             const session = await port.openWorkingCopy(template, templateLayers, { resizeTo: plan.outputSize || null });
+            // Print PDF: opened at the first written design, so a job where nothing succeeds leaves no empty PDF.
+            let pdf = null;
+            let pdfFile = null;
+            const addToPdf = async (bytes) => {
+                if (result.print && result.print.error) return;
+                try {
+                    if (!pdf) {
+                        pdfFile = await port.openOutputFile(output.entry, print.fileName);
+                        pdf = createPrintPdf({ write: (b) => pdfFile.write(b), print: print.options, size: { width: session.doc.width, height: session.doc.height }, title: print.fileName });
+                    }
+                    await pdf.addDesign(bytes);
+                    result.print = { designs: (result.print ? result.print.designs : 0) + 1 };
+                } catch (e) {
+                    result.print = { error: `The print PDF couldn't be written: ${e.message}` };
+                }
+            };
             try {
                 for (let i = 0; i < plan.items.length; i++) {
                     if (ctx.isCancelled() || signal.cancelled) {
@@ -69,8 +88,11 @@ export async function runDesignJob({ port, billing, template, templateLayers, pl
 
                     try {
                         await session.applyItem(planItem, folders);
+                        // Rendered before the files, so a failure here leaves nothing behind for this row.
+                        const printBytes = print ? await session.renderJpeg(12) : null;
                         state.files = await session.exportItem(output.entry, planItem.baseName, plan.formats, options);
                         state.status = ITEM.succeeded;
+                        if (printBytes) await addToPdf(printBytes);
                     } catch (e) {
                         state.status = ITEM.failed;
                         state.error = describeError(e);
@@ -96,6 +118,16 @@ export async function runDesignJob({ port, billing, template, templateLayers, pl
                 ctx.progress(1, "Finishing");
             } finally {
                 await session.close();
+                if (pdf && !(result.print && result.print.error)) {
+                    try {
+                        const done = await pdf.finish();
+                        const file = await pdfFile.close();
+                        result.print = { ...result.print, file: file.name, pages: done.pages, size: file.size };
+                    } catch (e) {
+                        result.print = { error: `The print PDF couldn't be finished: ${e.message}` };
+                    }
+                }
+                if (pdfFile && result.print && result.print.error) await pdfFile.remove();
             }
         });
     } catch (e) {

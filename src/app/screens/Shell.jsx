@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Button } from "../../ui/components.jsx";
@@ -106,6 +106,10 @@ export default function Shell() {
     const [panel, setPanel] = useState(null); // null | "account" | "projects"
     const [missing, setMissing] = useState(null); // project items to pick again after opening
     const View = STEP_VIEWS[state.step] || DataStep;
+    // The "project opened" notice is about the opened job; it goes away once a run starts.
+    useEffect(() => {
+        if (state.run.status === "running") setMissing(null);
+    }, [state.run.status]);
     const toggle = (name) => setPanel(panel === name ? null : name);
     return (
         <>

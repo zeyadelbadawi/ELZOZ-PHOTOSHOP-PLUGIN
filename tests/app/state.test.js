@@ -120,12 +120,13 @@ describe("folder-backed image mapping in state", () => {
         const store = new Map();
         const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
         const s0 = ready();
-        const withFolder = { ...s0.mapping, images: { 5: { layerId: 5, column: "Photo", folderKey: "f-5", fit: "fit" } } };
+        const withFolder = { ...s0.mapping, images: { 5: { layerId: 5, column: "Photo", folderKey: "f-5", fit: "fit" } }, colors: { 3: { layerId: 3, column: "Name", invalid: "skipRow" } } };
         rememberMapping(storage, s0.template, withFolder);
         const headers = [...s0.data.table.headers, { key: "Photo", label: "Photo" }];
         const back = recallMapping(storage, s0.template, headers);
         expect(back.text).toEqual(s0.mapping.text);
         expect(back.images[5]).toMatchObject({ column: "Photo", folderKey: null });
+        expect(back.colors[3]).toMatchObject({ column: "Name" }); // color rules are remembered too
         // A different template (other layers) gets nothing; a sheet without the column drops that rule.
         const other = { ...s0.template, layers: s0.template.layers.slice(0, 2) };
         expect(templateSignature(other)).not.toBe(templateSignature(s0.template));
@@ -133,6 +134,16 @@ describe("folder-backed image mapping in state", () => {
         expect(recallMapping(storage, s0.template, [{ key: "Name", label: "Name" }]).images).toEqual({});
         // Restoring marks the state so the Map step can say so.
         expect(reducer(s0, { type: "mapping", mapping: back, restored: true }).restoredMapping).toBe(true);
+    });
+
+    it("print settings: saved options merge over the defaults and are validated in the plan", () => {
+        expect(initialState({ settings: { print: { enabled: true, dpi: 150 } } }).settings.print).toMatchObject({ enabled: true, dpi: 150, layout: "pages", marks: true, paper: "A4" });
+        const s0 = reducer(ready(), { type: "settings", patch: { print: { ...initialState().settings.print, enabled: true, dpi: 10 } } });
+        const plan = computePlan(s0);
+        expect(plan.ok).toBe(false);
+        expect(plan.blocking.find((b) => b.code === "print").message).toMatch(/72 and 1200/);
+        const ok = computePlan(reducer(s0, { type: "settings", patch: { print: { ...s0.settings.print, dpi: 300 } } }));
+        expect(ok.print.design.w).toBeGreaterThan(0);
     });
 
     it("keeps at most 30 remembered templates (most recent first)", () => {

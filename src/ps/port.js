@@ -11,7 +11,8 @@ import { bounds, placeImage } from "./images.js";
 import { shrinkTextToBox } from "./textFit.js";
 import { setLayerColor } from "./color.js";
 import { splitOutputPath } from "../domain/naming.js";
-import { exportDocument } from "./export.js";
+import { exportDocument, saveOptionsFor } from "./export.js";
+import { addProofOverlay } from "./proof.js";
 import { applyFrameState, exportFrame, writeAndVerifyMovie } from "./video.js";
 
 // Label any Photoshop exception with the step and layer it happened on.
@@ -84,7 +85,7 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 let doc = findOpenDocument(template);
                 if (!doc) doc = await app.open(template.entry);
                 const { descriptors } = walkDocument(doc, constants);
-                return { documentId: doc.id, title: doc.title, width: doc.width, height: doc.height, layers: descriptors };
+                return { documentId: doc.id, title: doc.title, width: doc.width, height: doc.height, resolution: Number(doc.resolution) || 72, layers: descriptors };
             });
         },
 
@@ -94,6 +95,60 @@ export function createPhotoshopPort({ photoshop, uxp }) {
         async createTempFolder(name) {
             const temp = await fs.getTemporaryFolder();
             return temp.createFolder(name);
+        },
+
+        /**
+         * A new file in `folder` written in pieces (PDFs). A taken name gets " (2)", " (3)"...
+         * Small pieces are buffered so UXP sees few, large writes.
+         */
+        async openOutputFile(folder, fileName) {
+            const dot = fileName.lastIndexOf(".");
+            const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
+            const ext = dot > 0 ? fileName.slice(dot) : "";
+            let entry = null;
+            for (let n = 1; !entry && n < 100; n++) {
+                const name = n === 1 ? fileName : `${stem} (${n})${ext}`;
+                try {
+                    entry = await folder.createFile(name, { overwrite: false });
+                } catch (e) {
+                    entry = null;
+                }
+            }
+            if (!entry) throw new StepError("export", `Can't create "${fileName}" in the output folder.`);
+            const binary = uxp.storage.formats.binary;
+            let pending = [];
+            let pendingSize = 0;
+            let first = true;
+            const flush = async () => {
+                if (!pendingSize) return;
+                const data = new Uint8Array(pendingSize);
+                let o = 0;
+                for (const c of pending) {
+                    data.set(c, o);
+                    o += c.length;
+                }
+                pending = [];
+                pendingSize = 0;
+                await entry.write(data.buffer, { format: binary, append: !first });
+                first = false;
+            };
+            return {
+                name: entry.name,
+                async write(bytes) {
+                    pending.push(bytes);
+                    pendingSize += bytes.length;
+                    if (pendingSize >= 1 << 20) await flush();
+                },
+                async close() {
+                    await flush();
+                    const meta = await entry.getMetadata().catch(() => null);
+                    if (!meta || !(meta.size > 0)) throw new StepError("export", `"${entry.name}" was not written.`);
+                    return { name: entry.name, size: meta.size, nativePath: entry.nativePath };
+                },
+                async remove() {
+                    await entry.delete().catch(() => {});
+                }
+            };
         },
 
         async writeMovie(args) {
@@ -113,7 +168,7 @@ export function createPhotoshopPort({ photoshop, uxp }) {
          * Must be called inside runModal. Returns a session bound to a duplicate
          * of the template. `templateLayers` are the descriptors used for mapping.
          */
-        async openWorkingCopy(template, templateLayers, { resizeTo = null } = {}) {
+        async openWorkingCopy(template, templateLayers, { resizeTo = null, proof = null } = {}) {
             let source = findOpenDocument(template);
             let openedByUs = false;
             if (!source) {
@@ -126,6 +181,17 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 await doc.resizeImage(resizeTo.width, resizeTo.height);
             }
             const layerMap = mapLayersByStructure(templateLayers, doc, constants);
+            // Approval sheet: watermark + label strip, part of the pristine state (kept across rows).
+            let overlay = null;
+            if (proof) {
+                try {
+                    overlay = await addProofOverlay({ photoshop, doc, watermark: proof.watermark });
+                } catch (e) {
+                    await doc.closeWithoutSaving().catch(() => {});
+                    if (openedByUs) await source.closeWithoutSaving().catch(() => {});
+                    throw e;
+                }
+            }
             // Pristine state of layers a row changes outside History: visibility changes are not
             // undoable by default in Photoshop (History Options), so reset() restores them itself.
             const baseVisible = new Map();
@@ -177,6 +243,27 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 async exportItem(folder, baseName, formats, options) {
                     const target = await outputTarget(folder, baseName);
                     return exportDocument({ doc, folder: target.folder, baseName: target.name, formats, options });
+                },
+                /** Set the approval-sheet label for the current row (reverted by reset()). */
+                async setProofLabel(text) {
+                    if (!overlay) return;
+                    await doc.suspendHistory(async () => {
+                        await asStep("proof", null, () => setLayerText({ photoshop, layer: overlay.label, value: text }));
+                    }, "Elzoz: proof label");
+                },
+                /** The current state as JPEG bytes (temporary file, deleted afterwards). */
+                async renderJpeg(quality = 12) {
+                    const temp = await fs.getTemporaryFolder();
+                    const name = `elzoz-render-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.jpg`;
+                    const entry = await temp.createFile(name, { overwrite: true });
+                    try {
+                        await asStep("export", null, () => doc.saveAs.jpg(entry, saveOptionsFor("jpg", { jpgQuality: quality }), true));
+                        const bytes = new Uint8Array(await entry.read({ format: uxp.storage.formats.binary }));
+                        if (!bytes.length) throw new StepError("export", "Photoshop wrote an empty JPEG.");
+                        return bytes;
+                    } finally {
+                        await entry.delete().catch(() => {});
+                    }
                 },
                 snapshot() {
                     return doc.activeHistoryState;

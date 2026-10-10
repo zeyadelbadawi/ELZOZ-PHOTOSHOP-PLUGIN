@@ -4,6 +4,7 @@ import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, Checkbox, Field, FileField, NumberInput, Section, Select, Stat, TextInput } from "../../ui/components.jsx";
 import { computePlan, effectiveTable, previewPlan } from "../state.js";
 import { putProject, getProject } from "../../domain/projects.js";
+import { PrintCard, ProofCard } from "./PrintProof.jsx";
 
 const projectStorage = () => {
     try {
@@ -120,6 +121,8 @@ export default function CheckStep() {
                 </Card>
             </Section>
 
+            {!video && <PrintCard plan={plan} />}
+
             {error && <Alert tone="error">{error}</Alert>}
 
             {plan.blocking.length > 0 && (
@@ -163,11 +166,13 @@ export default function CheckStep() {
                                 {(video ? ["mov"] : plan.formats).map((f) => `${it.baseName}.${f}`).join(", ")}
                             </div>
                         ))}
+                        {!video && state.settings.print.enabled && <div className="ez-small ez-accent">{t("print.plusPdf")}</div>}
                     </Card>
                 </Section>
             )}
 
             {!video && <DesignPreview />}
+            {!video && <ProofCard plan={plan} />}
         </>
     );
 }

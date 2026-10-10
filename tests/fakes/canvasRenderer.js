@@ -71,6 +71,11 @@ export function createCanvasRenderer({ pixelStore, fileBytes, stamp = "SIMULATED
         const ctx = canvas.getContext("2d");
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (doc.canvasFill) {
+            // Canvas added by Canvas Size shows the background color below the original area.
+            ctx.fillStyle = doc.canvasFill;
+            ctx.fillRect(0, doc.originalHeight || 0, canvas.width, canvas.height - (doc.originalHeight || 0));
+        }
         for (const l of doc.layers.slice().reverse()) await drawLayer(ctx, l, 1);
         const s = Math.max(14, Math.round(canvas.width / 45));
         ctx.font = `bold ${s}px sans-serif`;
