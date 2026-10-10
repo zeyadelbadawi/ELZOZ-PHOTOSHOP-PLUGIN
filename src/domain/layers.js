@@ -3,13 +3,16 @@
 //
 // Descriptor: { id, name, kind, path: [names...], indexPath: "0/2/1", depth,
 //               visible, locked, bounds: {left, top, right, bottom} | null }
-// kind is normalized to: 'text' | 'smartObject' | 'pixel' | 'group' | 'other'
+// kind is normalized to: 'text' | 'smartObject' | 'pixel' | 'fill' | 'group' | 'other'
+// ('fill' = solid color fill layers, which is also how Photoshop reports shape layers)
 
 export const TEXT_KINDS = new Set(["text"]);
 export const IMAGE_KINDS = new Set(["smartObject", "pixel"]);
 
 export const isTextLayer = (layer) => TEXT_KINDS.has(layer.kind);
 export const isImageLayer = (layer) => IMAGE_KINDS.has(layer.kind);
+/** Layers whose color can come from a column: text, and solid color fill / shape layers. */
+export const isColorLayer = (layer) => layer.kind === "text" || layer.kind === "fill";
 
 export function displayPath(layer) {
     return layer.path.join(" / ");

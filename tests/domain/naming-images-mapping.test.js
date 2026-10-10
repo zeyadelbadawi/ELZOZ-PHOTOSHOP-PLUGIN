@@ -19,6 +19,7 @@ describe("naming", () => {
     it("avoids Windows reserved names and empty names", () => {
         expect(sanitizeFileName("CON")).toBe("_CON");
         expect(renderName("{Name}", row(2, { Name: "" }), { total: 5 })).toBe("design_3");
+        expect(renderName("{Key}_{Name}", row(0, { Key: " A1 ", Name: "  aurora   laptop " }), { total: 5 })).toBe("A1_aurora laptop");
     });
     it("flags unknown tokens", () => {
         expect(validatePattern("{row}-{Nmae}", [{ key: "Name", label: "Name" }])).toEqual(["Nmae"]);
@@ -81,6 +82,6 @@ describe("mapping", () => {
         let m = setTextMapping(createMapping(), 3, "Name");
         m = setImageMapping(m, 99, { column: "Photo" });
         m = setTextMapping(m, 4, "Gone");
-        expect(pruneMapping(m, headers, layers)).toEqual({ text: { 3: m.text[3] }, images: {}, visibility: {} });
+        expect(pruneMapping(m, headers, layers)).toEqual({ text: { 3: m.text[3] }, images: {}, visibility: {}, colors: {} });
     });
 });

@@ -4,6 +4,11 @@
 import { writePsd } from "ag-psd";
 import { imageInfo } from "./imageInfo.js";
 
+const rgbOf = (s) => {
+    const m = String(s || "").match(/(\d+)\D+(\d+)\D+(\d+)/);
+    return m ? { r: +m[1], g: +m[2], b: +m[3] } : null;
+};
+
 /**
  * @param {object} doc         simulator FakeDocument
  * @param {object} deps        { pixelStore, fileBytes(name) -> Uint8Array|null }
@@ -17,7 +22,19 @@ export function writeSimulatedPsd(doc, { pixelStore, fileBytes }) {
         if (l.kind === "group") return { ...base, children: (l.layers || []).slice().reverse().map(convert), opened: true };
         if (l.kind === "text") {
             const size = l.fontSize ? l.fontSize * l.scaleFactor() : 24;
-            return { ...base, text: { text: String(l._text ?? ""), transform: [1, 0, 0, 1, Math.round(b.left), Math.round(b.top + size)], style: { font: { name: "ArialMT" }, fontSize: Math.max(1, Math.round(size)) } } };
+            const fillColor = rgbOf(l.color);
+            return {
+                ...base,
+                text: { text: String(l._text ?? ""), transform: [1, 0, 0, 1, Math.round(b.left), Math.round(b.top + size)], style: { font: { name: "ArialMT" }, fontSize: Math.max(1, Math.round(size)), ...(fillColor ? { fillColor } : {}) } }
+            };
+        }
+        if (l.kind === "solidColor") {
+            const c = rgbOf(l.fillColor) || { r: 0, g: 0, b: 0 };
+            const w = Math.max(1, Math.round(b.right - b.left));
+            const h = Math.max(1, Math.round(b.bottom - b.top));
+            const data = new Uint8ClampedArray(w * h * 4);
+            for (let i = 0; i < data.length; i += 4) data.set([c.r, c.g, c.b, 255], i);
+            return { ...base, left: Math.round(b.left), top: Math.round(b.top), imageData: { width: w, height: h, data }, vectorFill: { type: "color", color: c } };
         }
         const w = Math.round(b.right - b.left);
         const h = Math.round(b.bottom - b.top);

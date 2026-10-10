@@ -178,7 +178,7 @@ export function Stat({ label, value, tone }) {
     );
 }
 
-export const KIND_LETTER = { text: "T", smartObject: "S", pixel: "P", group: "G", other: "·" };
+export const KIND_LETTER = { text: "T", smartObject: "S", pixel: "P", fill: "■", group: "G", other: "·" };
 export function KindIcon({ kind }) {
     return (
         <div className="ez-kind" title={kind}>

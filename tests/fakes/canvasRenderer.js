@@ -53,6 +53,9 @@ export function createCanvasRenderer({ pixelStore, fileBytes, stamp = "SIMULATED
             ctx.fillStyle = l.color || "#fff";
             ctx.textBaseline = "alphabetic";
             String(l._text ?? "").split(/\r|\n/).forEach((line, i) => ctx.fillText(line, b.left, b.top + size * (1 + i * 1.2), Math.max(w, size) * 3));
+        } else if (l.kind === "solidColor") {
+            ctx.fillStyle = l.fillColor || "#000";
+            ctx.fillRect(b.left, b.top, w, h);
         } else if (l.kind === "smartObject" && l.content) {
             const bm = await bitmap(l.content);
             if (bm) ctx.drawImage(bm, b.left, b.top, w, h);

@@ -116,7 +116,8 @@ class FakeLayer {
         this.embedded = spec.embedded ?? null;
         this.pixels = spec.pixels ?? null;
         this.fontSize = spec.fontSize ?? null;
-        this.color = spec.color ?? null;
+        this.color = spec.color ?? null; // text color, "rgb(r,g,b)"
+        this.fillColor = spec.fillColor ?? null; // color fill / shape layers, "rgb(r,g,b)"
         // Text scales with its box: remember the designed box height.
         this.baseHeight = spec.baseHeight ?? this.b.bottom - this.b.top;
         this.layers = spec.layers ? spec.layers.map((s) => new FakeLayer(doc, s)) : null;
@@ -124,6 +125,16 @@ class FakeLayer {
             const layer = this;
             this._text = spec.text ?? "";
             if (doc.env.domText) {
+                const characterStyle = {
+                    get color() {
+                        const m = String(layer.color || "rgb(0,0,0)").match(/(\d+)\D+(\d+)\D+(\d+)/);
+                        return { rgb: { red: +m[1], green: +m[2], blue: +m[3] } };
+                    },
+                    set color(c) {
+                        doc.requireModal();
+                        layer.color = `rgb(${Math.round(c.rgb.red)},${Math.round(c.rgb.green)},${Math.round(c.rgb.blue)})`;
+                    }
+                };
                 this.textItem = {
                     get contents() {
                         return layer._text;
@@ -132,6 +143,10 @@ class FakeLayer {
                         if (doc.env.rejectText) return; // simulate Photoshop ignoring the write
                         layer._text = v;
                         layer.reflow();
+                    },
+                    get characterStyle() {
+                        if (!doc.env.characterStyle) throw new Error("characterStyle is not available in this version");
+                        return characterStyle;
                     }
                 };
             }
@@ -176,6 +191,7 @@ class FakeLayer {
             pixels: this.pixels,
             fontSize: this.fontSize,
             color: this.color,
+            fillColor: this.fillColor,
             baseHeight: this.baseHeight,
             text: this._text,
             layers: this.layers ? this.layers.map((l) => l.toSpec(keepIds)) : undefined
@@ -243,6 +259,8 @@ class FakeDocument {
             layer.opacity = spec.opacity;
             layer.b = { ...spec.bounds };
             layer.content = spec.content;
+            layer.color = spec.color;
+            layer.fillColor = spec.fillColor;
             if (spec.kind === "text") layer._text = spec.text;
             layer.layers = spec.layers ? spec.layers.map(build) : null;
             return layer;
@@ -323,6 +341,7 @@ export function createFakeHost(cfg = {}) {
         calls: [],
         modalDepth: 0,
         domText: cfg.domText ?? true,
+        characterStyle: cfg.characterStyle ?? true, // TextItem.characterStyle (24.1+)
         textReflow: cfg.textReflow ?? false, // opt-in: text width follows its content
         visibilityUndoable: cfg.visibilityUndoable ?? false,
         rejectText: false,
@@ -386,6 +405,24 @@ export function createFakeHost(cfg = {}) {
                     tl._text = d.to.textKey;
                     tl.reflow();
                     out.push({});
+                } else if (d._obj === "set" && d._target[0]._ref === "property" && d._target[0]._property === "textStyle") {
+                    const layer = doc.activeLayers[0];
+                    if (!layer || layer.kind !== "text") {
+                        out.push({ _obj: "error", result: -25920, message: "The command “Set” is not currently available." });
+                        continue;
+                    }
+                    const c = d.to.color;
+                    layer.color = `rgb(${Math.round(c.red)},${Math.round(c.grain)},${Math.round(c.blue)})`;
+                    out.push({});
+                } else if (d._obj === "set" && d._target[0]._ref === "contentLayer") {
+                    const layer = doc.activeLayers[0];
+                    if (!layer || layer.kind !== "solidColor" || d.to._obj !== "solidColorLayer") {
+                        out.push({ _obj: "error", result: -25920, message: "The command “Set” is not currently available." });
+                        continue;
+                    }
+                    const c = d.to.color;
+                    layer.fillColor = `rgb(${Math.round(c.red)},${Math.round(c.grain)},${Math.round(c.blue)})`;
+                    out.push({});
                 } else if (d._obj === "placedLayerReplaceContents") {
                     const file = env.tokens.get(d.null._path);
                     if (!file || d.null._kind !== "local") throw new Error("Invalid file token used");
@@ -435,12 +472,18 @@ export function createFakeHost(cfg = {}) {
         return search(doc.layers);
     }
 
+    // The documented SolidColor class (only the RGB part is modelled).
+    app.SolidColor = class SolidColor {
+        constructor() {
+            this.rgb = { red: 0, green: 0, blue: 0 };
+        }
+    };
     const photoshop = {
         app,
         core,
         action,
         constants: {
-            LayerKind: { TEXT: "text", SMARTOBJECT: "smartObject", NORMAL: "pixel", GROUP: "group" },
+            LayerKind: { TEXT: "text", SMARTOBJECT: "smartObject", NORMAL: "pixel", GROUP: "group", SOLIDCOLOR: "solidColor" },
             AnchorPosition: { MIDDLECENTER: "middleCenter" }
         }
     };

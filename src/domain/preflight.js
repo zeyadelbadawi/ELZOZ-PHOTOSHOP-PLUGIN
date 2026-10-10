@@ -1,7 +1,8 @@
 // Preflight: turn (table, template layers, mapping, folders, output settings)
 // into an explicit plan plus issues. Nothing is rendered or charged unless the
 // plan has no blocking issues. Pure and unit-tested.
-import { findLayer, isImageLayer, isTextLayer, displayPath, summarizeTemplate } from "./layers.js";
+import { findLayer, isColorLayer, isImageLayer, isTextLayer, displayPath, summarizeTemplate } from "./layers.js";
+import { parseColor } from "./colors.js";
 import { resolveImage } from "./imageFiles.js";
 import { dedupeNames, renderName, validatePattern } from "./naming.js";
 import { mappedCount } from "./mapping.js";
@@ -62,7 +63,17 @@ export function resolveRow(row, mapping, folders) {
         if (visible !== null) visibility.push({ layerId: rule.layerId, visible });
     }
 
-    return { text, images, visibility, problems, notes };
+    const colors = [];
+    for (const rule of Object.values(mapping.colors || {})) {
+        const raw = String(row.values[rule.column] ?? "").trim();
+        if (!raw) continue; // empty cell: the template's color stays
+        const rgb = parseColor(raw);
+        if (rgb) colors.push({ layerId: rule.layerId, rgb });
+        else if (rule.invalidPolicy === "keepTemplate") notes.push({ code: "bad_color_kept", column: rule.column, value: raw });
+        else problems.push({ code: "bad_color", column: rule.column, layerId: rule.layerId, value: raw });
+    }
+
+    return { text, images, visibility, colors, problems, notes };
 }
 
 const PROBLEM_TEXT = {
@@ -71,7 +82,8 @@ const PROBLEM_TEXT = {
     folder_missing: (p) => `No image folder chosen for column "${p.column}"`,
     image_not_found: (p) => `Image not found for "${p.column}"`,
     image_path_not_allowed: (p) => `"${p.column}" contains a path; use a file name only`,
-    image_unsupported_type: (p) => `Unsupported image type in "${p.column}"`
+    image_unsupported_type: (p) => `Unsupported image type in "${p.column}"`,
+    bad_color: (p) => `"${p.column}" isn't a color (use #E30613, #F00, rgb(227,6,19) or a color name)`
 };
 
 /**
@@ -135,6 +147,12 @@ export function runPreflight(input) {
         if (!columns.has(rule.column)) blocking.push(issue("error", "column_missing", `Column "${rule.column}" is not in the spreadsheet.`, { fix: { step: "map", layerId: rule.layerId } }));
         if (!rule.folderKey || !folders[rule.folderKey]) blocking.push(issue("error", "folder_missing", `Choose an image folder for "${layer ? displayPath(layer) : rule.column}".`, { fix: { step: "map", layerId: rule.layerId } }));
     }
+    for (const rule of Object.values(mapping.colors || {})) {
+        const layer = findLayer(layers, rule.layerId);
+        if (!layer) blocking.push(issue("error", "layer_missing", `A layer used for colors no longer exists in the template.`, { fix: { step: "map", layerId: rule.layerId } }));
+        else if (!isColorLayer(layer)) blocking.push(issue("error", "not_colorable", `"${displayPath(layer)}" can't take a color (text or color fill / shape layer required).`, { fix: { step: "map", layerId: rule.layerId } }));
+        if (!columns.has(rule.column)) blocking.push(issue("error", "column_missing", `Column "${rule.column}" is not in the spreadsheet.`, { fix: { step: "map", layerId: rule.layerId } }));
+    }
     for (const rule of Object.values(mapping.visibility || {})) {
         const layer = findLayer(layers, rule.layerId);
         if (!layer) blocking.push(issue("error", "layer_missing", `A layer used for show/hide no longer exists in the template.`, { fix: { step: "map", layerId: rule.layerId } }));
@@ -163,10 +181,10 @@ export function runPreflight(input) {
     for (const row of chosenRows) {
         const res = resolveRow(row, mapping, folders);
         for (const n of res.notes) {
-            if (n.code === "not_a_number" || n.code === "not_a_date") {
+            if (n.code === "not_a_number" || n.code === "not_a_date" || n.code === "bad_color_kept") {
                 const k = `${n.code}|${n.column}`;
                 const g = unreadable.get(k) || { code: n.code, column: n.column, rows: [] };
-                g.rows.push(row.sourceRow);
+                if (g.rows[g.rows.length - 1] !== row.sourceRow) g.rows.push(row.sourceRow);
                 unreadable.set(k, g);
                 continue;
             }
@@ -180,18 +198,23 @@ export function runPreflight(input) {
             for (const p of res.problems) {
                 const k = `${p.code}|${p.column}`;
                 const g = grouped.get(k) || { problem: p, rows: [] };
-                g.rows.push(row.sourceRow);
+                // Two layers fed by the same column report the same row once.
+                if (g.rows[g.rows.length - 1] !== row.sourceRow) g.rows.push(row.sourceRow);
                 grouped.set(k, g);
             }
             continue;
         }
-        items.push({ key: `row-${row.sourceRow}`, index: row.index, sourceRow: row.sourceRow, text: res.text, images: res.images, visibility: res.visibility, row });
+        items.push({ key: `row-${row.sourceRow}`, index: row.index, sourceRow: row.sourceRow, text: res.text, images: res.images, visibility: res.visibility, colors: res.colors, row });
     }
     for (const { problem, rows } of grouped.values()) {
         const describe = PROBLEM_TEXT[problem.code] || (() => problem.code);
         warnings.push(issue("warning", problem.code, `${describe(problem)} in ${rows.length} row(s); those rows will be skipped.`, { rows, fix: { step: "map", layerId: problem.layerId } }));
     }
     for (const g of unreadable.values()) {
+        if (g.code === "bad_color_kept") {
+            warnings.push(issue("warning", g.code, `"${g.column}" isn't a color in ${g.rows.length} row(s); the template's color is kept there.`, { rows: g.rows, fix: { step: "map" } }));
+            continue;
+        }
         const what = g.code === "not_a_number" ? "a number" : "a date";
         warnings.push(issue("warning", g.code, `"${g.column}" can't be read as ${what} in ${g.rows.length} row(s); the text is used as it is.`, { rows: g.rows, fix: { step: "map" } }));
     }

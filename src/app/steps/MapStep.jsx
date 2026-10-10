@@ -2,8 +2,9 @@ import React from "react";
 import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, Checkbox, Field, FileField, KindIcon, Section, Select } from "../../ui/components.jsx";
-import { isImageLayer, isTextLayer } from "../../domain/layers.js";
-import { autoMap, createMapping, mappedCount, setImageMapping, setTextMapping, setTextOptions, setVisibilityMapping } from "../../domain/mapping.js";
+import { isColorLayer, isImageLayer, isTextLayer } from "../../domain/layers.js";
+import { parseColor, toHex } from "../../domain/colors.js";
+import { autoMap, createMapping, mappedCount, setColorMapping, setImageMapping, setTextMapping, setTextOptions, setVisibilityMapping } from "../../domain/mapping.js";
 import { VISIBILITY_EMPTY } from "../../domain/visibility.js";
 import { effectiveTable } from "../state.js";
 import TextFormat from "./TextFormat.jsx";
@@ -140,8 +141,44 @@ export default function MapStep() {
                 </Section>
             )}
 
+            <ColorSection layers={template.layers} mapping={mapping} columns={columns} firstRow={firstRow} set={set} />
+
             <VisibilitySection layers={template.layers} mapping={mapping} columns={columns} set={set} />
         </>
+    );
+}
+
+/** Color of text and color fill / shape layers from a column (HEX, rgb() or a color name). */
+function ColorSection({ layers, mapping, columns, firstRow, set }) {
+    const { t } = useI18n();
+    const colorable = layers.filter((l) => isColorLayer(l) && !l.locked);
+    if (!colorable.length) return null;
+    const rules = mapping.colors || {};
+    const invalidOptions = ["skipRow", "keepTemplate"].map((v) => ({ value: v, label: t(`map.color.invalid.${v}`) }));
+    // Fill/shape layers first: they are usually what people recolor.
+    const ordered = [...colorable.filter((l) => l.kind === "fill"), ...colorable.filter((l) => l.kind !== "fill")];
+    return (
+        <Section title={t("map.color.title")}>
+            <div className="ez-small ez-muted ez-mb2">{t("map.color.hint")}</div>
+            <Card>
+                {ordered.map((layer) => {
+                    const rule = rules[layer.id];
+                    const raw = rule && firstRow ? String(firstRow.values[rule.column] ?? "").trim() : "";
+                    const rgb = raw ? parseColor(raw) : null;
+                    return (
+                        <LayerRow key={layer.id} layer={layer} rule={rule} columns={columns} firstRow={null} onColumn={(c) => set(setColorMapping(mapping, layer.id, c, rule ? rule.invalidPolicy : "skipRow"))}>
+                            <div className="ez-row ez-mb2" data-testid="color-sample">
+                                <span className="ez-swatch" style={{ backgroundColor: rgb ? toHex(rgb) : "transparent" }} />
+                                <span className="ez-small ez-muted ez-ml2">{raw ? (rgb ? t("map.color.sample", { value: raw, hex: toHex(rgb) }) : t("map.color.notColor", { value: raw })) : t("map.color.empty")}</span>
+                            </div>
+                            <Field label={t("map.color.invalid")}>
+                                <Select value={rule && rule.invalidPolicy} options={invalidOptions} onChange={(v) => set(setColorMapping(mapping, layer.id, rule.column, v))} />
+                            </Field>
+                        </LayerRow>
+                    );
+                })}
+            </Card>
+        </Section>
     );
 }
 

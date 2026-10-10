@@ -9,6 +9,7 @@ import { mapLayersByStructure, walkDocument } from "./layerTree.js";
 import { setLayerText, StepError } from "./text.js";
 import { bounds, placeImage } from "./images.js";
 import { shrinkTextToBox } from "./textFit.js";
+import { setLayerColor } from "./color.js";
 import { splitOutputPath } from "../domain/naming.js";
 import { exportDocument } from "./export.js";
 import { applyFrameState, exportFrame, writeAndVerifyMovie } from "./video.js";
@@ -159,6 +160,9 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                                 throw new StepError("image", `Image "${img.file}" is no longer in "${folder.name}".`, { layerId: img.layerId });
                             }
                             await asStep("image", img.layerId, () => placeImage({ photoshop, fs, doc, layer: layerFor(img.layerId), kind: kinds.get(img.layerId), file, fit: img.fit }));
+                        }
+                        for (const c of item.colors || []) {
+                            await asStep("color", c.layerId, () => setLayerColor({ photoshop, layer: layerFor(c.layerId), kind: kinds.get(c.layerId), rgb: c.rgb }));
                         }
                         for (const v of item.visibility || []) {
                             const layer = layerFor(v.layerId);

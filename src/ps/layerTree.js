@@ -8,7 +8,8 @@ export function kindNormalizer(constants) {
         [K.TEXT || "text", "text"],
         [K.SMARTOBJECT || "smartObject", "smartObject"],
         [K.NORMAL || "pixel", "pixel"],
-        [K.GROUP || "group", "group"]
+        [K.GROUP || "group", "group"],
+        [K.SOLIDCOLOR || "solidColor", "fill"]
     ]);
     return (kind) => table.get(kind) || "other";
 }

@@ -56,6 +56,10 @@ export function templateFromPsd(bytes, pixelStore, title = "template.psd") {
         }
         const bounds = { left: layer.left || 0, top: layer.top || 0, right: layer.right || 0, bottom: layer.bottom || 0 };
         const pixels = layer.imageData ? pixelStore.put(layer.imageData) : null;
+        if (layer.vectorFill && layer.vectorFill.type === "color") {
+            const c = layer.vectorFill.color || { r: 0, g: 0, b: 0 };
+            return { ...base, kind: "solidColor", bounds, fillColor: `rgb(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)})` };
+        }
         if (layer.placedLayer) {
             const f = linked.get(layer.placedLayer.id);
             return { ...base, kind: "smartObject", bounds, pixels, content: null, embedded: f ? f.name : null };

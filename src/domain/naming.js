@@ -45,7 +45,8 @@ export function renderName(pattern, row, { total }) {
         seg.replace(/\{([^{}]+)\}/g, (_, token) => {
             if (token === "row") return String(row.index + 1).padStart(width, "0");
             if (token === "sheetRow") return String(row.sourceRow);
-            return byLabel[token] !== undefined ? String(byLabel[token]) : "";
+            // Cell spaces at the ends are noise in a file name ("A1_ aurora" -> "A1_aurora").
+            return byLabel[token] !== undefined ? String(byLabel[token]).trim() : "";
         });
     const segments = String(pattern || DEFAULT_PATTERN).split("/");
     const fileSeg = segments.pop();

@@ -5,6 +5,83 @@ import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, Field, Section, Select, TextInput } from "../../ui/components.jsx";
 import { DERIVED_TYPES, derivedValue, newDerived, validateDerived } from "../../domain/derived.js";
+import { appliedKitId, applyKit, deleteKit, kitFieldsFrom, listKits, saveKit } from "../../domain/brandKits.js";
+
+const storage = () => {
+    try {
+        return window.localStorage;
+    } catch (e) {
+        return null;
+    }
+};
+
+/** Brand kits: fixed values saved per client and applied in one step. */
+function BrandKits({ defs, set }) {
+    const { t } = useI18n();
+    const [kits, setKits] = useState(() => (storage() ? listKits(storage()) : []));
+    const [naming, setNaming] = useState(null); // null | "" (typing a name)
+    const [notice, setNotice] = useState(null);
+    const applied = appliedKitId(defs);
+    const fields = kitFieldsFrom(defs);
+    const refresh = () => setKits(listKits(storage()));
+    const save = () => {
+        const kit = saveKit(storage(), { name: naming, fields });
+        if (kit) {
+            refresh();
+            set(applyKit(defs.filter((d) => d.type !== "constant"), kit));
+            setNotice(t("kit.saved", { name: kit.name, n: kit.fields.length }));
+        }
+        setNaming(null);
+    };
+    return (
+        <Card className="ez-kit">
+            <div className="ez-row">
+                <div className="ez-grow ez-mr2">
+                    <Field label={t("kit.title")}>
+                        <Select
+                            value={applied}
+                            placeholder={t("kit.none")}
+                            options={kits.map((k) => ({ value: k.id, label: `${k.name} · ${t("kit.count", { n: k.fields.length })}` }))}
+                            onChange={(id) => {
+                                set(applyKit(defs, kits.find((k) => k.id === id) || null));
+                                setNotice(null);
+                            }}
+                        />
+                    </Field>
+                </div>
+                {applied && (
+                    <Button
+                        quiet
+                        onClick={() => {
+                            deleteKit(storage(), applied);
+                            refresh();
+                            set(applyKit(defs, null));
+                        }}
+                    >
+                        {t("kit.delete")}
+                    </Button>
+                )}
+            </div>
+            <div className="ez-small ez-muted ez-mb2">{t("kit.hint")}</div>
+            {naming === null ? (
+                <Button disabled={!fields.length} onClick={() => setNaming((kits.find((k) => k.id === applied) || {}).name || "")}>
+                    {t("kit.save")}
+                </Button>
+            ) : (
+                <div className="ez-row">
+                    <div className="ez-grow ez-mr2">
+                        <TextInput value={naming} placeholder={t("kit.namePlaceholder")} onChange={setNaming} />
+                    </div>
+                    <Button variant="primary" disabled={!naming.trim()} onClick={save}>
+                        {t("kit.saveNow")}
+                    </Button>
+                </div>
+            )}
+            {!fields.length && <div className="ez-small ez-muted ez-mt1">{t("kit.needFixed")}</div>}
+            {notice && <div className="ez-small ez-accent ez-mt1">{notice}</div>}
+        </Card>
+    );
+}
 
 const NUMBER_TYPES = ["saving", "price"];
 
@@ -33,13 +110,17 @@ export default function SmartColumns() {
     return (
         <Section title={t("derived.title")}>
             <div className="ez-small ez-muted ez-mb2">{t("derived.hint")}</div>
+            <BrandKits defs={defs} set={set} />
             {defs.map((d) => {
                 const problems = validateDerived(d, table.headers.filter((h) => !h.derived));
                 const sample = problems.length === 0 && firstRow ? derivedValue(d, firstRow).value : null;
                 return (
                     <Card key={d.id} className="ez-derived">
                         <div className="ez-row ez-mb2">
-                            <div className="ez-grow ez-strong">{t(`derived.type.${d.type}`)}</div>
+                            <div className="ez-grow ez-strong">
+                                {t(`derived.type.${d.type}`)}
+                                {d.kit && <span className="ez-small ez-accent"> · {t("kit.fromKit")}</span>}
+                            </div>
                             <Button quiet onClick={() => set(defs.filter((x) => x.id !== d.id))}>
                                 {t("derived.remove")}
                             </Button>

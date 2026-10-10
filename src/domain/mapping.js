@@ -8,7 +8,15 @@ export const EMPTY_POLICIES = ["blank", "keepTemplate", "skipRow"];
 export const FIT_MODES = ["fit", "fill", "none"];
 
 export function createMapping() {
-    return { text: {}, images: {}, visibility: {} };
+    return { text: {}, images: {}, visibility: {}, colors: {} };
+}
+
+/** Color of a text or fill/shape layer from a column. invalidPolicy: "skipRow" | "keepTemplate". */
+export function setColorMapping(mapping, layerId, column, invalidPolicy = "skipRow") {
+    const colors = { ...(mapping.colors || {}) };
+    if (!column) delete colors[layerId];
+    else colors[layerId] = { layerId, column, invalidPolicy };
+    return { ...mapping, colors };
 }
 
 export function setTextMapping(mapping, layerId, column, emptyPolicy = "blank") {
@@ -54,7 +62,7 @@ export function setImageMapping(mapping, layerId, rule) {
 }
 
 export function mappedCount(mapping) {
-    return Object.keys(mapping.text).length + Object.keys(mapping.images).length + Object.keys(mapping.visibility || {}).length;
+    return Object.keys(mapping.text).length + Object.keys(mapping.images).length + Object.keys(mapping.visibility || {}).length + Object.keys(mapping.colors || {}).length;
 }
 
 const normalize = (s) => String(s).toLowerCase().replace(/[\s_\-.]+/g, "");
@@ -85,6 +93,7 @@ export function pruneMapping(mapping, headers, layers) {
     return {
         text: Object.fromEntries(Object.entries(mapping.text).filter(([, r]) => keep(r))),
         images: Object.fromEntries(Object.entries(mapping.images).filter(([, r]) => keep(r))),
-        visibility: Object.fromEntries(Object.entries(mapping.visibility || {}).filter(([, r]) => keep(r)))
+        visibility: Object.fromEntries(Object.entries(mapping.visibility || {}).filter(([, r]) => keep(r))),
+        colors: Object.fromEntries(Object.entries(mapping.colors || {}).filter(([, r]) => keep(r)))
     };
 }
