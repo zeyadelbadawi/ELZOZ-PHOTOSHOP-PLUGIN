@@ -120,6 +120,21 @@ export function telegramClient({ token, chatId, fetch: f = fetch }) {
         chatId: String(chatId || ""),
         send: (text, buttons, to = chatId) =>
             call("sendMessage", { chat_id: to, text: clip(text, 4000), parse_mode: "HTML", disable_web_page_preview: true, reply_markup: markup(buttons) }),
+        /** Message with the persistent keyboard under the input box (rows of button labels). */
+        sendKeyboard: (text, rows, to = chatId) =>
+            call("sendMessage", {
+                chat_id: to,
+                text: clip(text, 4000),
+                parse_mode: "HTML",
+                disable_web_page_preview: true,
+                reply_markup: { keyboard: rows.map((r) => r.map((t) => ({ text: t }))), resize_keyboard: true, is_persistent: true }
+            }),
+        /** Bot profile: description (empty chat), short description (profile page), command menu (owner chat only). */
+        setProfile: async ({ description, shortDescription, commands }) => {
+            await call("setMyDescription", { description });
+            await call("setMyShortDescription", { short_description: shortDescription });
+            await call("setMyCommands", { commands, scope: { type: "chat", chat_id: chatId } });
+        },
         photo: (bytes, mime, caption, buttons) => {
             const form = new FormData();
             form.append("chat_id", String(chatId));

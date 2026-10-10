@@ -183,9 +183,11 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
             },
             tg: {
                 chatId: OWNER,
-                send: async (text, buttons) => tg.sent.push({ kind: "text", text, buttons }),
+                send: async (text, buttons, to) => tg.sent.push({ kind: "text", text, buttons, to }),
                 photo: async (bytes, mime, caption, buttons) => tg.sent.push({ kind: "photo", text: caption, buttons }),
                 answer: async (id, text) => tg.sent.push({ kind: "answer", text }),
+                sendKeyboard: async (text, rows, to) => tg.sent.push({ kind: "keyboard", text, rows, to }),
+                setProfile: async (profile) => tg.sent.push({ kind: "profile", profile }),
                 clearButtons: async () => {}
             },
             ai: {
@@ -331,6 +333,47 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
         const before = tg.sent.length;
         await tgUpdate({ message: { chat: { id: OWNER }, text: "/bot #C999999999" } });
         expect(tg.sent.slice(before).map((m) => m.text).join("\n")).toMatch(/مفيش عميل/);
+    });
+
+    it("owner panel: /start sets the profile and keyboard; keyboard buttons, menus and contact buttons work", async () => {
+        let before = tg.sent.length;
+        await tgUpdate({ message: { chat: { id: OWNER }, text: "/start" } });
+        const out = tg.sent.slice(before);
+        expect(out.find((m) => m.kind === "profile").profile.commands.map((c) => c.command)).toContain("orders");
+        const kb = out.find((m) => m.kind === "keyboard");
+        expect(kb.rows.flat()).toContain("🧾 الطلبات");
+        expect(kb.text).toMatch(/لوحة تحكم Elzoz/);
+        // every line of a card starts right-to-left
+        expect(kb.text.split("\n").filter(Boolean).every((l) => l.startsWith("\u200F"))).toBe(true);
+
+        before = tg.sent.length;
+        await tgUpdate({ message: { chat: { id: OWNER }, text: "📊 الحالة" } });
+        expect(tg.sent.slice(before).map((m) => m.text).join("\n")).toMatch(/تقرير آخر 24 ساعة/);
+        before = tg.sent.length;
+        await tgUpdate({ message: { chat: { id: OWNER }, text: "👥 العملاء" } });
+        expect(tg.sent.slice(before).map((m) => m.text).join("\n")).toMatch(/آخر العملاء/);
+        before = tg.sent.length;
+        await tgUpdate({ callback_query: { id: "n1", data: "m:orders", message: { message_id: 3, chat: { id: OWNER } } } });
+        expect(tg.sent.slice(before).map((m) => m.text).join("\n")).toMatch(/الطلبات المفتوحة/);
+
+        const me = phone();
+        await say(me, "اهلا");
+        const c = await contact(me);
+        const lead = tg.sent.filter((m) => (m.text || "").includes("عميل جديد")).at(-1);
+        expect(lead.buttons[0].map((b) => b.data)).toEqual([`hm:${c.id}`, `bk:${c.id}`]);
+        await tgUpdate({ callback_query: { id: "n2", data: `hm:${c.id}`, message: { message_id: 4, chat: { id: OWNER } } } });
+        expect((await contact(me)).human_until).not.toBeNull();
+        await tgUpdate({ callback_query: { id: "n3", data: `bk:${c.id}`, message: { message_id: 5, chat: { id: OWNER } } } });
+        expect((await contact(me)).blocked).toBe(true);
+        await tgUpdate({ message: { chat: { id: OWNER }, text: `/unblock ${c.id}` } });
+        expect((await contact(me)).blocked).toBe(false);
+
+        before = tg.sent.length;
+        await tgUpdate({ message: { chat: { id: 777 }, text: "/start" } });
+        const stranger = tg.sent.slice(before);
+        expect(stranger).toHaveLength(1);
+        expect(stranger[0]).toMatchObject({ to: "777" });
+        expect(stranger[0].text).toMatch(/خاص/);
     });
 
     it("uses the AI only for unclear text, and works without it", async () => {

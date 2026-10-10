@@ -12,12 +12,14 @@ import { MENU_ROWS, T, inWorkHours } from "./texts.mjs";
 import { extractForwarded, parsePayment } from "./payments.mjs";
 import { verifyMetaSignature } from "./clients.mjs";
 import { clip, escapeHtml, formatMoney, generatePassword, localHour, safeEqual, sha256Hex } from "./util.mjs";
+import * as UI from "./ownerui.mjs";
 
 const HUMAN_HOURS = 12;
 const FLOOD_PER_MINUTE = 15;
 const DOWNLOAD_LINK_SECONDS = 7 * 24 * 3600;
 
 const ok = (body = { ok: true }) => ({ status: 200, body });
+const STATUS_AR = { awaiting_payment: "مستني الدفع", paid: "اتدفع", fulfilling: "بيتجهز", fulfilled: "اتسلم", rejected: "مرفوض", expired: "انتهت مهلته", cancelled: "ملغي" };
 const deny = (status = 401) => ({ status, body: { error: "unauthorized" } });
 
 /**
@@ -54,6 +56,7 @@ export function createBot(deps) {
             log("warn", "telegram send failed", { error: e.message });
         }
     }
+    const ownerCard = (v) => owner(v.text, v.buttons);
 
     async function setContact(id, patch) {
         await db.update("bot_contacts", `id=eq.${id}`, { ...patch, updated_at: now().toISOString() });
@@ -82,9 +85,6 @@ export function createBot(deps) {
             await logOut(c.id, "list", body);
         }
     };
-
-    const tag = (c) => `#C${c.id}`;
-    const who = (c) => `${escapeHtml(c.name || "")} (+${c.wa_id}) ${tag(c)}`;
 
     // ------------------------------------------------------------ fulfilment
 
@@ -146,23 +146,19 @@ export function createBot(deps) {
                 }
             }
             await setContact(o.contact_id, { state: "idle", state_data: {} });
-            await owner(
-                `✅ <b>بيع ${escapeHtml(o.code)}</b>: ${formatMoney(o.amount_due)} جنيه\n${o.kind === "new" ? "حساب جديد" : "تجديد"}: ${escapeHtml(o.email)}\n` +
-                    `الموافقة: ${escapeHtml(o.approved_by || "")}` +
-                    (delivered ? "" : `\n⚠️ رسالة واتساب للعميل فشلت. ${password ? "اعمل له Reset Password من الداشبورد وابعتهوله." : "بلغه بنفسك."}`)
-            );
+            await owner(UI.saleAlert({ ...o, approved_by: o.approved_by }, delivered, !!password));
             if (done.referral && wa) {
                 try {
                     await wa.text(done.referral.wa_id, T.referral(done.referral.credits));
                 } catch {
                     /* outside the 24h window: the owner is told below */
                 }
-                await owner(`🎁 مكافأة ترشيح ${done.referral.credits} كريدت لـ +${done.referral.wa_id}`);
+                await owner(UI.say.info(`🎁 مكافأة ترشيح <b>${done.referral.credits}</b> كريدت لـ <code>+${done.referral.wa_id}</code>`));
             }
             return done;
         } catch (e) {
             log("error", "fulfillment failed", { order: o.code, error: e.message });
-            await owner(`⛔ فشل تجهيز الطلب ${escapeHtml(o.code)}: ${escapeHtml(e.message)}\nهيتعاد تلقائي بعد 10 دقايق.`);
+            await owner(UI.say.error(`فشل تجهيز الطلب <code>${escapeHtml(o.code)}</code>: ${escapeHtml(e.message)}\nهيتعاد تلقائي بعد 10 دقايق.`));
             return null;
         }
     }
@@ -212,7 +208,7 @@ export function createBot(deps) {
                     await w();
                 } catch (e) {
                     log("error", "message failed", { error: e.message });
-                    await owner(`⛔ خطأ في معالجة رسالة: ${escapeHtml(e.message)}`);
+                    await owner(UI.say.error(`خطأ في معالجة رسالة: ${escapeHtml(e.message)}`));
                 }
             }
         })();
@@ -263,9 +259,7 @@ export function createBot(deps) {
         const hours = localHour(now(), s.timezone || "Africa/Cairo");
         await setContact(c.id, { state: "idle", state_data: {}, human_until: new Date(now().getTime() + HUMAN_HOURS * 3600e3).toISOString() });
         await send.text(c, T.human(s, inWorkHours(hours, s)));
-        await owner(`👤 <b>طلب دعم</b> ${who(c)}\nالسبب: ${escapeHtml(reason)}\n${text ? "آخر رسالة: " + escapeHtml(clip(text, 500)) : ""}\n\nرد على الرسالة دي وردك هيوصل للعميل.`, [
-            [{ text: "↩️ رجّعه للبوت", data: `rl:${c.id}` }]
-        ]);
+        await ownerCard(UI.supportAlert(c, reason, text));
     }
 
     async function execute(step, c, msg) {
@@ -275,12 +269,12 @@ export function createBot(deps) {
             case "welcome":
                 await showMenu(c, c.account ? T.welcomeBack(c.name, c.account) : T.welcome(c.name));
                 await setContact(c.id, { state: "idle", state_data: {} });
-                await owner(`🆕 <b>عميل جديد</b> ${who(c)}\nالمصدر: ${escapeHtml(c.source || "")}\nأول رسالة: ${escapeHtml(clip(msg.text, 300))}`);
+                await ownerCard(UI.newContactAlert(c, msg.text));
                 return;
             case "menu":
                 if (step.release) await setContact(c.id, { human_until: null });
                 await showMenu(c, step.greet ? T.welcomeBack(c.name, c.account) : undefined);
-                if (step.unclear && msg.text) await owner(`❓ رسالة مش مفهومة من ${who(c)}:\n${escapeHtml(clip(msg.text, 400))}`);
+                if (step.unclear && msg.text) await owner(UI.unclearAlert(c, msg.text));
                 if (c.state !== "awaiting_payment") await setContact(c.id, { state: "idle", state_data: {} });
                 return;
             case "prices":
@@ -328,7 +322,7 @@ export function createBot(deps) {
                 return;
             case "image_without_order":
                 await send.text(c, T.notImage);
-                await owner(`📷 صورة من ${who(c)} من غير طلب مفتوح.`);
+                await owner(UI.messageAlert(c, "صورة من غير طلب مفتوح", "image"));
                 return;
             case "cancel_order":
                 if (data.order_code) {
@@ -394,13 +388,13 @@ export function createBot(deps) {
         if (msg.type === "image" && msg.mediaId && wa) {
             try {
                 const media = await wa.media(msg.mediaId);
-                await tg.photo(media.bytes, media.mime, `💬 ${who(c)}${msg.text ? ": " + escapeHtml(clip(msg.text, 300)) : ""}`);
+                await tg.photo(media.bytes, media.mime, UI.messageAlert(c, msg.text || "صورة", "image"));
                 return;
             } catch (e) {
                 log("warn", "media forward failed", { error: e.message });
             }
         }
-        await owner(`💬 ${who(c)}:\n${escapeHtml(clip(msg.text || msg.id || `[${msg.type}]`, 1500))}`);
+        await owner(UI.messageAlert(c, msg.text || msg.id, msg.type));
     }
 
     async function createOrder(c, pkg, email) {
@@ -424,10 +418,7 @@ export function createBot(deps) {
         }
         await send.text(c, T.payment(order, s));
         await setContact(c.id, { state: "awaiting_payment", state_data: { order_code: order.code, order_id: order.id, amount_due: order.amount_due } });
-        await owner(
-            `🧾 <b>طلب ${escapeHtml(order.code)}</b> ${who(c)}\n${escapeHtml(order.package_name)} — المطلوب ${formatMoney(order.amount_due)} جنيه\n` +
-                `${order.kind === "new" ? "حساب جديد" : "تجديد"}: ${escapeHtml(order.email)}`
-        );
+        await owner(UI.orderAlert(c, order));
     }
 
     async function claimPayment(c, msg, data) {
@@ -455,20 +446,16 @@ export function createBot(deps) {
             const st = rows[0]?.status;
             if (st === "paid" || st === "fulfilling" || st === "fulfilled") return; // already confirmed automatically
             await send.text(c, st === "expired" ? T.orderExpired(data.order_code) : T.noOpenOrder);
-            await owner(`📷 إيصال لطلب ${escapeHtml(data.order_code)} (الحالة: ${escapeHtml(st || "?")}) من ${who(c)}`, [
-                [{ text: "✅ قبول", data: `ap:${data.order_code}` }, { text: "❌ رفض", data: `rj:${data.order_code}` }]
-            ]);
+            await ownerCard(UI.lateReceiptAlert(c, data.order_code, st));
             return;
         }
         const order = updated[0];
         let reply = T.claimReceived;
         if (read?.is_receipt && read.amount != null && Math.abs(read.amount - Number(order.amount_due)) >= 0.01) reply += "\n\n" + T.amountMismatch(read.amount, order.amount_due);
         await send.text(c, reply);
-        const caption =
-            `📸 <b>إيصال للطلب ${escapeHtml(order.code)}</b> ${who(c)}\nالمطلوب: ${formatMoney(order.amount_due)} جنيه\n` +
-            (read ? `قراءة الذكاء الاصطناعي: ${read.is_receipt ? "إيصال" : "مش إيصال؟"} — ${read.amount ?? "?"} جنيه — مرجع ${escapeHtml(read.reference || "?")}\n` : "") +
-            `لو إشعار الدفع وصل للموبايل هيتأكد لوحده. أو قرر إنت:`;
-        const buttons = [[{ text: "✅ قبول", data: `ap:${order.code}` }, { text: "❌ رفض", data: `rj:${order.code}` }]];
+        const alert = UI.receiptAlert(c, order, read);
+        const caption = alert.text;
+        const buttons = alert.buttons;
         if (tg && tg.chatId && media) {
             try {
                 await tg.photo(media.bytes, media.mime, caption, buttons);
@@ -491,7 +478,7 @@ export function createBot(deps) {
         await db.setPassword(c.user_id, password);
         await setContact(c.id, { state_data: { ...data, reset_at: now().toISOString() } });
         await send.text(c, T.passwordReset(c.account?.email || "", password), { secret: true });
-        await owner(`🔑 اتعمل باسورد جديد تلقائي لـ ${escapeHtml(c.account?.email || "")} ${who(c)}`);
+        await owner(UI.say.info(`🔑 اتعمل باسورد جديد تلقائي لـ <code>${escapeHtml(c.account?.email || "")}</code>  ·  <code>#C${c.id}</code>`));
     }
 
     // ------------------------------------------------------------ Telegram (owner)
@@ -507,16 +494,26 @@ export function createBot(deps) {
         const chat = String(u.message?.chat?.id ?? u.callback_query?.message?.chat?.id ?? "");
         if (!config.tgOwner) {
             // Setup helper: reveals only the chat id, so the owner can set TG_OWNER_CHAT_ID.
-            if (u.message?.text?.startsWith("/start") && tg) await tg.send(`chat id: <code>${escapeHtml(chat)}</code>\nحطه في TG_OWNER_CHAT_ID.`, null, chat);
+            if (u.message?.text?.startsWith("/start") && tg) await tg.send(UI.lines(`🔑 chat id: <code>${escapeHtml(chat)}</code>`, "حطه في Secret اسمه <code>TG_OWNER_CHAT_ID</code>."), null, chat);
             return ok();
         }
-        if (chat !== String(config.tgOwner)) return ok(); // anyone else is ignored
+        if (chat !== String(config.tgOwner)) {
+            // Anyone else gets one polite line and nothing else.
+            if (u.message?.text && tg) {
+                try {
+                    await tg.send(UI.lines("🔒 البوت ده خاص بإدارة Elzoz."), null, chat);
+                } catch {
+                    /* ignore */
+                }
+            }
+            return ok();
+        }
         try {
             if (u.callback_query) await ownerButton(u.callback_query);
             else if (u.message?.text) await ownerMessage(u.message);
         } catch (e) {
             log("error", "owner command failed", { error: e.message });
-            await owner(`⛔ ${escapeHtml(e.message)}`);
+            await owner(UI.say.error(escapeHtml(e.message)));
         }
         return ok();
     }
@@ -529,14 +526,14 @@ export function createBot(deps) {
 
     async function approve(code, by, eventId = null) {
         const r = await db.rpc("bot_mark_paid", { p_code: code, p_by: by, p_event: eventId });
-        if (!r.changed) return `الطلب ${code} حالته ${r.status || "مش موجود"}`;
+        if (!r.changed) return { ok: false, text: `الطلب <code>${escapeHtml(code)}</code> حالته: ${escapeHtml(STATUS_AR[r.status] || r.status || "مش موجود")}` };
         await fulfill(r.order.id);
-        return `✅ اتقبل ${code}`;
+        return { ok: true, text: `اتقبل الطلب <code>${escapeHtml(code)}</code>` };
     }
 
     async function reject(code, by, reason) {
         const r = await db.rpc("bot_reject", { p_code: code, p_by: by, p_reason: reason || "rejected by owner" });
-        if (!r.changed) return `الطلب ${code} حالته ${r.status || "مش موجود"}`;
+        if (!r.changed) return { ok: false, text: `الطلب <code>${escapeHtml(code)}</code> حالته: ${escapeHtml(STATUS_AR[r.status] || r.status || "مش موجود")}` };
         const c = await contactById(r.order.contact_id);
         if (c && wa) {
             try {
@@ -546,112 +543,166 @@ export function createBot(deps) {
             }
             await setContact(c.id, { state: "idle", state_data: {} });
         }
-        return `❌ اترفض ${code}`;
+        return { ok: true, text: `اترفض الطلب <code>${escapeHtml(code)}</code> واتبلغ العميل` };
+    }
+
+    const result = (r) => (r.ok ? UI.say.ok(r.text) : UI.say.info(r.text));
+
+    async function isPaused() {
+        const rows = await db.select("bot_settings", "select=value&key=eq.paused");
+        return rows[0]?.value === true;
+    }
+
+    async function setPaused(paused) {
+        await db.update("bot_settings", "key=eq.paused", { value: paused, updated_at: now().toISOString() });
+        cache = null;
+        await tg.sendKeyboard(
+            paused ? UI.lines("⏸️ <b>البوت واقف</b>", "كل رسايل العملاء هتجيلك هنا، وكل عميل هياخد رد واحد إننا هنرد عليه قريب.") : UI.lines("▶️ <b>البوت شغال</b>", "البوت بيرد على العملاء تلقائي."),
+            UI.mainKeyboard(paused)
+        );
+    }
+
+    async function showStatus() {
+        const r = await db.rpc("bot_report", { p_since: new Date(now().getTime() - 86400e3).toISOString() });
+        return ownerCard(UI.statusScreen(r, await isPaused()));
+    }
+
+    async function showOrders() {
+        const rows = await db.select("bot_orders", "select=code,email,amount_due,claimed_at,created_at&status=eq.awaiting_payment&order=created_at.desc&limit=10");
+        return ownerCard(UI.ordersScreen(rows, now()));
+    }
+
+    async function showContacts() {
+        const rows = await db.select(
+            "bot_contacts",
+            "select=id,wa_id,name,user_id,blocked,human_until,last_inbound_at,bot_messages(body)&bot_messages.direction=eq.in&bot_messages.order=id.desc&bot_messages.limit=1&order=last_inbound_at.desc.nullslast&limit=10"
+        );
+        const t = now();
+        return ownerCard(
+            UI.contactsScreen(
+                rows.map((c) => ({ ...c, human: c.human_until && new Date(c.human_until) > t, last: c.bot_messages?.[0]?.body || "" })),
+                t
+            )
+        );
     }
 
     async function ownerButton(q) {
         const [kind, arg, extra] = String(q.data || "").split(":");
-        let answer = "تم";
-        if (kind === "ap") answer = await approve(arg, "owner:telegram", extra ? Number(extra) : null);
-        else if (kind === "rj") answer = await reject(arg, "owner:telegram");
-        else if (kind === "rl" && Number(arg) > 0) {
-            await setContact(Number(arg), { human_until: null, state: "idle", state_data: {} });
-            answer = `↩️ #C${arg} رجع للبوت`;
+        let answer = "تم ✓";
+        if (kind === "m") {
+            await tg.answer(q.id, "");
+            if (arg === "status") return showStatus();
+            if (arg === "orders") return showOrders();
+            if (arg === "contacts") return showContacts();
+            if (arg === "pause" || arg === "resume") return setPaused(arg === "pause");
+            if (arg === "help") return owner(UI.helpScreen());
+            return;
+        }
+        if (kind === "ap" || kind === "rj") {
+            const r = kind === "ap" ? await approve(arg, "owner:telegram", extra ? Number(extra) : null) : await reject(arg, "owner:telegram");
+            answer = r.ok ? (kind === "ap" ? "✅ اتقبل" : "❌ اترفض") : "ℹ️ اتعمل قبل كده";
+            await tg.answer(q.id, answer);
+            if (q.message?.message_id) {
+                try {
+                    await tg.clearButtons(q.message.message_id);
+                } catch {
+                    /* already edited */
+                }
+            }
+            return owner(result(r));
+        }
+        const cid = Number(arg);
+        if (!(cid > 0)) return tg.answer(q.id, "");
+        if (kind === "rl") {
+            await setContact(cid, { human_until: null, state: "idle", state_data: {} });
+            await tg.answer(q.id, "↩️ رجع للبوت");
+            return owner(UI.say.ok(`<code>#C${cid}</code> رجع للبوت، والبوت هيرد عليه تاني.`));
+        }
+        if (kind === "hm") {
+            await setContact(cid, { human_until: new Date(now().getTime() + HUMAN_HOURS * 3600e3).toISOString() });
+            await tg.answer(q.id, "🙋 تمام، البوت هيسكت معاه");
+            return owner(UI.say.ok(`البوت ساكت مع <code>#C${cid}</code> لمدة ${HUMAN_HOURS} ساعة. اعمل Reply على تنبيهه عشان ترد.`));
+        }
+        if (kind === "bk") {
+            await setContact(cid, { blocked: true });
+            await tg.answer(q.id, "🚫 اتحظر");
+            return owner(UI.say.ok(`🚫 اتحظر <code>#C${cid}</code>. لفك الحظر: <code>/unblock ${cid}</code>`));
         }
         await tg.answer(q.id, answer);
-        if (q.message?.message_id && (kind === "ap" || kind === "rj")) {
-            try {
-                await tg.clearButtons(q.message.message_id);
-            } catch {
-                /* already edited */
-            }
-        }
-        await owner(escapeHtml(answer));
     }
 
     async function ownerMessage(m) {
-        const text = String(m.text || "").trim();
+        const raw = String(m.text || "").trim();
         const replied = m.reply_to_message?.text || m.reply_to_message?.caption || "";
         const target = replied.match(/#C(\d+)/);
-        if (target && !text.startsWith("/")) return relay(Number(target[1]), text);
+        if (target && !raw.startsWith("/") && !UI.keyboardCommand(raw)) return relay(Number(target[1]), raw);
 
-        const [cmd, ...rest] = text.split(/\s+/);
+        const text = UI.keyboardCommand(raw) || raw;
+        const [cmdRaw, ...rest] = text.split(/\s+/);
+        const cmd = cmdRaw.toLowerCase().replace(/@.*$/, "");
         const arg = rest[0];
         // Customer number for /msg, /bot, /block, /unblock: "12", "C12" or "#C12".
         const cid = Number(String(arg || "").replace(/^#?c/i, ""));
-        const needsContact = ["/msg", "/bot", "/block", "/unblock"].includes(cmd.toLowerCase());
-        if (needsContact && !(Number.isInteger(cid) && cid > 0)) {
-            return owner(`اكتب رقم العميل بعد الأمر، مثلاً: <code>${escapeHtml(cmd)} 12</code>${cmd === "/msg" ? " النص" : ""}\nرقم العميل هو اللي بعد #C في التنبيهات.`);
+        if (["/msg", "/bot", "/block", "/unblock"].includes(cmd) && !(Number.isInteger(cid) && cid > 0)) {
+            return owner(UI.say.info(`اكتب رقم العميل بعد الأمر، مثلاً: <code>${escapeHtml(cmd)} 12${cmd === "/msg" ? " أهلاً" : ""}</code>\nرقم العميل هو اللي بعد #C في التنبيهات.`));
         }
-        switch (cmd.toLowerCase().replace(/@.*$/, "")) {
-            case "/start":
+        switch (cmd) {
+            case "/start": {
+                try {
+                    await tg.setProfile(UI.PROFILE);
+                } catch (e) {
+                    log("warn", "telegram profile failed", { error: e.message });
+                }
+                const w = UI.welcomeScreen(await isPaused());
+                return tg.sendKeyboard(w.text, w.keyboard);
+            }
             case "/help":
-                return owner(
-                    "<b>أوامر Elzoz</b>\n/status — ملخص آخر 24 ساعة\n/orders — الطلبات المفتوحة\n/approve EZ-123456 — قبول طلب\n/reject EZ-123456 السبب — رفض\n" +
-                        "/msg 12 النص — رسالة لعميل #C12\n/bot 12 — رجّع #C12 للبوت\n/block 12 · /unblock 12\n/pause — إيقاف البوت (كل الرسايل ليك)\n/resume — تشغيل البوت\n\nوللرد على عميل: اعمل Reply على تنبيهه."
-                );
-            case "/status": {
-                const r = await db.rpc("bot_report", { p_since: new Date(now().getTime() - 86400e3).toISOString() });
-                const { s } = await settings();
-                return owner(reportText(r, s.paused === true));
-            }
-            case "/orders": {
-                const rows = await db.select("bot_orders", "select=code,email,amount_due,claimed_at,created_at&status=eq.awaiting_payment&order=created_at.desc&limit=15");
-                if (!rows.length) return owner("مفيش طلبات مفتوحة.");
-                return owner(
-                    rows.map((o) => `• ${escapeHtml(o.code)} — ${formatMoney(o.amount_due)} ج — ${escapeHtml(o.email)}${o.claimed_at ? " 📸" : ""}`).join("\n"),
-                    rows.filter((o) => o.claimed_at).slice(0, 5).map((o) => [{ text: `✅ ${o.code}`, data: `ap:${o.code}` }, { text: `❌ ${o.code}`, data: `rj:${o.code}` }])
-                );
-            }
+                return owner(UI.helpScreen());
+            case "/status":
+                return showStatus();
+            case "/orders":
+                return showOrders();
+            case "/contacts":
+                return showContacts();
             case "/approve":
-                return owner(escapeHtml(await approve(String(arg || "").toUpperCase(), "owner:telegram")));
+                if (!arg) return owner(UI.say.info("اكتب رقم الطلب، مثلاً: <code>/approve EZ-123456</code>"));
+                return owner(result(await approve(String(arg).toUpperCase(), "owner:telegram")));
             case "/reject":
-                return owner(escapeHtml(await reject(String(arg || "").toUpperCase(), "owner:telegram", rest.slice(1).join(" "))));
+                if (!arg) return owner(UI.say.info("اكتب رقم الطلب، مثلاً: <code>/reject EZ-123456 السبب</code>"));
+                return owner(result(await reject(String(arg).toUpperCase(), "owner:telegram", rest.slice(1).join(" "))));
             case "/msg":
                 return relay(cid, rest.slice(1).join(" "));
             case "/bot":
-                if (!(await contactById(cid))) return owner(`مفيش عميل #C${cid}`);
+                if (!(await contactById(cid))) return owner(UI.say.info(`مفيش عميل <code>#C${cid}</code>`));
                 await setContact(cid, { human_until: null, state: "idle", state_data: {} });
-                return owner(`↩️ #C${cid} رجع للبوت`);
+                return owner(UI.say.ok(`<code>#C${cid}</code> رجع للبوت.`));
             case "/block":
             case "/unblock":
-                if (!(await contactById(cid))) return owner(`مفيش عميل #C${cid}`);
-                await setContact(cid, { blocked: cmd.toLowerCase() === "/block" });
-                return owner(`${cmd.toLowerCase() === "/block" ? "🚫 اتحظر" : "✅ اتفك حظر"} #C${cid}`);
+                if (!(await contactById(cid))) return owner(UI.say.info(`مفيش عميل <code>#C${cid}</code>`));
+                await setContact(cid, { blocked: cmd === "/block" });
+                return owner(UI.say.ok(`${cmd === "/block" ? "🚫 اتحظر" : "اتفك حظر"} <code>#C${cid}</code>`));
             case "/pause":
             case "/resume":
-                await db.update("bot_settings", "key=eq.paused", { value: cmd === "/pause", updated_at: now().toISOString() });
-                cache = null;
-                return owner(cmd === "/pause" ? "⏸️ البوت واقف: كل الرسايل هتجيلك هنا." : "▶️ البوت شغال.");
+                return setPaused(cmd === "/pause");
             default:
-                return owner("مش فاهم الأمر. اكتب /help");
+                return owner(UI.say.info("مش فاهم الأمر 🤔 اختار من الزراير اللي تحت، أو اكتب /help"));
         }
     }
 
     async function relay(contactId, text) {
         const c = await contactById(contactId);
-        if (!c) return owner(`مفيش عميل #C${escapeHtml(String(contactId))}`);
-        if (!text) return owner(`اكتب الرسالة بعد الرقم، مثلاً: <code>/msg ${c.id} أهلاً</code>`);
+        if (!c) return owner(UI.say.info(`مفيش عميل <code>#C${escapeHtml(String(contactId))}</code>`));
+        if (!text) return owner(UI.say.info(`اكتب الرسالة بعد الرقم، مثلاً: <code>/msg ${c.id} أهلاً</code>`));
         try {
             await send.text(c, text);
         } catch (e) {
-            return owner(`⛔ الرسالة ما اتبعتتش (غالباً عدّى 24 ساعة من آخر رسالة للعميل): ${escapeHtml(e.message)}`);
+            return owner(UI.say.error(`الرسالة ما اتبعتتش. غالباً عدّى 24 ساعة من آخر رسالة من العميل.\n${escapeHtml(e.message)}`));
         }
         await setContact(c.id, { human_until: new Date(now().getTime() + HUMAN_HOURS * 3600e3).toISOString() });
-        return owner(`✓ اتبعت لـ #C${c.id}. البوت ساكت معاه ${HUMAN_HOURS} ساعة (أو /bot ${c.id}).`);
-    }
-
-    function reportText(r, paused) {
-        const lines = [
-            `📊 <b>تقرير آخر 24 ساعة</b>${paused ? " — ⏸️ البوت واقف" : ""}`,
-            `عملاء جدد: ${r.new_contacts} · طلبات: ${r.orders_created}`,
-            `مبيعات: ${r.sales} · إيراد: ${formatMoney(r.revenue)} جنيه (تلقائي: ${r.auto_approved})`,
-            `مستني موافقتك: ${(r.waiting_owner || []).join(", ") || "لا"}`,
-            `تحويلات مش متطابقة: ${r.unmatched_payments}`
-        ];
-        if ((r.expiring_3d || []).length) lines.push(`⏳ بيخلص خلال 3 أيام: ${r.expiring_3d.map((x) => escapeHtml(x.email)).join(", ")}`);
-        if ((r.inactive_new || []).length) lines.push(`😴 اشتركوا وما استخدموش لسه: ${r.inactive_new.map(escapeHtml).join(", ")}`);
-        return lines.join("\n");
+        return ownerCard({
+            text: UI.say.ok(`اتبعت لـ <code>#C${c.id}</code>. البوت ساكت معاه ${HUMAN_HOURS} ساعة.`),
+            buttons: [[{ text: "↩️ رجّعه للبوت دلوقتي", data: `rl:${c.id}` }]]
+        });
     }
 
     // ------------------------------------------------------------ payment notifications
@@ -677,23 +728,19 @@ export function createBot(deps) {
             p_received_at: receivedAt.toISOString()
         });
         if (r.duplicate) return ok({ duplicate: true });
-        const line = `${formatMoney(p.amount)} جنيه — ${p.channel}${p.payer ? " من " + escapeHtml(p.payer) : ""}${p.reference ? " — مرجع " + escapeHtml(p.reference) : ""}`;
         if (r.matched) {
             const work = (async () => {
-                await owner(`💰 تحويل وصل واتطابق مع ${escapeHtml(r.order.code)}: ${line}`);
+                await ownerCard(UI.paymentAlert("matched", p, { order: r.order.code }));
                 await fulfill(r.order.id);
             })();
             return { ...ok({ matched: true }), background: work };
         }
         if (!p.trusted) {
-            await owner(`⚠️ رسالة دفع من مصدر مش موثوق (${escapeHtml(p.sender || "?")}): ${line}\nلو المصدر ده سليم ضيفه في PAY_ALLOWED_SENDERS.`);
+            await ownerCard(UI.paymentAlert("untrusted", p));
             return ok({ matched: false });
         }
         const candidate = r.candidate || r.late_candidate;
-        await owner(
-            `💰 تحويل وصل ومش متطابق مع طلب مفتوح: ${line}` + (candidate ? `\nممكن يكون للطلب ${escapeHtml(candidate)}.` : ""),
-            candidate ? [[{ text: `✅ اعتبره لـ ${candidate}`, data: `ap:${candidate}:${r.event_id}` }]] : undefined
-        );
+        await ownerCard(UI.paymentAlert("unmatched", p, { candidate, eventId: r.event_id }));
         return ok({ matched: false });
     }
 
@@ -716,7 +763,7 @@ export function createBot(deps) {
         }
         if (t.report) {
             const { s } = await settings();
-            await owner(reportText(t.report, s.paused === true));
+            await ownerCard(UI.statusScreen(t.report, s.paused === true));
         }
         return ok({ fulfilled: (t.to_fulfill || []).length, expired: (t.expired || []).length, report: !!t.report });
     }
