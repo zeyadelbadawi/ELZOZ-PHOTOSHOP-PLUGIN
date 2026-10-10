@@ -522,6 +522,7 @@ export function createBot(deps) {
     }
 
     async function contactById(id) {
+        if (!(Number.isInteger(Number(id)) && Number(id) > 0)) return null;
         const rows = await db.select("bot_contacts", `select=id,wa_id,name,user_id,state,state_data&id=eq.${Number(id)}`);
         return rows[0] || null;
     }
@@ -553,7 +554,7 @@ export function createBot(deps) {
         let answer = "تم";
         if (kind === "ap") answer = await approve(arg, "owner:telegram", extra ? Number(extra) : null);
         else if (kind === "rj") answer = await reject(arg, "owner:telegram");
-        else if (kind === "rl") {
+        else if (kind === "rl" && Number(arg) > 0) {
             await setContact(Number(arg), { human_until: null, state: "idle", state_data: {} });
             answer = `↩️ #C${arg} رجع للبوت`;
         }
@@ -576,6 +577,12 @@ export function createBot(deps) {
 
         const [cmd, ...rest] = text.split(/\s+/);
         const arg = rest[0];
+        // Customer number for /msg, /bot, /block, /unblock: "12", "C12" or "#C12".
+        const cid = Number(String(arg || "").replace(/^#?c/i, ""));
+        const needsContact = ["/msg", "/bot", "/block", "/unblock"].includes(cmd.toLowerCase());
+        if (needsContact && !(Number.isInteger(cid) && cid > 0)) {
+            return owner(`اكتب رقم العميل بعد الأمر، مثلاً: <code>${escapeHtml(cmd)} 12</code>${cmd === "/msg" ? " النص" : ""}\nرقم العميل هو اللي بعد #C في التنبيهات.`);
+        }
         switch (cmd.toLowerCase().replace(/@.*$/, "")) {
             case "/start":
             case "/help":
@@ -601,14 +608,16 @@ export function createBot(deps) {
             case "/reject":
                 return owner(escapeHtml(await reject(String(arg || "").toUpperCase(), "owner:telegram", rest.slice(1).join(" "))));
             case "/msg":
-                return relay(Number(arg), rest.slice(1).join(" "));
+                return relay(cid, rest.slice(1).join(" "));
             case "/bot":
-                await setContact(Number(arg), { human_until: null, state: "idle", state_data: {} });
-                return owner(`↩️ #C${Number(arg)} رجع للبوت`);
+                if (!(await contactById(cid))) return owner(`مفيش عميل #C${cid}`);
+                await setContact(cid, { human_until: null, state: "idle", state_data: {} });
+                return owner(`↩️ #C${cid} رجع للبوت`);
             case "/block":
             case "/unblock":
-                await setContact(Number(arg), { blocked: cmd === "/block" });
-                return owner(`${cmd === "/block" ? "🚫 اتحظر" : "✅ اتفك حظر"} #C${Number(arg)}`);
+                if (!(await contactById(cid))) return owner(`مفيش عميل #C${cid}`);
+                await setContact(cid, { blocked: cmd.toLowerCase() === "/block" });
+                return owner(`${cmd.toLowerCase() === "/block" ? "🚫 اتحظر" : "✅ اتفك حظر"} #C${cid}`);
             case "/pause":
             case "/resume":
                 await db.update("bot_settings", "key=eq.paused", { value: cmd === "/pause", updated_at: now().toISOString() });
@@ -621,7 +630,8 @@ export function createBot(deps) {
 
     async function relay(contactId, text) {
         const c = await contactById(contactId);
-        if (!c || !text) return owner("العميل مش موجود أو الرسالة فاضية.");
+        if (!c) return owner(`مفيش عميل #C${escapeHtml(String(contactId))}`);
+        if (!text) return owner(`اكتب الرسالة بعد الرقم، مثلاً: <code>/msg ${c.id} أهلاً</code>`);
         try {
             await send.text(c, text);
         } catch (e) {

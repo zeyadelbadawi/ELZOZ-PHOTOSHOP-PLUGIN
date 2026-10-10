@@ -320,6 +320,19 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
         expect((await contact(me)).human_until).toBeNull();
     });
 
+    it("owner commands without a customer number answer with usage instead of failing", async () => {
+        for (const cmd of ["/msg", "/bot", "/block", "/unblock", "/msg abc", "/bot 0"]) {
+            const before = tg.sent.length;
+            await tgUpdate({ message: { chat: { id: OWNER }, text: cmd } });
+            const reply = tg.sent.slice(before).map((m) => m.text).join("\n");
+            expect(reply).toMatch(/اكتب رقم العميل/);
+            expect(reply).not.toMatch(/⛔/);
+        }
+        const before = tg.sent.length;
+        await tgUpdate({ message: { chat: { id: OWNER }, text: "/bot #C999999999" } });
+        expect(tg.sent.slice(before).map((m) => m.text).join("\n")).toMatch(/مفيش عميل/);
+    });
+
     it("uses the AI only for unclear text, and works without it", async () => {
         const me = phone();
         await say(me, "اهلا");
