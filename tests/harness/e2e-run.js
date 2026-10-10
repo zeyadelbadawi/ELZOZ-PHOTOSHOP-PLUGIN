@@ -1263,6 +1263,45 @@ scenario("I", "Features 1-15: smart prices, formatting (more added per feature)"
     await shot(p, "I28-results-subject-320-dark", "Results: 2 designs with smart crop + background removed (simulated)");
     acct = await account(email);
     check("2 rows charged (57 → 55)", Number(acct.balance.balance) === 55, acct.balance);
+
+    // ---- F5: one template with artboards → each row in several sizes
+    await click(p, "New job");
+    await queue(p, { file: "spreadsheets/offers.xlsx" });
+    await click(p, "Choose file");
+    await click(p, "Next");
+    await queue(p, { file: "templates/social-sizes-artboards.psd" });
+    await click(p, "Choose PSD");
+    await page_wait(p);
+    const boardsList = await p.locator('[data-testid="artboards-list"]').textContent();
+    check("the template's artboards are listed with their sizes", boardsList === "Post (1080 × 1080) · Story (1080 × 1920) · Banner (1200 × 628)", boardsList);
+    await shot(p, "I29-template-artboards-320-dark", "Template: 3 artboards found (Post, Story, Banner)");
+    await click(p, "Next");
+    const mapNote = await p.locator(".ez-alert").filter({ hasText: "Mapping the artboard" }).textContent();
+    check("Map explains that only the first artboard is mapped", /Mapping the artboard “Post”.*Story, Banner get the same columns/.test(mapNote), mapNote);
+    await click(p, "Auto-map by name");
+    await pickLayerFolder(p, "Photo", "images/products");
+    const nameRowCount = await p.locator(".ez-layer", { has: p.locator(".ez-layer-name > div:first-child", { hasText: /^Name$/ }) }).count();
+    check("each layer is shown once, not once per artboard (Name: text + colors = 2, not 6)", nameRowCount === 2, nameRowCount);
+    await shot(p, "I30-map-artboards-320-dark", "Map: the Post artboard is mapped; Story and Banner follow");
+    await click(p, "Next");
+    await field(p, "File names").fill("{artboard}/{SKU}");
+    await field(p, "Rows to generate").fill("2-3");
+    await sel(p, "Sizes (artboards)").locator('label:has-text("Story") input').uncheck();
+    await p.waitForTimeout(200);
+    const sizes = await p.locator('[data-testid="sizes-summary"]').textContent();
+    check("Check shows rows × sizes = designs (2 × 2 = 4, Story off)", sizes === "2 row(s) × 2 size(s) = 4 design(s)", sizes);
+    await sel(p, "Sizes (artboards)").scrollIntoViewIfNeeded();
+    await shot(p, "I31-check-sizes-320-dark", "Check: sizes to export (Story turned off), 2 rows × 2 sizes = 4 designs", { scroll: null });
+    await click(p, "Next");
+    await btn(p, "Generate 4").click();
+    await waitForResults(p);
+    const dir8 = path.join(OUTS, "scenario-i-artboards");
+    await saveOutputs(p, "Elzoz output I", dir8);
+    const sized = JSON.parse(execFileSync("python3", ["-c", "import json,sys,os\nfrom PIL import Image\nout={}\nfor d in ('Post','Banner','Story'):\n  p=os.path.join(sys.argv[1],d)\n  if os.path.isdir(p):\n    for n in sorted(os.listdir(p)):\n      if n.endswith('.jpg'): out[d+'/'+n]=list(Image.open(os.path.join(p,n)).size)\nprint(json.dumps(out))", dir8]).toString());
+    check("each design is exported at its artboard's size, in a folder per size (PIL)", JSON.stringify(sized) === JSON.stringify({ "Post/ELZ-0001.jpg": [1080, 1080], "Post/ELZ-0002.jpg": [1080, 1080], "Banner/ELZ-0001.jpg": [1200, 628], "Banner/ELZ-0002.jpg": [1200, 628] }), sized);
+    await shot(p, "I32-results-artboards-320-dark", "Results: 4 designs, 2 sizes per row");
+    acct = await account(email);
+    check("4 designs charged (55 → 51)", Number(acct.balance.balance) === 51, acct.balance);
     await finishRecording(p, "SIMULATED-scenario-I-features", "Scenario I: new features 1-15 (simulated host)");
 });
 

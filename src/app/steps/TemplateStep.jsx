@@ -13,6 +13,7 @@ const storage = () => {
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, FileField, Section, Stat } from "../../ui/components.jsx";
 import { summarizeTemplate } from "../../domain/layers.js";
+import { artboardSize, leadLayers } from "../../domain/artboards.js";
 
 export default function TemplateStep() {
     const { state, dispatch, services } = useApp();
@@ -47,7 +48,8 @@ export default function TemplateStep() {
         }
     };
 
-    const summary = tpl ? summarizeTemplate(tpl.layers) : null;
+    const boards = (tpl && tpl.artboards) || [];
+    const summary = tpl ? summarizeTemplate(boards.length ? leadLayers(tpl.layers, boards) : tpl.layers) : null;
     return (
         <>
             <div className="ez-title">{t("template.title")}</div>
@@ -77,6 +79,14 @@ export default function TemplateStep() {
                         <Stat label={t("template.images")} value={summary.images.length} />
                         <Stat label={t("template.groups")} value={summary.groups} />
                     </div>
+                    {boards.length > 0 && (
+                        <Alert tone="info" title={t("artboards.found", { n: boards.length })}>
+                            <div data-testid="artboards-list">
+                                {boards.map((a) => `${a.name} (${artboardSize(a).width} × ${artboardSize(a).height})`).join(" · ")}
+                            </div>
+                            <div className="ez-small">{t(boards.length > 1 ? "artboards.howMany" : "artboards.one")}</div>
+                        </Alert>
+                    )}
                     {summary.duplicateNames.length > 0 && <Alert tone="warning">{t("template.duplicates", { n: summary.duplicateNames.length })}</Alert>}
                 </>
             )}

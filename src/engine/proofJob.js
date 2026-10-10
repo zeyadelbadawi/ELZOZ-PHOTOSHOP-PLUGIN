@@ -31,7 +31,9 @@ export function proofLabel(number, item) {
  */
 export async function runProofJob({ port, template, templateLayers, plan, folders, output, proof, signal = {}, onEvent = () => {} }) {
     const startedAt = new Date().toISOString();
-    const items = plan.items.map((it) => ({ key: it.key, sourceRow: it.sourceRow, baseName: it.baseName, status: ITEM.notStarted, files: [], error: null }));
+    // With artboards, the approval sheet shows each row once with all its sizes (plan.proofItems).
+    const list = plan.proofItems || plan.items;
+    const items = list.map((it) => ({ key: it.key, sourceRow: it.sourceRow, baseName: it.baseName, status: ITEM.notStarted, files: [], error: null }));
     const result = { kind: "proof", jobId: null, status: JOB.failed, startedAt, finishedAt: null, items, fatal: null, proof: null, billing: { charged: 0 } };
     onEvent({ type: "started", jobId: null, total: items.length });
 
@@ -44,14 +46,14 @@ export async function runProofJob({ port, template, templateLayers, plan, folder
             const base = plan.outputSize || proof.templateSize;
             const session = await port.openWorkingCopy(template, templateLayers, { resizeTo: base ? proofSize(base.width, base.height) : null, proof: { watermark: "PROOF" } });
             try {
-                for (let i = 0; i < plan.items.length; i++) {
+                for (let i = 0; i < list.length; i++) {
                     if (ctx.isCancelled() || signal.cancelled) {
                         cancelled = true;
                         break;
                     }
-                    const planItem = plan.items[i];
+                    const planItem = list[i];
                     const state = items[i];
-                    ctx.progress(i / plan.items.length, `Proof ${i + 1} of ${plan.items.length}`);
+                    ctx.progress(i / list.length, `Proof ${i + 1} of ${list.length}`);
                     onEvent({ type: "item-start", index: i, key: state.key });
                     const label = proofLabel(i + 1, planItem);
                     try {

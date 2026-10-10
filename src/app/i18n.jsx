@@ -417,6 +417,14 @@ const en = {
     "map.bgFail": "If the background can't be removed",
     "map.bgFail.keep": "Use the photo as it is (noted in the results)",
     "map.bgFail.skip": "Skip the row (not charged)",
+    "artboards.found": "{n} artboard(s) in this template",
+    "artboards.howMany": "Each row makes one design per artboard (each design is one credit). Map the first artboard; the others follow.",
+    "artboards.one": "Designs are exported at the artboard's size.",
+    "artboards.mapLead": "Mapping the artboard “{name}”",
+    "artboards.mapFollow": "Layers with the same name and group in {names} get the same columns automatically.",
+    "artboards.sizes": "Sizes (artboards)",
+    "artboards.summary": "{rows} row(s) × {sizes} size(s) = {n} design(s)",
+    "artboards.naming": "File names get “_” + the artboard name, or put {artboard} where you want it (e.g. {artboard}/{Name} makes a folder per size).",
     "error.generic": "Something went wrong: {message}"
 };
 
@@ -826,6 +834,14 @@ const ar = {
     "map.bgFail": "لو الخلفية متشالتش",
     "map.bgFail.keep": "استخدم الصورة زي ما هي (هيتكتب في النتايج)",
     "map.bgFail.skip": "تخطى الصف (مش هيتحسب)",
+    "artboards.found": "التمبلت فيه {n} آرت بورد",
+    "artboards.howMany": "كل صف بيطلع تصميم لكل آرت بورد (كل تصميم بكريدت). اربط أول آرت بورد والباقي بيمشي وراه.",
+    "artboards.one": "التصميمات بتطلع بمقاس الآرت بورد.",
+    "artboards.mapLead": "بنربط الآرت بورد “{name}”",
+    "artboards.mapFollow": "الطبقات اللي ليها نفس الاسم والجروب في {names} بتاخد نفس الأعمدة لوحدها.",
+    "artboards.sizes": "المقاسات (الآرت بوردات)",
+    "artboards.summary": "{rows} صف × {sizes} مقاس = {n} تصميم",
+    "artboards.naming": "اسم الملف بيتضاف له “_” + اسم الآرت بورد، أو حط {artboard} في المكان اللي تحبه (مثلًا {artboard}/{Name} بيعمل فولدر لكل مقاس).",
     "error.generic": "حدث خطأ: {message}"
 };
 

@@ -49,6 +49,28 @@ async function outputTarget(root, relPath) {
     return { folder, name };
 }
 
+/**
+ * Artboards of a document: top-level groups whose layer descriptor has
+ * artboardEnabled, with their rectangle (batchPlay "get" of the layer).
+ */
+async function readArtboards(photoshop, doc, descriptors) {
+    const out = [];
+    for (const d of descriptors.filter((x) => x.depth === 0 && x.kind === "group")) {
+        try {
+            const r = await photoshop.action.batchPlay([{ _obj: "get", _target: [{ _ref: "layer", _id: d.id }, { _ref: "document", _id: doc.id }], _options: { dialogOptions: "dontDisplay" } }], {});
+            const info = r && r[0];
+            const rect = info && info.artboardEnabled && info.artboard && info.artboard.artboardRect;
+            if (!rect) continue;
+            const n = (v) => Number(v && typeof v === "object" ? v._value : v);
+            out.push({ id: d.id, name: d.name, indexPath: d.indexPath, rect: { left: n(rect.left), top: n(rect.top), right: n(rect.right), bottom: n(rect.bottom) } });
+        } catch (e) {
+            /* not readable: treated as a normal group */
+        }
+    }
+    // Canvas reading order (rows top to bottom, then left to right), not Layers panel order.
+    return out.sort((a, b) => (Math.abs(a.rect.top - b.rect.top) > 50 ? a.rect.top - b.rect.top : a.rect.left - b.rect.left));
+}
+
 export function createPhotoshopPort({ photoshop, uxp }) {
     const { app, core, constants } = photoshop;
     const fs = uxp.storage.localFileSystem;
@@ -85,7 +107,8 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                 let doc = findOpenDocument(template);
                 if (!doc) doc = await app.open(template.entry);
                 const { descriptors } = walkDocument(doc, constants);
-                return { documentId: doc.id, title: doc.title, width: doc.width, height: doc.height, resolution: Number(doc.resolution) || 72, layers: descriptors };
+                const artboards = await readArtboards(photoshop, doc, descriptors);
+                return { documentId: doc.id, title: doc.title, width: doc.width, height: doc.height, resolution: Number(doc.resolution) || 72, layers: descriptors, artboards };
             });
         },
 
@@ -199,6 +222,32 @@ export function createPhotoshopPort({ photoshop, uxp }) {
             const kinds = new Map(templateLayers.map((l) => [l.id, l.kind]));
             const baseState = doc.activeHistoryState;
 
+            // The current state as JPEG bytes (temporary file, deleted afterwards).
+            const renderJpegNow = async (quality) => {
+                const temp = await fs.getTemporaryFolder();
+                const name = `elzoz-render-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.jpg`;
+                const entry = await temp.createFile(name, { overwrite: true });
+                try {
+                    await asStep("export", null, () => doc.saveAs.jpg(entry, saveOptionsFor("jpg", { jpgQuality: quality }), true));
+                    const bytes = new Uint8Array(await entry.read({ format: uxp.storage.formats.binary }));
+                    if (!bytes.length) throw new StepError("export", "Photoshop wrote an empty JPEG.");
+                    return bytes;
+                } finally {
+                    await entry.delete().catch(() => {});
+                }
+            };
+            // Artboards: crop the canvas to one artboard for this export, then step back in History.
+            const withCrop = async (crop, fn) => {
+                if (!crop) return fn();
+                const before = doc.activeHistoryState;
+                await asStep("export", null, () => doc.crop({ left: crop.left, top: crop.top, right: crop.right, bottom: crop.bottom }));
+                try {
+                    return await fn();
+                } finally {
+                    doc.activeHistoryState = before;
+                }
+            };
+
             const layerFor = (templateId) => {
                 const layer = layerMap.get(templateId);
                 if (!layer) throw new StepError("layer", "A mapped layer could not be found in the working copy.", { layerId: templateId });
@@ -245,9 +294,9 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                     return { notes };
                 },
                 /** baseName may contain subfolders ("Shoes/12_Name"); they are created as needed. */
-                async exportItem(folder, baseName, formats, options) {
+                async exportItem(folder, baseName, formats, options, crop = null) {
                     const target = await outputTarget(folder, baseName);
-                    return exportDocument({ doc, folder: target.folder, baseName: target.name, formats, options });
+                    return withCrop(crop, () => exportDocument({ doc, folder: target.folder, baseName: target.name, formats, options }));
                 },
                 /** Set the approval-sheet label for the current row (reverted by reset()). */
                 async setProofLabel(text) {
@@ -257,18 +306,8 @@ export function createPhotoshopPort({ photoshop, uxp }) {
                     }, "Elzoz: proof label");
                 },
                 /** The current state as JPEG bytes (temporary file, deleted afterwards). */
-                async renderJpeg(quality = 12) {
-                    const temp = await fs.getTemporaryFolder();
-                    const name = `elzoz-render-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.jpg`;
-                    const entry = await temp.createFile(name, { overwrite: true });
-                    try {
-                        await asStep("export", null, () => doc.saveAs.jpg(entry, saveOptionsFor("jpg", { jpgQuality: quality }), true));
-                        const bytes = new Uint8Array(await entry.read({ format: uxp.storage.formats.binary }));
-                        if (!bytes.length) throw new StepError("export", "Photoshop wrote an empty JPEG.");
-                        return bytes;
-                    } finally {
-                        await entry.delete().catch(() => {});
-                    }
+                async renderJpeg(quality = 12, crop = null) {
+                    return withCrop(crop, () => renderJpegNow(quality));
                 },
                 snapshot() {
                     return doc.activeHistoryState;

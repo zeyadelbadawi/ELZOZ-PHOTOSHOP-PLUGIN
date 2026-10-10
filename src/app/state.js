@@ -1,5 +1,6 @@
 // Job state for the guided flow. Pure reducer + selectors (unit-tested).
 import { checkPrint, DEFAULT_PRINT } from "../domain/imposition.js";
+import { artboardSize } from "../domain/artboards.js";
 import { createMapping, mappedCount, pruneMapping } from "../domain/mapping.js";
 import { runPreflight } from "../domain/preflight.js";
 import { runVideoPreflight } from "../domain/video/preflight.js";
@@ -98,7 +99,7 @@ export function reducer(state, action) {
         }
         case "template": {
             const mapping = state.data && action.template ? pruneMapping(state.mapping, effectiveTable(state).headers, action.template.layers) : createMapping();
-            return { ...state, template: action.template, mapping, restoredMapping: false, video: { ...state.video, tracks: {} }, run: idleRun() };
+            return { ...state, template: action.template, mapping, restoredMapping: false, video: { ...state.video, tracks: {} }, settings: { ...state.settings, artboardsOff: [] }, run: idleRun() };
         }
         case "mapping":
             return { ...state, mapping: action.mapping, restoredMapping: action.restored ? true : state.restoredMapping && !action.clearRestored };
@@ -204,15 +205,22 @@ export function computePlan(state, { balance = null, pricing = {} } = {}) {
             pricing: { unitPrice: video.price ?? 1, hdLongEdge: video.hd_long_edge, hdMultiplier: video.hd_multiplier }
         });
     }
+    const allBoards = (state.template && state.template.artboards) || [];
+    const off = new Set(state.settings.artboardsOff || []);
     const plan = runPreflight({
         ...input,
+        artboards: allBoards.filter((a) => !off.has(a.name)),
         outputWidth: state.settings.outputWidth,
         templateSize: state.template ? { width: state.template.width, height: state.template.height } : null,
         pricing: { unitPrice: (pricing.design && pricing.design.price) ?? 1 }
     });
     // Print PDF (feature 13): validated against the size the designs will have.
-    const size = plan.outputSize || (state.template ? { width: state.template.width, height: state.template.height } : null);
+    const boards = (plan.artboards || []);
+    const size = boards.length ? artboardSize(boards[0]) : plan.outputSize || (state.template ? { width: state.template.width, height: state.template.height } : null);
     const print = checkPrint(state.settings.print, size, plan.items.length);
+    const sizes = new Set(boards.map((a) => `${artboardSize(a).width}x${artboardSize(a).height}`));
+    if (state.settings.print.enabled && state.settings.print.layout === "sheet" && sizes.size > 1) print.blocking.push("Print sheets need designs of one size. Use \"One design per page\", or export one artboard size.");
+    if (allBoards.length && !allBoards.some((a) => !off.has(a.name))) plan.blocking.push({ severity: "error", code: "no_artboard", message: "Choose at least one artboard size to export.", fix: { step: "check" } });
     for (const message of print.blocking) plan.blocking.push({ severity: "error", code: "print", message, fix: { step: "check" } });
     for (const message of print.warnings) plan.warnings.push({ severity: "warning", code: "print_warning", message, fix: { step: "check" } });
     plan.print = print;

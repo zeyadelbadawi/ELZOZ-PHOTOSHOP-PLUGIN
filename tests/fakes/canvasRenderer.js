@@ -40,6 +40,13 @@ export function createCanvasRenderer({ pixelStore, fileBytes, subjectOf = null, 
         const a = alpha * ((l.opacity ?? 100) / 100);
         if (a <= 0) return;
         if (l.kind === "group") {
+            if (l.artboard) {
+                // Artboards have a white background of their own.
+                const r = l.artboard.rect;
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(r.left, r.top, r.right - r.left, r.bottom - r.top);
+            }
             for (const child of (l.layers || []).slice().reverse()) await drawLayer(ctx, child, a);
             return;
         }

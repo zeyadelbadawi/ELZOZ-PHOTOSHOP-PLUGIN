@@ -38,8 +38,10 @@ export function createPrintPdf({ write, print, size, title = "Elzoz print" }) {
             const im = await pdf.addJpeg(jpegBytes);
             images.push(im);
             if (sheet) return;
-            const w = design.w * MM;
-            const h = design.h * MM;
+            // One design per page: each page takes its own design's size (artboards can differ).
+            const own = designSizeMm(im.width, im.height, print.dpi, Number(print.bleedMm) || 0);
+            const w = own.w * MM;
+            const h = own.h * MM;
             const pad = print.marks ? markArea * MM : 0;
             const c = new PageContent().image(im.name, pad, pad, w, h);
             if (print.marks) cornerMarks(c, pad + bleed, pad + bleed, w - 2 * bleed, h - 2 * bleed);

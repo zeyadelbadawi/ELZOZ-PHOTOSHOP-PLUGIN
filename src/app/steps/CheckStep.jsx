@@ -6,6 +6,7 @@ import { computePlan, effectiveTable, previewPlan } from "../state.js";
 import { putProject, getProject } from "../../domain/projects.js";
 import { PrintCard, ProofCard } from "./PrintProof.jsx";
 import LinkDownloads, { CodeImages } from "./LinkDownloads.jsx";
+import { artboardSize } from "../../domain/artboards.js";
 
 const projectStorage = () => {
     try {
@@ -42,6 +43,30 @@ function ProjectCard() {
                 ) : (
                     <div className="ez-small ez-muted">{t("projects.pickKey")}</div>
                 )}
+            </Card>
+        </Section>
+    );
+}
+
+/** Artboards: which sizes to export, and what a row turns into. */
+function SizesCard({ plan }) {
+    const { state, dispatch } = useApp();
+    const { t } = useI18n();
+    const boards = state.template.artboards;
+    const off = new Set(state.settings.artboardsOff || []);
+    const on = boards.filter((a) => !off.has(a.name));
+    const rows = on.length ? Math.round(plan.items.length / on.length) : 0;
+    const toggle = (name, v) => dispatch({ type: "settings", patch: { artboardsOff: v ? [...off].filter((n) => n !== name) : [...off, name] } });
+    return (
+        <Section title={t("artboards.sizes")}>
+            <Card>
+                {boards.map((a) => (
+                    <Checkbox key={a.id} checked={!off.has(a.name)} onChange={(v) => toggle(a.name, v)} label={`${a.name} · ${artboardSize(a).width} × ${artboardSize(a).height}`} />
+                ))}
+                <div className="ez-small ez-strong" data-testid="sizes-summary">
+                    {t("artboards.summary", { rows, sizes: on.length, n: plan.items.length })}
+                </div>
+                <div className="ez-small ez-muted">{t("artboards.naming")}</div>
             </Card>
         </Section>
     );
@@ -86,6 +111,7 @@ export default function CheckStep() {
     return (
         <>
             {state.project && <ProjectCard />}
+            {!video && state.template && (state.template.artboards || []).length > 0 && <SizesCard plan={plan} />}
             <LinkDownloads />
             <CodeImages />
             <Section title={t("check.output")}>

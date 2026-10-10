@@ -87,3 +87,36 @@ const shopify = [
 fs.mkdirSync(path.join(OUT, "spreadsheets"), { recursive: true });
 fs.writeFileSync(path.join(OUT, "spreadsheets", "shopify-products.csv"), "﻿" + shopify.map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n");
 console.log("wrote spreadsheets/shopify-products.csv");
+
+// Feature 5: one template, three artboards (Post, Story, Banner) side by side.
+// The same layer names repeat in every artboard; Banner has no Price on purpose.
+{
+    const linked = [];
+    const boards = [
+        { name: "Post", left: 0, top: 0, w: 1080, h: 1080, price: true },
+        { name: "Story", left: 1180, top: 0, w: 1080, h: 1920, price: true },
+        { name: "Banner", left: 2360, top: 0, w: 1200, h: 628, price: false }
+    ];
+    const W = 3560;
+    const H = 1920;
+    const children = boards.map((b) => {
+        const s = Math.min(b.w, b.h);
+        const photoW = Math.round(b.w * 0.7);
+        const photoH = Math.round(b.h * (b.h > b.w ? 0.45 : 0.55));
+        const x = b.left + Math.round((b.w - photoW) / 2);
+        const items = [
+            { name: "Background", imageData: gradient(b.w, b.h, [245, 245, 240], [225, 225, 218]), left: b.left, top: b.top },
+            smartObject("Photo", x, b.top + Math.round(b.h * 0.08), photoW, photoH, linked),
+            {
+                name: "Text",
+                opened: true,
+                children: [
+                    text("Name", "Product name", b.left + Math.round(s * 0.07), b.top + Math.round(b.h * 0.08) + photoH + Math.round(s * 0.04), Math.round(s * 0.06), { r: 20, g: 20, b: 30 }),
+                    ...(b.price ? [text("Price", "0", b.left + Math.round(s * 0.07), b.top + Math.round(b.h * 0.08) + photoH + Math.round(s * 0.14), Math.round(s * 0.07), { r: 227, g: 6, b: 19 })] : [])
+                ]
+            }
+        ];
+        return { name: b.name, opened: true, artboard: { rect: { top: b.top, left: b.left, bottom: b.top + b.h, right: b.left + b.w }, presetName: "", backgroundType: 1 }, children: items };
+    });
+    write(path.join(PSD, "social-sizes-artboards.psd"), W, H, children, linked, solid(W, H, [255, 255, 255]));
+}

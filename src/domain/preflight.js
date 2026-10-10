@@ -12,6 +12,7 @@ import { formatValue } from "./transforms.js";
 import { partitionDone, rowKey } from "./projects.js";
 import { directLink, LINK_FOLDER_KEY, linksNeeded } from "./linkImages.js";
 import { CODE_FOLDER_KEY, CODE_KINDS, codeKey, codesNeeded, codeValue } from "./codes.js";
+import { combineRow, expandItems, leadLayers } from "./artboards.js";
 
 export const FORMATS = ["jpg", "png", "psd"];
 
@@ -148,7 +149,7 @@ const PROBLEM_TEXT = {
  * @param {boolean} [input.onlyNew]         skip rows whose key is in doneKeys
  */
 export function runPreflight(input) {
-    const { table, layers, mapping, folders = {}, output, formats = [], namePattern, pricing, balance = null, allowedFormats = FORMATS, unitsPerItem = 1, rowSelection = "", outputWidth = null, templateSize = null, keyColumn = "", doneKeys = {}, onlyNew = false } = input;
+    const { table, layers, mapping, folders = {}, output, formats = [], namePattern, pricing, balance = null, allowedFormats = FORMATS, unitsPerItem = 1, rowSelection = "", outputWidth = null, templateSize = null, keyColumn = "", doneKeys = {}, onlyNew = false, artboards = [] } = input;
     const blocking = [];
     const warnings = [];
 
@@ -160,12 +161,15 @@ export function runPreflight(input) {
     if (!output) blocking.push(issue("error", "no_output", "Choose an output folder.", { fix: { step: "generate" } }));
     const fmts = formats.filter((f) => allowedFormats.includes(f));
     if (!fmts.length) blocking.push(issue("error", "no_format", "Select at least one output format.", { fix: { step: "generate" } }));
-    const unknownTokens = table ? validatePattern(namePattern, table.headers) : [];
+    const boards = artboards || [];
+    const unknownTokens = table ? validatePattern(namePattern, boards.length ? [...table.headers, { key: "artboard", label: "artboard" }] : table.headers) : [];
     if (unknownTokens.length) blocking.push(issue("error", "bad_pattern", `Unknown name token(s): ${unknownTokens.map((t) => `{${t}}`).join(", ")}`, { fix: { step: "generate" } }));
     const selection = parseRowSelection(rowSelection);
     if (!selection.ok) blocking.push(issue("error", "bad_rows", `Row selection "${selection.error}" isn't valid. Use spreadsheet row numbers like 2-10, 15.`, { fix: { step: "generate" } }));
     let outputSize = null;
-    if (outputWidth !== null && outputWidth !== undefined && outputWidth !== "") {
+    if (boards.length && outputWidth !== null && outputWidth !== undefined && outputWidth !== "") {
+        blocking.push(issue("error", "size_with_artboards", "Output width can't be used with artboards: each artboard is exported at its own size. Clear the output width.", { fix: { step: "generate" } }));
+    } else if (outputWidth !== null && outputWidth !== undefined && outputWidth !== "") {
         const w = Number(outputWidth);
         if (!Number.isInteger(w) || w < 16 || w > 10000) blocking.push(issue("error", "bad_size", "Output width must be a whole number between 16 and 10000 px.", { fix: { step: "generate" } }));
         else if (templateSize && templateSize.width > 0) {
@@ -203,7 +207,8 @@ export function runPreflight(input) {
         if (!columns.has(rule.column)) blocking.push(issue("error", "column_missing", `Column "${rule.column}" is not in the spreadsheet.`, { fix: { step: "map", layerId: rule.layerId } }));
     }
     const mappedIds = new Set([...Object.keys(mapping.text), ...Object.keys(mapping.images)].map(Number));
-    for (const dup of summarizeTemplate(layers).duplicateNames) {
+    // With artboards the same names repeat in every artboard on purpose: only the first artboard counts.
+    for (const dup of summarizeTemplate((artboards || []).length ? leadLayers(layers, artboards) : layers).duplicateNames) {
         if (dup.layers.some((l) => mappedIds.has(l.id))) {
             warnings.push(issue("warning", "duplicate_layer_name", `${dup.layers.length} layers are named "${dup.name}". Check the group path shown in Map.`, { fix: { step: "map" } }));
         }
@@ -286,8 +291,23 @@ export function runPreflight(input) {
         warnings.push(issue("warning", "image_ambiguous", `Several files match "${g.column}" values without an extension in ${g.rows.length} row(s); JPG is preferred, then PNG.`, { rows: g.rows, fix: { step: "map" } }));
     }
 
+    // --- Artboards: one design per row and artboard ----------------------------
+    let proofItems = null;
+    if (boards.length) {
+        const { items: expanded, missing } = expandItems(items, layers, boards);
+        for (const [name, set] of missing) warnings.push(issue("warning", "artboard_missing_layers", `Artboard "${name}" has no layer like ${[...set].map((n) => `"${n}"`).join(", ")}; there it keeps its own design.`, { fix: { step: "map" } }));
+        // The approval sheet shows each row once, with all its sizes.
+        proofItems = items.map((it) => ({ ...combineRow(expanded.filter((e) => e.key.split("@")[0] === it.key)), baseName: renderName(namePattern.replace(/[_\- ]?\{artboard\}/g, ""), it.row, { total: dataRows.length }) }));
+        items.splice(0, items.length, ...expanded);
+    }
+
     // --- Names ---------------------------------------------------------------
-    const bases = items.map((it) => renderName(namePattern, it.row, { total: dataRows.length }));
+    const withBoard = (it) => {
+        if (!it.artboard) return renderName(namePattern, it.row, { total: dataRows.length });
+        const row = { ...it.row, values: { ...it.row.values, artboard: it.artboard.name } };
+        return /\{artboard\}/.test(namePattern) ? renderName(namePattern, row, { total: dataRows.length }) : renderName(`${namePattern}_{artboard}`, row, { total: dataRows.length });
+    };
+    const bases = items.map(withBoard);
     const unique = dedupeNames(bases, output.existingFileNames || [], fmts);
     let renamed = 0;
     items.forEach((it, i) => {
@@ -303,5 +323,6 @@ export function runPreflight(input) {
     if (!units && !blocking.some((b) => b.code === "no_rows_selected" || b.code === "nothing_new")) blocking.push(issue("error", "nothing_to_generate", "Every row has a problem, so nothing can be generated.", { fix: { step: "map" } }));
     if (balance !== null && balance < cost) blocking.push(issue("error", "insufficient_credits", `This job needs ${cost} credits; ${balance} available.`, { fix: { step: "account" } }));
 
-    return { ok: blocking.length === 0, blocking, warnings, items, skipped, units, cost, formats: fmts, outputSize };
+    if (proofItems) for (const p of proofItems) delete p.row;
+    return { ok: blocking.length === 0, blocking, warnings, items, skipped, units, cost, formats: fmts, outputSize, ...(proofItems ? { proofItems, artboards: boards } : {}) };
 }

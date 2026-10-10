@@ -90,8 +90,9 @@ export async function runDesignJob({ port, billing, template, templateLayers, pl
                         const applied = await session.applyItem(planItem, folders);
                         if (applied && applied.notes && applied.notes.length) state.notes = applied.notes;
                         // Rendered before the files, so a failure here leaves nothing behind for this row.
-                        const printBytes = print ? await session.renderJpeg(12) : null;
-                        state.files = await session.exportItem(output.entry, planItem.baseName, plan.formats, options);
+                        const crop = planItem.artboard ? planItem.artboard.rect : null; // one artboard per design
+                        const printBytes = print ? await session.renderJpeg(12, crop) : null;
+                        state.files = await session.exportItem(output.entry, planItem.baseName, plan.formats, options, crop);
                         state.status = ITEM.succeeded;
                         if (printBytes) await addToPdf(printBytes);
                     } catch (e) {

@@ -124,6 +124,7 @@ class FakeLayer {
         this.color = spec.color ?? null; // text color, "rgb(r,g,b)"
         this.fillColor = spec.fillColor ?? null; // color fill / shape layers, "rgb(r,g,b)"
         this.mask = spec.mask ?? null; // "subject": a layer mask that shows only the subject
+        this.artboard = spec.artboard ?? null; // groups only: { rect: {left, top, right, bottom} }
         // Text scales with its box: remember the designed box height.
         this.baseHeight = spec.baseHeight ?? this.b.bottom - this.b.top;
         this.layers = spec.layers ? spec.layers.map((s) => new FakeLayer(doc, s)) : null;
@@ -199,6 +200,7 @@ class FakeLayer {
             color: this.color,
             fillColor: this.fillColor,
             mask: this.mask,
+            artboard: this.artboard,
             baseHeight: this.baseHeight,
             text: this._text,
             layers: this.layers ? this.layers.map((l) => l.toSpec(keepIds)) : undefined
@@ -271,6 +273,7 @@ class FakeDocument {
             layer.color = spec.color;
             layer.fillColor = spec.fillColor;
             layer.mask = spec.mask ?? null;
+            layer.artboard = spec.artboard ?? null;
             if (spec.kind === "text") layer._text = spec.text;
             layer.layers = spec.layers ? spec.layers.map(build) : null;
             return layer;
@@ -291,6 +294,12 @@ class FakeDocument {
     }
     set activeHistoryState(state) {
         this.requireModal();
+        const size = this.historySizes && this.historySizes[state.index];
+        if (size) {
+            // Canvas size is part of History (crop); other entries keep the current size.
+            this.width = size.width;
+            this.height = size.height;
+        }
         this.historyIndex = state.index;
         this.restore(this.history[state.index]);
         this.env.calls.push({ op: "revert", doc: this.id, to: state.index });
@@ -325,6 +334,26 @@ class FakeDocument {
         this.history.push(this.serialize());
         this.historyIndex = this.history.length - 1;
         this.env.calls.push({ op: "resizeImage", doc: this.id, width, height });
+    }
+    /** Crop the canvas to bounds (artboard export). Content and artboards move with the canvas. */
+    async crop(bounds) {
+        this.requireModal();
+        const { left, top, right, bottom } = bounds;
+        if (!(right > left && bottom > top)) throw new Error("Invalid crop bounds");
+        for (const l of this.allLayers()) {
+            l.b = { left: l.b.left - left, top: l.b.top - top, right: l.b.right - left, bottom: l.b.bottom - top };
+            if (l.artboard) l.artboard = { ...l.artboard, rect: { left: l.artboard.rect.left - left, top: l.artboard.rect.top - top, right: l.artboard.rect.right - left, bottom: l.artboard.rect.bottom - top } };
+        }
+        const prev = { width: this.width, height: this.height };
+        this.width = right - left;
+        this.height = bottom - top;
+        this.history = this.history.slice(0, this.historyIndex + 1);
+        this.history.push(this.serialize());
+        this.historySizes = this.historySizes || [];
+        this.historySizes[this.history.length - 1] = { width: this.width, height: this.height };
+        this.historySizes[this.historyIndex] = this.historySizes[this.historyIndex] || prev;
+        this.historyIndex = this.history.length - 1;
+        this.env.calls.push({ op: "crop", doc: this.id, bounds: { left, top, right, bottom } });
     }
     /** Canvas Size, anchored at the top centre (the only anchor the plugin uses). */
     async resizeCanvas(width, height, anchor) {
@@ -480,6 +509,15 @@ export function createFakeHost(cfg = {}) {
                     doc.selection = { left: layer.b.left + rel.l * w, top: layer.b.top + rel.t * h, right: layer.b.left + rel.r * w, bottom: layer.b.top + rel.b * h };
                     doc.selectionLayer = layer.id;
                     out.push({});
+                } else if (d._obj === "get" && d._target[0]._ref === "layer") {
+                    // Layer descriptor: only what the plugin reads (artboards).
+                    const target = doc.findLayer(d._target[0]._id) || (env.app.documents.map((x) => x.findLayer(d._target[0]._id)).find(Boolean));
+                    if (!target) {
+                        out.push({ _obj: "error", result: -25920, message: "No such layer" });
+                        continue;
+                    }
+                    const r = target.artboard && target.artboard.rect;
+                    out.push({ layerID: target.id, name: target.name, artboardEnabled: !!r, ...(r ? { artboard: { _obj: "artboard", artboardRect: { _obj: "classFloatRect", top: r.top, left: r.left, bottom: r.bottom, right: r.right } } } : {}) });
                 } else if (d._obj === "get" && d._target[0]._property === "selection") {
                     const sel = doc.selection;
                     const u = (v) => ({ _unit: "pixelsUnit", _value: v });

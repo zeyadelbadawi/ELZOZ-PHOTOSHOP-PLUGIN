@@ -137,7 +137,8 @@ describe("runDesignJob — non-destructive contract", () => {
     it("selects the layer before Replace Contents (avoids -25920)", async () => {
         const s = await setup({ rows: [ROWS[0]] });
         await run(s, fakeBilling());
-        const ops = s.host.env.calls.filter((c) => c.op === "batchPlay").map((c) => c._obj);
+        // Read-only "get" calls (artboard detection when the template is read) don't count.
+        const ops = s.host.env.calls.filter((c) => c.op === "batchPlay" && c._obj !== "get").map((c) => c._obj);
         expect(ops).toEqual(["select", "placedLayerReplaceContents"]);
     });
 

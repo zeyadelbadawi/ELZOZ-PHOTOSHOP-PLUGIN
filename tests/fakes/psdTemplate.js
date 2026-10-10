@@ -37,7 +37,10 @@ export function templateFromPsd(bytes, pixelStore, title = "template.psd") {
     const linked = new Map((psd.linkedFiles || []).map((f) => [f.id, f]));
     const convert = (layer) => {
         const base = { name: layer.name, visible: !layer.hidden, opacity: Math.round((layer.opacity ?? 1) * 100) };
-        if (layer.children) return { ...base, kind: "group", layers: layer.children.slice().reverse().map(convert), bounds: { left: 0, top: 0, right: 0, bottom: 0 } };
+        if (layer.children) {
+            const art = layer.artboard && layer.artboard.rect ? { rect: { ...layer.artboard.rect } } : null;
+            return { ...base, kind: "group", ...(art ? { artboard: art } : {}), layers: layer.children.slice().reverse().map(convert), bounds: { left: 0, top: 0, right: 0, bottom: 0 } };
+        }
         if (layer.text) {
             const t = layer.text;
             const size = (t.style && t.style.fontSize) || 24;

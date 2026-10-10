@@ -6,6 +6,7 @@ import { isColorLayer, isImageLayer, isTextLayer } from "../../domain/layers.js"
 import { parseColor, toHex } from "../../domain/colors.js";
 import { autoMap, createMapping, mappedCount, setColorMapping, setImageMapping, setTextMapping, setTextOptions, setVisibilityMapping } from "../../domain/mapping.js";
 import { VISIBILITY_EMPTY } from "../../domain/visibility.js";
+import { leadLayers } from "../../domain/artboards.js";
 import { directLink, linkShare } from "../../domain/linkImages.js";
 import { CODE_KINDS, codePng, codeValue, frameAspect } from "../../domain/codes.js";
 import { base64 } from "../services.js";
@@ -51,8 +52,11 @@ export default function MapStep() {
     const table = effectiveTable(state);
     const columns = table.headers.map((h) => ({ value: h.key, label: h.key }));
     const firstRow = table.rows.find((r) => !r.isEmpty);
-    const textLayers = template.layers.filter(isTextLayer);
-    const imageLayers = template.layers.filter(isImageLayer);
+    // Artboards: map the first one; the same layers in the other artboards follow.
+    const boards = template.artboards || [];
+    const shown = boards.length ? leadLayers(template.layers, boards) : template.layers;
+    const textLayers = shown.filter(isTextLayer);
+    const imageLayers = shown.filter(isImageLayer);
     const set = (m) => dispatch({ type: "mapping", mapping: m });
     const emptyOptions = ["blank", "keepTemplate", "skipRow"].map((v) => ({ value: v, label: t(`map.empty.${v}`) }));
     const imageEmptyOptions = ["keepTemplate", "skipRow"].map((v) => ({ value: v, label: t(`map.empty.${v}`) }));
@@ -71,7 +75,7 @@ export default function MapStep() {
                 <div className="ez-grow">
                     <div className="ez-title">{t("map.title")}</div>
                 </div>
-                <Button quiet onClick={() => set(autoMap(mapping, table.headers, template.layers, table.rows))}>
+                <Button quiet onClick={() => set(autoMap(mapping, table.headers, shown, table.rows))}>
                     {t("map.auto")}
                 </Button>
             </div>
@@ -88,6 +92,11 @@ export default function MapStep() {
                     }
                 >
                     {t("map.restored")}
+                </Alert>
+            )}
+            {boards.length > 1 && (
+                <Alert tone="info" title={t("artboards.mapLead", { name: boards[0].name })}>
+                    {t("artboards.mapFollow", { names: boards.slice(1).map((a) => a.name).join(", ") })}
                 </Alert>
             )}
             {textLayers.length + imageLayers.length === 0 && <Alert tone="warning">{t("map.noLayers")}</Alert>}
@@ -183,9 +192,9 @@ export default function MapStep() {
                 </Section>
             )}
 
-            <ColorSection layers={template.layers} mapping={mapping} columns={columns} firstRow={firstRow} set={set} />
+            <ColorSection layers={shown} mapping={mapping} columns={columns} firstRow={firstRow} set={set} />
 
-            <VisibilitySection layers={template.layers} mapping={mapping} columns={columns} set={set} />
+            <VisibilitySection layers={shown} mapping={mapping} columns={columns} set={set} />
         </>
     );
 }
