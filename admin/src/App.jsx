@@ -1,46 +1,8 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { api, configured, currentEmail, restore, signIn, signOut } from "./api.js";
 import { errorText, translate } from "./i18n.js";
-
-const Ctx = createContext(null);
-const useT = () => useContext(Ctx);
-const PAGE = 25;
-
-function fmtDate(iso, lang, withTime = false) {
-    if (!iso) return "—";
-    const d = new Date(iso);
-    return d.toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { year: "numeric", month: "short", day: "numeric", ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}) });
-}
-const daysUntil = (iso) => Math.ceil((new Date(iso) - Date.now()) / 86400000);
-const num = (v) => Number(v || 0).toLocaleString("en-US");
-
-function useAsync(fn, deps) {
-    const [state, setState] = useState({ loading: true, data: null, error: null });
-    const run = useCallback(() => {
-        setState((s) => ({ ...s, loading: true, error: null }));
-        return fn().then(
-            (data) => setState({ loading: false, data, error: null }),
-            (error) => setState({ loading: false, data: null, error })
-        );
-    }, deps); // eslint-disable-line react-hooks/exhaustive-deps
-    useEffect(() => {
-        run();
-    }, [run]);
-    return [state, run];
-}
-
-function ErrorBox({ error }) {
-    const { t, lang, onSignedOut } = useT();
-    useEffect(() => {
-        if (error && error.code === "signed_out") onSignedOut();
-    }, [error, onSignedOut]);
-    if (!error) return null;
-    return (
-        <div className="alert alert-error" role="alert">
-            {errorText(lang, error)}
-        </div>
-    );
-}
+import { Ctx, ErrorBox, PAGE, daysUntil, fmtDate, num, useAsync, useT } from "./ui.jsx";
+import Sales from "./Sales.jsx";
 
 function CopyButton({ text, label }) {
     const { t } = useT();
@@ -633,8 +595,10 @@ function Settings() {
 // ------------------------------------------------------------------ shell
 
 function parseHash() {
-    const m = window.location.hash.match(/^#\/(overview|clients|settings)(?:\/([0-9a-f-]{36}))?$/);
-    return m ? { tab: m[1], client: m[2] || null } : { tab: "clients", client: null };
+    const m = window.location.hash.match(/^#\/(overview|clients|sales|settings)(?:\/([0-9a-f-]{36}|[a-z]+))?$/);
+    if (!m) return { tab: "clients", client: null, sub: null };
+    const isClient = m[1] === "clients" && /^[0-9a-f-]{36}$/.test(m[2] || "");
+    return { tab: m[1], client: isClient ? m[2] : null, sub: m[1] === "sales" ? m[2] || null : null };
 }
 
 export default function App() {
@@ -651,7 +615,7 @@ export default function App() {
     // so refresh, the back button and bookmarks keep the admin where they were.
     const [view, setViewState] = useState(parseHash);
     const setView = useCallback((v) => {
-        const hash = v.client ? `#/clients/${v.client}` : `#/${v.tab}`;
+        const hash = v.client ? `#/clients/${v.client}` : v.sub ? `#/${v.tab}/${v.sub}` : `#/${v.tab}`;
         if (window.location.hash !== hash) window.location.hash = hash;
         setViewState(v);
     }, []);
@@ -700,7 +664,7 @@ export default function App() {
                     <header className="topbar">
                         <div className="brand">{ctx.t("appName")}</div>
                         <nav className="tabs">
-                            {["overview", "clients", "settings"].map((tab) => (
+                            {["overview", "clients", "sales", "settings"].map((tab) => (
                                 <button key={tab} className={`tab ${view.tab === tab && !view.client ? "tab-on" : ""}`} onClick={() => setView({ tab, client: null })}>
                                     {ctx.t(tab)}
                                 </button>
@@ -727,6 +691,8 @@ export default function App() {
                             <ClientDetail id={view.client} back={() => setView({ tab: "clients", client: null })} />
                         ) : view.tab === "overview" ? (
                             <Overview />
+                        ) : view.tab === "sales" ? (
+                            <Sales sub={view.sub} go={(sub) => setView({ tab: "sales", client: null, sub })} />
                         ) : view.tab === "settings" ? (
                             <Settings />
                         ) : (

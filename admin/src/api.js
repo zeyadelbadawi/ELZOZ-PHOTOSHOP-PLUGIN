@@ -117,5 +117,18 @@ export const api = {
     createUser: (input) => adminFn({ action: "create_user", ...input, idempotency_key: key() }),
     resetPassword: (userId) => adminFn({ action: "reset_password", user_id: userId }),
     setDisabled: (userId, disabled) => adminFn({ action: "set_disabled", user_id: userId, disabled }),
+    // WhatsApp sales bot
+    botOverview: () => rpc("admin_bot_overview"),
+    botOrders: (status, search) => rpc("admin_bot_orders", { p_status: status, p_search: search, p_limit: 100 }),
+    botContacts: (search) => rpc("admin_bot_contacts", { p_search: search, p_limit: 100 }),
+    botPayments: () => rpc("admin_bot_payments", { p_limit: 100 }),
+    botApprove: (code) => rpc("admin_bot_approve", { p_code: code }),
+    botReject: (code, reason) => rpc("admin_bot_reject", { p_code: code, p_reason: reason }),
+    botPackages: () => rpc("admin_bot_packages"),
+    botSavePackage: (p) =>
+        rpc("admin_bot_save_package", { p_code: p.code, p_name: p.name, p_credits: p.credits, p_valid_days: p.valid_days, p_price_egp: p.price_egp, p_active: p.active, p_sort: p.sort }),
+    botSettings: () => rpc("admin_bot_settings"),
+    botSetSetting: (key, value) => rpc("admin_bot_set_setting", { p_key: key, p_value: value }),
+    botContactUpdate: (id, blocked, release) => rpc("admin_bot_contact_update", { p_contact: id, p_blocked: blocked, p_release: !!release }),
     newKey: key
 };

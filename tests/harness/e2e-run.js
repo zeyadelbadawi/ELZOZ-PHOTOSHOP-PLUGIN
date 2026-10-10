@@ -747,6 +747,98 @@ scenario("G", "Designer features: show/hide by column, shrink-to-fit, row select
 });
 
 const btnText = (hasChange, a, b) => (hasChange ? a : b);
+scenario("H", "WhatsApp sales bot in the dashboard: orders, approval, conversations, transfers, packages, bot settings", async () => {
+    const pg = require("pg");
+    const db = new pg.Client({ connectionString: process.env.ELZOZ_TEST_DATABASE_URL });
+    await db.connect();
+    const svc = async (sql, params = []) => {
+        await db.query("begin");
+        await db.query("set local role service_role");
+        const r = await db.query(sql, params);
+        await db.query("commit");
+        return r.rows[0] && r.rows[0].r;
+    };
+    // Seed through the same SQL functions the bot uses.
+    const phone = () => "2010" + String(Math.floor(Math.random() * 1e8)).padStart(8, "0");
+    const a = await svc("select public.bot_touch_contact($1, 'Mona', 'أهلاً [IG-BIO]') as r", [phone()]);
+    await svc("select public.bot_log_in($1, $2, 'text', 'عايزة باقة المحترف') as r", [a.id, `wamid.${RUN}a`]);
+    const oa = await svc("select public.bot_create_order($1, 'pro', $2) as r", [a.id, `mona-${RUN}@e2e.test`]);
+    await db.query("update public.bot_orders set claimed_at = now(), claim = '{\"is_receipt\": true, \"amount\": 500}' where id = $1", [oa.id]);
+    const b = await svc("select public.bot_touch_contact($1, 'Karim', 'السلام عليكم [FB-AD1]') as r", [phone()]);
+    await svc("select public.bot_log_in($1, $2, 'text', 'عندي مشكلة في التثبيت') as r", [b.id, `wamid.${RUN}b`]);
+    await db.query("update public.bot_contacts set human_until = now() + interval '3 hours' where id = $1", [b.id]);
+    const ob = await svc("select public.bot_create_order($1, 'basic', $2) as r", [b.id, `karim-${RUN}@e2e.test`]);
+    await svc("select public.bot_record_payment('vodafone_cash', 'VF-Cash', true, $1, '01012345678', $2, $3, $4) as r", [ob.amount_due, `T${RUN}`, `تم استلام مبلغ ${ob.amount_due} جنيه من رقم 01012345678`, `fp-${RUN}`]);
+    await svc("select public.bot_record_payment('unknown', '+201000000000', false, 777, null, null, 'تم استلام مبلغ 777 جنيه', $1) as r", [`fp2-${RUN}`]);
+    await db.end();
+
+    const adminEmail = `sales-owner-${RUN}@e2e.test`;
+    await post("/__e2e/users", { email: adminEmail, password: "owner pass 123", admin: true });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+    const adm = await ctx.newPage();
+    adm.on("dialog", (d) => d.accept());
+    adm.on("pageerror", (e) => report.errors.push({ scenario: "H", kind: "pageerror", message: e.message }));
+    adm.on("console", (m) => m.type() === "error" && report.errors.push({ scenario: "H", kind: "console", message: m.text() }));
+    const shot = async (page, id, title, width = 1280) => {
+        await page.waitForTimeout(250);
+        await page.screenshot({ path: path.join(SHOTS, `${id}.png`), fullPage: true });
+        report.screenshots.push({ file: `${id}.png`, title, scenario: "H", width, theme: "system-light", lang: "ar", layoutProblems: [] });
+    };
+    await adm.goto(`${ORIGIN}/admin/`);
+    await adm.fill("input[type=email]", adminEmail);
+    await adm.fill("input[type=password]", "owner pass 123");
+    await adm.click("button.btn-primary");
+    await adm.waitForSelector("text=العملاء");
+    await adm.click("text=المبيعات (واتساب)");
+    await adm.waitForSelector(`text=${oa.code}`);
+    check("orders list shows the open order with its unique amount", (await adm.textContent("table")).includes(String(Number(oa.amount_due))));
+    check("auto-matched order is delivered or being delivered", /اتدفع|بيتجهز|اتسلم/.test(await adm.textContent(`tr:has-text("${ob.code}")`)));
+    check("an order with a receipt is flagged", (await adm.textContent(`tr:has-text("${oa.code}")`)).includes("بعت إيصال"));
+    await shot(adm, "H01-sales-orders-ar", "Sales: bot status + orders (receipt waiting, auto-paid)");
+    await adm.click(`tr:has-text("${oa.code}") >> text=قبول`);
+    await adm.waitForFunction((code) => [...document.querySelectorAll("tr")].some((tr) => tr.textContent.includes(code) && /اتدفع/.test(tr.textContent)), oa.code);
+    check("owner approval from the dashboard marks the order paid", true);
+    await adm.click("nav.tabs >> nth=1 >> text=المحادثات");
+    await adm.waitForSelector("text=Karim");
+    check("conversation with a person shows 'with support' and can go back to the bot", (await adm.textContent("table")).includes("مع الدعم"));
+    await shot(adm, "H02-sales-contacts-ar", "Sales: conversations (source, last message, handed to support)");
+    await adm.click(`tr:has-text("Karim") >> text=رجّعه للبوت`);
+    await adm.waitForFunction(() => ![...document.querySelectorAll("tr")].some((tr) => tr.textContent.includes("Karim") && tr.textContent.includes("مع الدعم")));
+    await adm.click("text=التحويلات");
+    await adm.waitForSelector("text=مش موثوق");
+    await shot(adm, "H03-sales-payments-ar", "Sales: payment notifications (matched, untrusted sender)");
+    await adm.click("text=الباقات");
+    await adm.waitForSelector("text=محترف - 300 تصميم");
+    await adm.click(`tr:has-text("trial") >> text=تعديل`);
+    await adm.fill("form input[type=number] >> nth=0", "60");
+    await shot(adm, "H04-sales-package-edit-ar", "Sales: edit a package price");
+    await adm.click("form >> text=حفظ");
+    await adm.waitForSelector(`tr:has-text("trial") >> text=60`);
+    check("package price saved", true);
+    await adm.click("text=إعدادات البوت");
+    await adm.waitForSelector("text=الأسئلة الشائعة");
+    check("bot settings show the InstaPay address", (await adm.inputValue("form input[type=text] >> nth=0")) === "elbadawi@instapay");
+    await shot(adm, "H05-sales-bot-settings-ar", "Sales: bot settings (payment details, hours, FAQ)");
+    await adm.click("text=إيقاف البوت");
+    await adm.waitForSelector("text=البوت واقف");
+    check("pause toggles the bot", true);
+    await adm.click("text=تشغيل البوت");
+    await adm.waitForSelector("text=البوت شغال");
+    await ctx.close();
+
+    const m = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    const mob = await m.newPage();
+    await mob.goto(`${ORIGIN}/admin/#/sales/orders`);
+    await mob.fill("input[type=email]", adminEmail);
+    await mob.fill("input[type=password]", "owner pass 123");
+    await mob.click("button.btn-primary");
+    await mob.waitForSelector(`text=${oa.code}`);
+    await shot(mob, "H06-sales-orders-mobile-ar", "Sales orders on a phone (390 px)", 390);
+    const overflow = await mob.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+    check("sales page fits a 390 px phone without horizontal scrolling", !overflow);
+    await m.close();
+});
+
 async function page_wait(p) {
     await p.waitForSelector(".ez-stats, .ez-alert", { timeout: 10000 });
     await p.waitForTimeout(150);

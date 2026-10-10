@@ -125,3 +125,19 @@ input:focus { outline: 2px solid var(--primary); outline-offset: 0; }
     .stat-value { font-size: 22px; }
     .table th, .table td { padding: 8px; }
 }
+
+/* Sales tables: one stacked card per row on phones */
+@media (max-width: 640px) {
+    .table.cards thead { display: none; }
+    .table.cards, .table.cards tbody, .table.cards tr, .table.cards td { display: block; width: 100%; }
+    .table.cards tr { padding: 10px 4px; border-bottom: 1px solid var(--border); }
+    .table.cards tr:last-child { border-bottom: 0; }
+    .table.cards td { border: 0; padding: 3px 8px; }
+    .table.cards td.num { text-align: start; }
+    .table.cards td.hide-sm { display: none; }
+    .table.cards td:empty { display: none; }
+}
+.subtabs { flex-wrap: wrap; margin-bottom: 12px; }
+@media (max-width: 640px) {
+    .stats.stats-compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
