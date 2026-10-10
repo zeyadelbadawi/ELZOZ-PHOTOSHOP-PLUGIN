@@ -116,6 +116,7 @@ export const api = {
     setPrice: (unit, price) => rpc("admin_set_price", { p_unit: unit, p_price: price }),
     createUser: (input) => adminFn({ action: "create_user", ...input, idempotency_key: key() }),
     resetPassword: (userId) => adminFn({ action: "reset_password", user_id: userId }),
+    clientNotices: (userId) => rpc("admin_client_notifications", { p_user: userId, p_limit: 20 }),
     setDisabled: (userId, disabled) => adminFn({ action: "set_disabled", user_id: userId, disabled }),
     // WhatsApp sales bot
     botOverview: () => rpc("admin_bot_overview"),

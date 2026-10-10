@@ -360,6 +360,44 @@ function ActionForm({ title, button, confirmText, fields, onSubmit, danger }) {
     );
 }
 
+/** What the bot told the client about changes made here (newest first). */
+function ClientNotices({ id, refresh }) {
+    const { t, lang } = useT();
+    const [{ data }, reload] = useAsync(() => api.clientNotices(id), [id]);
+    useEffect(() => {
+        reload();
+        // Delivery takes a few seconds: look again shortly after a change.
+        const timer = setTimeout(reload, 8000);
+        return () => clearTimeout(timer);
+    }, [refresh]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!data || !data.length) return null;
+    return (
+        <>
+            <h3>{t("notices")}</h3>
+            <div className="table-wrap">
+                <table className="table" data-testid="notices">
+                    <tbody>
+                        {data.map((n) => (
+                            <tr key={n.id}>
+                                <td className="nowrap">{fmtDate(n.created_at, lang, true)}</td>
+                                <td>
+                                    {t(`notice_${n.kind}`)}
+                                    {n.data && n.data.amount ? ` (${num(n.data.amount)})` : ""}
+                                </td>
+                                <td>
+                                    <span className={`badge ${n.status === "sent" ? "badge-on" : n.status === "failed" ? "badge-off" : "badge-muted"}`} title={n.error || ""}>
+                                        {t(`nstatus_${n.status}`)}
+                                    </span>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </>
+    );
+}
+
 function ClientDetail({ id, back }) {
     const { t, lang } = useT();
     const [{ data, error }, reload] = useAsync(() => api.userDetail(id), [id]);
@@ -440,6 +478,8 @@ function ClientDetail({ id, back }) {
                 />
             </div>
 
+            <p className="muted small">{t("notifyHint")}</p>
+
             <div className="row gap wrap">
                 <button className="btn" onClick={() => window.confirm(t("resetConfirm")) && act(async () => setSecret((await api.resetPassword(id)).password))}>
                     {t("resetPassword")}
@@ -454,6 +494,8 @@ function ClientDetail({ id, back }) {
                     </button>
                 )}
             </div>
+
+            <ClientNotices id={id} refresh={data} />
 
             <h3>{t("lots")}</h3>
             <div className="table-wrap">

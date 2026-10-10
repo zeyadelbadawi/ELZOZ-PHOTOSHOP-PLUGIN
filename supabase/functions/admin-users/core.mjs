@@ -150,7 +150,15 @@ export async function handleAdminRequest(req, env) {
             const password = input.password ? String(input.password) : generatePassword(env.getRandomValues);
             if (password.length < 8 || password.length > 72) throw new HttpError(400, "invalid_password", "Password must be 8-72 characters.");
             await authAdmin("PUT", `/${id}`, { password });
-            return reply(200, { user_id: id, password });
+            // Tell the client on WhatsApp that the password changed (never the password itself).
+            // Best effort: the reset has already succeeded.
+            let notified = true;
+            try {
+                await asCaller("admin_note_password_reset", { p_user: id });
+            } catch {
+                notified = false;
+            }
+            return reply(200, { user_id: id, password, notified });
         }
 
         if (input.action === "set_disabled") {

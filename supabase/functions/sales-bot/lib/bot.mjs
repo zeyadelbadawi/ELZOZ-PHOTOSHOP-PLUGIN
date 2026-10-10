@@ -184,6 +184,48 @@ export function createBot(deps) {
         }
     }
 
+    // ------------------------------------------------------------ client notifications (dashboard changes)
+
+    /**
+     * Tells the client about a change the owner made from the dashboard. Free-form WhatsApp
+     * messages are allowed only within 24 hours of the client's last message, so outside that
+     * window the notice waits and goes out with the bot's next reply (`replying`).
+     */
+    async function deliverNotice(n, replying = false) {
+        const done = (status, error = null) => db.rpc("bot_notification_done", { p_id: n.id, p_status: status, p_error: error });
+        const c = n.contact;
+        if (!c) {
+            await done("no_contact");
+            return ownerCard({ text: UI.noticeResult(n, "no_contact") });
+        }
+        if (c.blocked) return done("skipped", "contact blocked");
+        const text = T.notice(n);
+        if (!text) return done("skipped", "unknown kind");
+        if (!replying && !c.in_window) {
+            await done("waiting");
+            return ownerCard({ text: UI.noticeResult(n, "waiting") });
+        }
+        try {
+            await send.text({ id: c.id, wa_id: c.wa_id }, text);
+        } catch (e) {
+            log("error", "notice failed", { id: n.id, kind: n.kind, error: e.message });
+            await done("failed", e.message);
+            return ownerCard({ text: UI.noticeResult(n, "failed", e.message) });
+        }
+        await done("sent");
+        await ownerCard({ text: UI.noticeResult(n, "sent") });
+    }
+
+    async function deliverNotices(list, replying = false) {
+        for (const n of list || []) {
+            try {
+                await deliverNotice(n, replying);
+            } catch (e) {
+                log("error", "notice delivery error", { id: n.id, error: e.message });
+            }
+        }
+    }
+
     // ------------------------------------------------------------ WhatsApp
 
     function normalizeMessage(m) {
@@ -274,6 +316,14 @@ export function createBot(deps) {
         const logged = await db.rpc("bot_log_in", { p_contact: contact.id, p_wa_message_id: m.id, p_kind: msg.type, p_body: clip(msg.text || msg.id || "", 2000) });
         if (!logged.fresh || contact.blocked) return; // WhatsApp retry, or blocked
         if (logged.recent > FLOOD_PER_MINUTE) return;
+        // Account changes made while the 24-hour window was closed go out first.
+        if (wa) {
+            try {
+                await deliverNotices(await db.rpc("bot_take_waiting_notifications", { p_contact: contact.id }), true);
+            } catch (e) {
+                log("error", "waiting notices failed", { error: e.message });
+            }
+        }
         const { s } = await settings();
         const ctx = { contact, msg, paused: s.paused === true, now: now() };
         let step = decide(ctx);
@@ -827,7 +877,9 @@ export function createBot(deps) {
             const { s } = await settings();
             await ownerCard(UI.statusScreen(t.report, s.paused === true));
         }
-        return ok({ fulfilled: (t.to_fulfill || []).length, expired: (t.expired || []).length, report: !!t.report });
+        const notices = wa ? await db.rpc("bot_claim_notifications", { p_limit: 20 }) : [];
+        await deliverNotices(notices);
+        return ok({ fulfilled: (t.to_fulfill || []).length, expired: (t.expired || []).length, report: !!t.report, notices: notices.length });
     }
 
     return { handleWhatsApp, handleTelegram, handlePayment, handleCron, fulfill, processMessage };

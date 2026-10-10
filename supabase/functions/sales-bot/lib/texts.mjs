@@ -71,7 +71,33 @@ export const T = {
     thanks: "العفو 🙏 لو احتجت أي حاجة اكتب: القائمة",
     notImage: "لو ده إيصال تحويل، اطلب الأول باقة من القائمة وبعدين ابعته 🙏",
     unsupported: "مقدرش أقرا النوع ده من الرسايل 🙈 اكتبلي نص أو اختار من القائمة.",
-    demo: (s) => `🎬 شوف البلجن بيشتغل إزاي: ${s.demo_url}`
+    demo: (s) => `🎬 شوف البلجن بيشتغل إزاي: ${s.demo_url}`,
+    /** A change the owner made to the client's account from the dashboard. Null for an unknown kind. */
+    notice: (n) => {
+        const d = n.data || {};
+        const acc = n.account || {};
+        const balance = acc.available != null ? `\n💳 رصيدك دلوقتي: *${acc.available}* كريدت` : "";
+        const reason = (note) => (note && note.trim() && note.trim().toLowerCase() !== "refund" ? `\n📝 السبب: ${note.trim()}` : "");
+        const help = "\n\nلو عندك أي استفسار اكتب: الدعم";
+        switch (n.kind) {
+            case "credits_added":
+                return `🎁 *اتضافلك ${d.amount} كريدت* على حسابك${reason(d.note)}${d.expires_at ? `\n⏳ صالحين لحد ${formatDate(d.expires_at)}` : ""}${balance}`;
+            case "credits_removed":
+                return `ℹ️ *اتخصم ${d.amount} كريدت* من حسابك${reason(d.note)}${balance}${help}`;
+            case "refund":
+                return `↩️ *رجعنالك ${d.amount} كريدت* على حسابك${reason(d.note)}${balance}`;
+            case "disabled":
+                return `⏸️ حسابك على Elzoz *اتوقف مؤقتاً*، ومش هتقدر تستخدم البلجن لحد ما يتفعّل تاني.${help}`;
+            case "enabled":
+                return `▶️ حسابك على Elzoz *اتفعّل تاني*، وتقدر تستخدم البلجن دلوقتي 🎉${balance}`;
+            case "password_reset":
+                return `🔑 باسورد حسابك${acc.email ? ` (${acc.email})` : ""} اتغيّر من فريق الدعم.\nلو إنت اللي طلبت، هيوصلك الباسورد الجديد مننا. لو مش إنت، كلمنا فوراً: اكتب الدعم`;
+            case "order_rejected":
+                return T.rejected(d.code || "");
+            default:
+                return null;
+        }
+    }
 };
 
 export function inWorkHours(hour, s) {

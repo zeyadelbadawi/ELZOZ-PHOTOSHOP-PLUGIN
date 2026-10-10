@@ -467,6 +467,51 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
         expect((await contact(me)).state).toBe("idle");
     });
 
+    it("dashboard changes reach the client: at once inside 24h, otherwise with the bot's next reply", async () => {
+        const cron = () => bot.handleCron({ method: "POST", query: {}, headers: { "x-cron-key": CRON_KEY } });
+        const adminGrant = (uid, amount, note) =>
+            pgc.query("select public.grant_credits($1, $2, $3, null, 'admin:owner@test', $4, now() + interval '30 days')", [uid, amount, amount > 0 ? "purchase" : "adjustment", note]);
+        const statusOf = async (uid) => (await pgc.query("select kind, status from public.bot_notifications where user_id = $1 order by id", [uid])).rows;
+        const uid = crypto.randomUUID();
+        await pgc.query("insert into auth.users (id, email) values ($1, $2)", [uid, `notice.${uid}@example.com`]);
+
+        // Linked contact who wrote recently: told immediately, owner gets a short confirmation.
+        const me = phone();
+        await say(me, "اهلا");
+        await pgc.query("update public.bot_contacts set user_id = $1 where wa_id = $2", [uid, me]);
+        await adminGrant(uid, 30, "هدية");
+        await cron();
+        expect(lastTo(me).body).toMatch(/اتضافلك 30 كريدت/);
+        expect(lastTo(me).body).toMatch(/السبب: هدية/);
+        expect(lastTo(me).body).toMatch(/رصيدك دلوقتي: \*30\*/);
+        expect(tg.sent.at(-1).text).toMatch(/اتبعت للعميل/);
+
+        // 24-hour window closed: nothing is sent, the owner is told it waits.
+        await pgc.query("update public.bot_contacts set last_inbound_at = now() - interval '2 days' where wa_id = $1", [me]);
+        const before = wa.sent.filter((m) => m.to === me).length;
+        await adminGrant(uid, -10, "تصحيح رصيد");
+        await cron();
+        expect(wa.sent.filter((m) => m.to === me).length).toBe(before);
+        expect(tg.sent.at(-1).text).toMatch(/مستني العميل/);
+        expect((await statusOf(uid)).at(-1)).toEqual({ kind: "credits_removed", status: "waiting" });
+
+        // The client writes again: the waiting notice goes first, then the normal reply.
+        await say(me, "القائمة");
+        const mine = wa.sent.filter((m) => m.to === me).slice(before);
+        expect(mine[0].body).toMatch(/اتخصم 10 كريدت/);
+        expect(mine[0].body).toMatch(/السبب: تصحيح رصيد/);
+        expect(mine[1].kind).toBe("list");
+        expect((await statusOf(uid)).map((r) => r.status)).toEqual(["sent", "sent"]);
+
+        // No WhatsApp linked: the owner is told to inform the client directly.
+        const lonely = crypto.randomUUID();
+        await pgc.query("insert into auth.users (id, email) values ($1, $2)", [lonely, `lonely.${lonely}@example.com`]);
+        await adminGrant(lonely, 5, null);
+        await cron();
+        expect(tg.sent.some((m) => /مش مربوط برقم واتساب/.test(m.text || ""))).toBe(true);
+        expect((await statusOf(lonely))[0].status).toBe("no_contact");
+    });
+
     it("when paused, replies once and forwards everything to the owner", async () => {
         await pgc.query("update public.bot_settings set value = 'true' where key = 'paused'");
         try {
