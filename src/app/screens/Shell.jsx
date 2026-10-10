@@ -4,6 +4,8 @@ import { useI18n } from "../i18n.jsx";
 import { Button } from "../../ui/components.jsx";
 import { stepBlocker, stepsFor, computePlan } from "../state.js";
 import Account from "./Account.jsx";
+import Projects from "./Projects.jsx";
+import { Alert } from "../../ui/components.jsx";
 import DataStep from "../steps/DataStep.jsx";
 import TemplateStep from "../steps/TemplateStep.jsx";
 import MapStep from "../steps/MapStep.jsx";
@@ -13,7 +15,7 @@ import GenerateStep from "../steps/GenerateStep.jsx";
 
 const STEP_VIEWS = { data: DataStep, template: TemplateStep, map: MapStep, animate: AnimateStep, check: CheckStep, generate: GenerateStep };
 
-function Header({ onAccount }) {
+function Header({ onAccount, onProjects }) {
     const { state, dispatch, account, session } = useApp();
     const { t } = useI18n();
     const running = state.run.status === "running";
@@ -35,6 +37,9 @@ function Header({ onAccount }) {
                 ))}
             </div>
             <div className="ez-header-spacer" />
+            <div className={`ez-pchip ${state.project ? "ez-pchip-on" : ""}`} onClick={() => !running && onProjects()} title={t("projects.title")} data-testid="projects-chip">
+                {state.project ? <span className="ez-ellipsis ez-chip-name">{state.project.name}</span> : t("projects.chip")}
+            </div>
             <div className={`ez-chip ${low ? "ez-chip-low" : ""}`} onClick={onAccount} title={t("app.account")}>
                 {session.dev ? "DEV" : account ? account.available : "–"}
                 <span className="ez-chip-label ez-muted">&nbsp;{t("app.credits")}</span>
@@ -98,18 +103,34 @@ function ActionBar() {
 export default function Shell() {
     const { state, session } = useApp();
     const { t } = useI18n();
-    const [showAccount, setShowAccount] = useState(false);
+    const [panel, setPanel] = useState(null); // null | "account" | "projects"
+    const [missing, setMissing] = useState(null); // project items to pick again after opening
     const View = STEP_VIEWS[state.step] || DataStep;
+    const toggle = (name) => setPanel(panel === name ? null : name);
     return (
         <>
-            <Header onAccount={() => setShowAccount(!showAccount)} />
-            {showAccount ? (
-                <Account onClose={() => setShowAccount(false)} />
+            <Header onAccount={() => toggle("account")} onProjects={() => toggle("projects")} />
+            {panel === "account" ? (
+                <Account onClose={() => setPanel(null)} />
+            ) : panel === "projects" ? (
+                <Projects
+                    onClose={(missingItems) => {
+                        setPanel(null);
+                        if (missingItems) setMissing(missingItems);
+                    }}
+                />
             ) : (
                 <>
                     <Stepper />
                     <div className="ez-content">
                         {session.dev && state.step !== "generate" && <div className="ez-small ez-muted ez-mb2">{t("app.devMode")}</div>}
+                        {missing && (
+                            <Alert tone={missing.length ? "warning" : "success"} action={<span className="ez-link" onClick={() => setMissing(null)}>✕</span>}>
+                                {missing.length
+                                    ? t("projects.missing", { list: missing.map((m) => (m.startsWith("folder:") ? m.slice(7) : t(`projects.missing.${m}`))).join(", ") })
+                                    : t("projects.opened")}
+                            </Alert>
+                        )}
                         <View />
                     </div>
                     <ActionBar />

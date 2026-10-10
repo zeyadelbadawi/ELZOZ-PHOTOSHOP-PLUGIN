@@ -40,6 +40,16 @@ export function createServices({ photoshop, uxp }) {
         return entries.filter((e) => e.isFile).map((e) => e.name);
     }
 
+    // Loaders shared by the pickers and by reopening a saved project.
+    const loadSpreadsheet = async (entry) => {
+        const bytes = new Uint8Array(await entry.read({ format: binary }));
+        const { workbook, sheetNames } = readWorkbook(bytes);
+        return { entry, fileName: entry.name, workbook, sheetNames };
+    };
+    const loadTemplate = async (entry) => ({ entry, ...(await port.inspectTemplate({ entry })) });
+    const loadImageFolder = async (entry) => ({ entry, name: entry.name, path: entry.nativePath, index: buildFolderIndex(await listFileNames(entry)) });
+    const loadOutputFolder = async (entry) => ({ entry, name: entry.name, path: entry.nativePath, existingFileNames: await listFileNames(entry) });
+
     return {
         port,
         caps: port.caps,
@@ -65,9 +75,34 @@ export function createServices({ photoshop, uxp }) {
         async pickSpreadsheet() {
             const entry = await fs.getFileForOpening({ types: ["xlsx", "xls", "csv"], allowMultiple: false });
             if (!entry) return null;
-            const bytes = new Uint8Array(await entry.read({ format: binary }));
-            const { workbook, sheetNames } = readWorkbook(bytes);
-            return { entry, fileName: entry.name, workbook, sheetNames };
+            return loadSpreadsheet(entry);
+        },
+        loadSpreadsheet,
+        loadTemplate,
+        loadImageFolder,
+        loadOutputFolder,
+
+        /**
+         * Persistent access to a picked file or folder (UXP persistent tokens), so a saved
+         * project can be reopened without the file pickers. null if unavailable.
+         */
+        async persistEntry(entry) {
+            if (!entry || typeof fs.createPersistentToken !== "function") return null;
+            try {
+                return await fs.createPersistentToken(entry);
+            } catch (e) {
+                return null;
+            }
+        },
+
+        /** The entry behind a persistent token; null if it was moved, deleted or access was revoked. */
+        async entryFromToken(token) {
+            if (!token || typeof fs.getEntryForPersistentToken !== "function") return null;
+            try {
+                return await fs.getEntryForPersistentToken(token);
+            } catch (e) {
+                return null;
+            }
         },
 
         readSheet(workbook, sheetName, headerRow) {
@@ -77,8 +112,7 @@ export function createServices({ photoshop, uxp }) {
         async pickTemplate() {
             const entry = await fs.getFileForOpening({ types: ["psd", "psb"], allowMultiple: false });
             if (!entry) return null;
-            const info = await port.inspectTemplate({ entry });
-            return { entry, ...info };
+            return loadTemplate(entry);
         },
 
         async useActiveDocument() {
@@ -91,14 +125,13 @@ export function createServices({ photoshop, uxp }) {
         async pickImageFolder() {
             const entry = await fs.getFolder();
             if (!entry) return null;
-            const names = await listFileNames(entry);
-            return { entry, name: entry.name, path: entry.nativePath, index: buildFolderIndex(names) };
+            return loadImageFolder(entry);
         },
 
         async pickOutputFolder() {
             const entry = await fs.getFolder();
             if (!entry) return null;
-            return { entry, name: entry.name, path: entry.nativePath, existingFileNames: await listFileNames(entry) };
+            return loadOutputFolder(entry);
         },
 
         async refreshOutputFolder(output) {

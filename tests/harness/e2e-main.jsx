@@ -9,6 +9,7 @@
 // screen says so.
 import React from "react";
 import ReactDOM from "react-dom";
+import * as XLSX from "xlsx";
 import App from "../../src/app/App.jsx";
 import { createServices } from "../../src/app/services.js";
 import { createFakeHost, FakeFolder } from "../fakes/fakePhotoshop.js";
@@ -84,7 +85,18 @@ Object.assign(host.uxp, {
     versions: { ...host.uxp.versions, plugin: "1.0.0-e2e" }
 });
 host.uxp.storage.secureStorage = secureStore;
+const tokens = new Map(); // persistent tokens (saved projects); "revoked" ones simulate a moved file
 Object.assign(host.uxp.storage.localFileSystem, {
+    async createPersistentToken(entry) {
+        const token = `tok-${tokens.size + 1}-${entry.name}`;
+        tokens.set(token, entry);
+        return token;
+    },
+    async getEntryForPersistentToken(token) {
+        const entry = tokens.get(token);
+        if (!entry) throw new Error("Invalid token");
+        return entry;
+    },
     async getFileForOpening() {
         const next = queue.shift();
         if (!next) return null; // user cancelled the dialog
@@ -113,6 +125,16 @@ window.__harness = {
     simulated: true,
     host,
     queue: (...items) => queue.push(...items),
+    /** Simulate a file/folder that was moved since the project was saved. */
+    revokeTokens: (match) => [...tokens.keys()].filter((k) => k.includes(match)).forEach((k) => tokens.delete(k)),
+    /** Append rows to a picked spreadsheet (the client sent more products); its saved project sees them. */
+    async addRows(fileName, rows) {
+        const entry = [...tokens.values()].find((e) => e.name === fileName);
+        const wb = XLSX.read(new Uint8Array(await entry.read()), { type: "array" });
+        XLSX.utils.sheet_add_aoa(wb.Sheets[wb.SheetNames[0]], rows, { origin: -1 });
+        const bytes = new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" }));
+        entry.read = async () => bytes.buffer.slice(0);
+    },
     /** Copy a fixture file into a loaded folder under a new name (the user fixing a missing/corrupt file). */
     async putFile(folder, name, fixture) {
         const f = folders.get(folder);

@@ -9,6 +9,7 @@ import { mappedCount } from "./mapping.js";
 import { parseRowSelection, rowSelected } from "./rows.js";
 import { visibilityFor } from "./visibility.js";
 import { formatValue } from "./transforms.js";
+import { partitionDone, rowKey } from "./projects.js";
 
 export const FORMATS = ["jpg", "png", "psd"];
 
@@ -102,9 +103,12 @@ const PROBLEM_TEXT = {
  * @param {string} [input.rowSelection]     "" = all rows, or e.g. "2-10, 15" (spreadsheet row numbers)
  * @param {number|null} [input.outputWidth] resize designs to this width (keeps the aspect ratio)
  * @param {{width, height}} [input.templateSize]
+ * @param {string} [input.keyColumn]        project key column (identifies a row across months)
+ * @param {object} [input.doneKeys]         keys generated before { key: isoDate }
+ * @param {boolean} [input.onlyNew]         skip rows whose key is in doneKeys
  */
 export function runPreflight(input) {
-    const { table, layers, mapping, folders = {}, output, formats = [], namePattern, pricing, balance = null, allowedFormats = FORMATS, unitsPerItem = 1, rowSelection = "", outputWidth = null, templateSize = null } = input;
+    const { table, layers, mapping, folders = {}, output, formats = [], namePattern, pricing, balance = null, allowedFormats = FORMATS, unitsPerItem = 1, rowSelection = "", outputWidth = null, templateSize = null, keyColumn = "", doneKeys = {}, onlyNew = false } = input;
     const blocking = [];
     const warnings = [];
 
@@ -173,10 +177,23 @@ export function runPreflight(input) {
     const ambiguous = new Map();
     const unreadable = new Map(); // "not_a_number|column" -> rows (formatting couldn't read the cell)
     const dataRows = table.rows.filter((r) => !r.isEmpty);
-    const chosenRows = dataRows.filter((r) => rowSelected(selection, r.sourceRow));
+    let chosenRows = dataRows.filter((r) => rowSelected(selection, r.sourceRow));
     if (!selection.all) {
         if (!chosenRows.length) blocking.push(issue("error", "no_rows_selected", "No data rows match the row selection.", { fix: { step: "generate" } }));
         else warnings.push(issue("info", "rows_selected", `Generating ${chosenRows.length} of ${dataRows.length} rows (${String(rowSelection).trim()}).`, { fix: { step: "generate" } }));
+    }
+    const useKey = !!keyColumn && columns.has(keyColumn);
+    if (keyColumn && !useKey) warnings.push(issue("warning", "key_missing", `The project's key column "${keyColumn}" is not in this spreadsheet, so every row is treated as new.`, { fix: { step: "generate" } }));
+    if (useKey && onlyNew) {
+        const part = partitionDone(chosenRows, keyColumn, doneKeys);
+        if (part.doneCount) {
+            const before = chosenRows.length;
+            chosenRows = chosenRows.filter((r) => !part.skip.has(r.sourceRow));
+            warnings.push(issue("info", "already_done", `${part.doneCount} row(s) were generated before (same ${keyColumn}) and are skipped. ${chosenRows.length} new of ${before}.`, { rows: [...part.skip], fix: { step: "generate" } }));
+            if (!chosenRows.length) blocking.push(issue("error", "nothing_new", `Every row was generated before. Turn off "Only new rows" to generate them again.`, { fix: { step: "generate" } }));
+        }
+        if (part.emptyKeyRows.length) warnings.push(issue("warning", "empty_key", `${part.emptyKeyRows.length} row(s) have no ${keyColumn}; they can't be recognised next time and are always generated.`, { rows: part.emptyKeyRows, fix: { step: "data" } }));
+        if (part.duplicateKeyRows.length) warnings.push(issue("warning", "duplicate_key", `${part.duplicateKeyRows.length} row(s) repeat a ${keyColumn} used by an earlier row; they count as the same row next time.`, { rows: part.duplicateKeyRows, fix: { step: "data" } }));
     }
     for (const row of chosenRows) {
         const res = resolveRow(row, mapping, folders);
@@ -204,7 +221,7 @@ export function runPreflight(input) {
             }
             continue;
         }
-        items.push({ key: `row-${row.sourceRow}`, index: row.index, sourceRow: row.sourceRow, text: res.text, images: res.images, visibility: res.visibility, colors: res.colors, row });
+        items.push({ key: `row-${row.sourceRow}`, index: row.index, sourceRow: row.sourceRow, text: res.text, images: res.images, visibility: res.visibility, colors: res.colors, ...(useKey ? { rowKey: rowKey(row, keyColumn) } : {}), row });
     }
     for (const { problem, rows } of grouped.values()) {
         const describe = PROBLEM_TEXT[problem.code] || (() => problem.code);
@@ -236,7 +253,7 @@ export function runPreflight(input) {
     // --- Cost --------------------------------------------------------------------
     const units = items.length;
     const cost = units * unitsPerItem * (pricing?.unitPrice ?? 1);
-    if (!units && !blocking.some((b) => b.code === "no_rows_selected")) blocking.push(issue("error", "nothing_to_generate", "Every row has a problem, so nothing can be generated.", { fix: { step: "map" } }));
+    if (!units && !blocking.some((b) => b.code === "no_rows_selected" || b.code === "nothing_new")) blocking.push(issue("error", "nothing_to_generate", "Every row has a problem, so nothing can be generated.", { fix: { step: "map" } }));
     if (balance !== null && balance < cost) blocking.push(issue("error", "insufficient_credits", `This job needs ${cost} credits; ${balance} available.`, { fix: { step: "account" } }));
 
     return { ok: blocking.length === 0, blocking, warnings, items, skipped, units, cost, formats: fmts, outputSize };

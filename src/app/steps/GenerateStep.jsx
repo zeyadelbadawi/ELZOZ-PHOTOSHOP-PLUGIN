@@ -5,6 +5,8 @@ import { Alert, Button, Card, ProgressBar, Section, Stat } from "../../ui/compon
 import { runDesignJob, summarize } from "../../engine/designJob.js";
 import { runVideoJob } from "../../engine/videoJob.js";
 import { computePlan, rememberMapping, reportCsv, retryKeys, runProgress, subsetPlan } from "../state.js";
+import { markDone, succeededKeys } from "../../domain/projects.js";
+import { saveProject } from "../projectIO.js";
 
 const CONFIRM_ABOVE = 50;
 
@@ -45,6 +47,16 @@ export default function GenerateStep() {
         };
         const result = video ? await runVideoJob(args) : await runDesignJob(args);
         dispatch({ type: "run-done", result });
+        // Open project: remember the rows that were generated, and the job's latest settings.
+        if (state.project) {
+            const done = markDone(state.project.done, succeededKeys(result, thePlan));
+            dispatch({ type: "project", project: { done } });
+            try {
+                await saveProject({ storage: window.localStorage, services, state: { ...state, project: { ...state.project, done } } });
+            } catch (e) {
+                /* the job's files are written; the project just isn't updated */
+            }
+        }
         refreshAccount();
         services.refreshOutputFolder(state.output).then((o) => dispatch({ type: "output", output: o })).catch(() => {});
     };

@@ -80,6 +80,7 @@ body {
 
 .ez-segmented {
     display: flex;
+    flex-shrink: 0;
     flex-direction: row;
     border: 1px solid var(--ez-border);
     border-radius: var(--ez-r1);
@@ -465,6 +466,8 @@ body {
     .ez-step .ez-step-label { display: none; }
     .ez-step-current .ez-step-label { display: inline; }
     .ez-step { margin-right: var(--ez-s2); }
+    .ez-chip-label { display: none; }
+    .ez-brand { margin-right: var(--ez-s2); }
 }
 @media (max-width: 279px) {
     .ez-step-current .ez-step-label { display: none; }
@@ -506,3 +509,26 @@ body {
 .ez-kit {
     margin-bottom: 10px;
 }
+
+/* ---------- saved projects ---------- */
+.ez-pchip {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 2px var(--ez-s2);
+    border: 1px dashed var(--ez-border);
+    border-radius: 10px;
+    font-size: var(--ez-font-sm);
+    margin-left: var(--ez-s2);
+    cursor: pointer;
+    min-width: 0;
+    max-width: 140px;
+    flex-shrink: 1;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.ez-pchip-on { border-style: solid; border-color: var(--ez-accent); }
+.ez-chip-name { min-width: 0; }
+.ez-chip { flex-shrink: 0; }
+.ez-project { margin-bottom: var(--ez-s2); }
+.ez-project-active { border-color: var(--ez-accent); }

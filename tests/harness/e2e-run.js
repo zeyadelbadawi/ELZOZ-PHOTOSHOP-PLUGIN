@@ -991,7 +991,61 @@ scenario("I", "Features 1-15: smart prices, formatting (more added per feature)"
     check("the row with an invalid color was not generated", !Object.keys(fills).some((n) => n.startsWith("A4_")), Object.keys(fills));
     await shot(p, "I08-results-colors-320-dark", "Results: 4 recolored offer cards");
     acct = await account(email);
-    check("4 more rows charged (79 → 71)", Number(acct.balance.balance) === 71, acct.balance);
+    check("4 more rows charged (75 → 71)", Number(acct.balance.balance) === 71, acct.balance);
+
+    // ---- F15: save the job as a project; next week the client adds a row; only the new row is generated
+    await p.locator('[data-testid="projects-chip"]').click();
+    await p.waitForTimeout(150);
+    const keySelect = await fieldIn(p.locator(".ez-content"), "Key column");
+    check("the key column is guessed (SKU)", (await keySelect.inputValue()) === "SKU", await keySelect.inputValue());
+    await field(p, "Project name").fill("Weekly offers – Nova");
+    await click(p, "Save project");
+    const savedNote = await p.locator(".ez-alert").first().textContent();
+    check("project saved; the 4 rows just generated are marked done", /Saved "Weekly offers – Nova"/.test(savedNote) && /The 4 row\(s\) you just generated/.test(savedNote), savedNote);
+    await shot(p, "I09-projects-saved-320-dark", "Projects: the job saved as “Weekly offers – Nova” (key column SKU, 4 rows remembered)");
+    await click(p, "Close");
+    const chipName = await p.locator('[data-testid="projects-chip"]').textContent();
+    check("the header shows the open project", chipName.includes("Weekly offers"), chipName);
+
+    // A week later: a new product row, a fresh job, then reopen the project.
+    await p.evaluate(() => window.__harness.addRows("offers.xlsx", [["nova speaker mini", "450", "399", "Pocket size, big sound.", "speaker.webp", "nova.png", "05/11/2026", "01000000006", "#1DB954", "ELZ-0006", "", "A6"]]));
+    await click(p, "New job");
+    await p.locator('[data-testid="projects-chip"]').click();
+    await p.waitForTimeout(150);
+    await shot(p, "I10-projects-list-320-dark", "Projects: the saved project, ready to open in one click");
+    await p.locator(".ez-project").first().locator('sp-button:has-text("Open")').click();
+    await page_wait(p);
+    const opened = await p.locator(".ez-content").textContent();
+    check("the project opens on Check with everything in place (no file pickers)", /Project opened with everything in place/.test(opened) && (await p.locator(".ez-step-current").first().textContent()).includes("Check"), opened.slice(0, 200));
+    const doneInfo = await p.locator(".ez-alert").filter({ hasText: "were generated before" }).first().textContent();
+    check("only the new rows are planned: 4 skipped, 2 new of 6", /4 row\(s\) were generated before \(same SKU\).*2 new of 6/.test(doneInfo), doneInfo);
+    await shot(p, "I11-check-only-new-rows-320-dark", "Check: project “Weekly offers – Nova”, only new rows (the invalid-color row is still skipped)", { scroll: 0 });
+    await click(p, "Next");
+    await btn(p, "Generate 1").click();
+    await waitForResults(p);
+    const names3 = await p.evaluate(() => window.__harness.outputNames("Elzoz output I"));
+    check("only the new row was generated (A6), with the project's naming and PSD", names3.includes("A6_nova speaker mini.psd") && names3.filter((n) => n.startsWith("A1_")).length === 2, names3);
+    acct = await account(email);
+    check("1 more row charged (71 → 70)", Number(acct.balance.balance) === 70, acct.balance);
+
+    // The moved template: the project still opens and asks for just that file.
+    await p.evaluate(() => window.__harness.revokeTokens("offer-card"));
+    await click(p, "New job");
+    await p.locator('[data-testid="projects-chip"]').click();
+    await p.waitForTimeout(150);
+    const meta = await p.locator(".ez-project").first().textContent();
+    check("the project keeps its name and remembers 5 generated rows", /^Weekly offers – Nova/.test(meta) && /5 row\(s\) generated/.test(meta), meta);
+    await p.locator(".ez-project").first().locator('sp-button:has-text("Open")').click();
+    await p.waitForTimeout(400);
+    const moved = await p.locator(".ez-alert").first().textContent();
+    check("a moved template is named and the user lands on the Template step", /Pick these again.*the template/.test(moved), moved);
+    await shot(p, "I12-project-moved-template-320-dark", "Project opened: the template was moved, so only it has to be picked again");
+    await queue(p, { file: "templates/offer-card-1080x1350.psd" });
+    await click(p, "Choose PSD");
+    await page_wait(p);
+    await click(p, "Next");
+    const kept = await layerRow(p, "Discount").locator("select").first().inputValue();
+    check("after re-picking the template the project's mapping is kept", kept === "✦ Discount", kept);
     await finishRecording(p, "SIMULATED-scenario-I-features", "Scenario I: new features 1-15 (simulated host)");
 });
 

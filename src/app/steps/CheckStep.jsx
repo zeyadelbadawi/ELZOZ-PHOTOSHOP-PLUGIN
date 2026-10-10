@@ -2,7 +2,48 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Alert, Button, Card, Checkbox, Field, FileField, NumberInput, Section, Select, Stat, TextInput } from "../../ui/components.jsx";
-import { computePlan, previewPlan } from "../state.js";
+import { computePlan, effectiveTable, previewPlan } from "../state.js";
+import { putProject, getProject } from "../../domain/projects.js";
+
+const projectStorage = () => {
+    try {
+        return window.localStorage;
+    } catch (e) {
+        return null;
+    }
+};
+
+/** The open project's key column and "only new rows" switch (saved immediately). */
+function ProjectCard() {
+    const { state, dispatch } = useApp();
+    const { t } = useI18n();
+    const p = state.project;
+    const table = effectiveTable(state);
+    const done = Object.keys(p.done || {}).length;
+    const update = (patch) => {
+        dispatch({ type: "project", project: patch });
+        const store = projectStorage();
+        const stored = store && getProject(store, p.id);
+        if (stored) putProject(store, { ...stored, ...patch });
+    };
+    return (
+        <Section title={t("projects.card", { name: p.name })}>
+            <Card>
+                <Field label={t("projects.key")} hint={t("projects.keyHint")}>
+                    <Select value={p.keyColumn} placeholder={t("projects.noKey")} options={(table ? table.headers : []).filter((h) => !h.derived).map((h) => ({ value: h.key, label: h.key }))} onChange={(v) => update({ keyColumn: v })} />
+                </Field>
+                {p.keyColumn ? (
+                    <>
+                        <Checkbox checked={p.onlyNew} onChange={(v) => update({ onlyNew: v })} label={t("projects.onlyNew")} />
+                        <div className="ez-small ez-muted">{t("projects.doneCount", { n: done, key: p.keyColumn })}</div>
+                    </>
+                ) : (
+                    <div className="ez-small ez-muted">{t("projects.pickKey")}</div>
+                )}
+            </Card>
+        </Section>
+    );
+}
 
 const rowsText = (rows) => (rows.length > 8 ? `${rows.slice(0, 8).join(", ")} … (+${rows.length - 8})` : rows.join(", "));
 
@@ -18,7 +59,7 @@ export default function CheckStep() {
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const balance = session.dev ? null : account ? account.available : null;
-    const plan = useMemo(() => computePlan(state, { balance, pricing }), [state.data, state.template, state.mapping, state.folders, state.output, state.settings, state.video, state.mode, balance, pricing]);
+    const plan = useMemo(() => computePlan(state, { balance, pricing }), [state.data, state.template, state.mapping, state.folders, state.output, state.settings, state.video, state.mode, state.derived, state.project, balance, pricing]);
 
     const pickOutput = async () => {
         setError(null);
@@ -42,6 +83,7 @@ export default function CheckStep() {
 
     return (
         <>
+            {state.project && <ProjectCard />}
             <Section title={t("check.output")}>
                 <Card>
                     <Field label={t("check.folder")}>

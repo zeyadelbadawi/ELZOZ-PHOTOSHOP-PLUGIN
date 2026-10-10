@@ -22,6 +22,7 @@ export function initialState(saved = {}) {
         template: null, // { entry, documentId, title, width, height, layers }
         mapping: createMapping(),
         derived: [], // smart columns (src/domain/derived.js)
+        project: null, // open saved project: { id, name, keyColumn, onlyNew, done } (src/domain/projects.js)
         folders: {}, // key -> { name, entry, index }
         output: null, // { entry, name, path, existingFileNames }
         settings: { ...initialSettings, ...(saved.settings || {}), rowSelection: "" },
@@ -43,6 +44,29 @@ export function reducer(state, action) {
             const next = { ...state, data: action.data };
             const mapping = state.template && action.data ? pruneMapping(state.mapping, effectiveTable(next).headers, state.template.layers) : state.mapping;
             return { ...next, mapping, settings: { ...state.settings, rowSelection: "" }, run: idleRun() };
+        }
+        case "project":
+            return { ...state, project: action.project ? { ...(state.project || {}), ...action.project } : null };
+        case "project-loaded": {
+            // Everything at once, so the mapping is pruned against the final table and template.
+            const p = action.loaded;
+            const next = {
+                ...initialState({ mode: p.mode, settings: { ...state.settings, ...p.settings }, video: p.video ? { ...state.video, ...p.video } : state.video }),
+                data: p.data,
+                template: p.template,
+                derived: p.derived || [],
+                folders: p.folders || {},
+                output: p.output || state.output,
+                project: p.project
+            };
+            next.video = { ...next.video, tracks: (p.video && p.video.tracks) || {} };
+            const table = effectiveTable(next);
+            next.mapping = p.mapping && table && p.template ? pruneMapping(p.mapping, table.headers, p.template.layers) : p.mapping || createMapping();
+            next.restoredMapping = false;
+            const steps = stepsFor(next.mode);
+            const firstMissing = !next.data ? "data" : !next.template ? "template" : (p.missing || []).some((m) => m.startsWith("folder:")) ? "map" : "check";
+            next.step = steps.includes(firstMissing) ? firstMissing : "check";
+            return next;
         }
         case "derived": {
             // Removing a smart column also removes the mappings that used it.
@@ -81,6 +105,7 @@ export function reducer(state, action) {
         case "run-reset":
             return { ...state, run: idleRun() };
         case "new-job":
+            // A new job leaves the open project (its rows and settings stay saved).
             return { ...initialState({ mode: state.mode, settings: state.settings, video: state.video }), output: state.output, derived: state.derived };
         default:
             return state;
@@ -136,6 +161,9 @@ export function timelineSpec(state) {
 export function computePlan(state, { balance = null, pricing = {} } = {}) {
     const input = {
         rowSelection: state.settings.rowSelection,
+        keyColumn: state.project ? state.project.keyColumn : "",
+        doneKeys: state.project ? state.project.done : {},
+        onlyNew: !!(state.project && state.project.onlyNew),
         table: effectiveTable(state),
         layers: state.template ? state.template.layers : [],
         mapping: state.mapping,
