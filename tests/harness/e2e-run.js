@@ -217,6 +217,20 @@ function movSummary(file) {
     return { container: p.format.format_name, codec: v.codec_name, width: v.width, height: v.height, fps: v.r_frame_rate, frames: Number(v.nb_read_frames), durationSec: Number(p.format.duration) };
 }
 
+/**
+ * Dashboard pages in F and H: confirm every in-page confirmation dialog (with "notify the client"
+ * left on), the same way native dialogs are accepted. Scenario J clicks its dialog itself.
+ */
+function autoConfirm() {
+    setInterval(() => {
+        const ok = document.querySelector(".modal button.btn-primary, .modal button.btn-danger");
+        if (ok && !ok.dataset.autoConfirmed) {
+            ok.dataset.autoConfirmed = "1";
+            ok.click();
+        }
+    }, 100);
+}
+
 // ---------- scenarios ----------
 const scenarios = [];
 const scenario = (id, title, fn) => scenarios.push({ id, title, fn });
@@ -535,6 +549,7 @@ scenario("F", "Selling cycle: admin dashboard creates a client, client works in 
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, recordVideo: { dir: path.join(RECS, ".raw"), size: { width: 1280, height: 800 } } });
     const adm = await ctx.newPage();
     adm.on("dialog", (d) => d.accept());
+    await adm.addInitScript(autoConfirm);
     adm.on("pageerror", (e) => report.errors.push({ scenario: "F", kind: "pageerror", message: e.message }));
     adm.on("console", (m) => m.type() === "error" && !current.faultsInjected && report.errors.push({ scenario: "F", kind: "console", message: m.text() }));
     adm.meta = { width: 1280, height: 800, theme: "system-light", lang: "ar" };
@@ -605,7 +620,7 @@ scenario("F", "Selling cycle: admin dashboard creates a client, client works in 
     await topUp.locator("input").nth(0).fill("100");
     await topUp.locator("input").nth(1).fill("60");
     await topUp.locator("input").nth(2).fill("تجديد الاشتراك");
-    await topUp.locator("button").click();
+    await topUp.locator("button.btn-primary").click();
     await adm.waitForFunction(() => document.querySelector("[data-testid=available]").textContent.trim() === "147");
     await ashot("F07-admin-after-topup-ar", "After a 100-credit, 60-day top-up: two packs with different expiry");
     acct = await account(client);
@@ -784,6 +799,7 @@ scenario("H", "WhatsApp sales bot in the dashboard: orders, approval, conversati
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
     const adm = await ctx.newPage();
     adm.on("dialog", (d) => d.accept());
+    await adm.addInitScript(autoConfirm);
     adm.on("pageerror", (e) => report.errors.push({ scenario: "H", kind: "pageerror", message: e.message }));
     adm.on("console", (m) => m.type() === "error" && report.errors.push({ scenario: "H", kind: "console", message: m.text() }));
     const shot = async (page, id, title, width = 1280) => {
@@ -809,8 +825,9 @@ scenario("H", "WhatsApp sales bot in the dashboard: orders, approval, conversati
     await adm.waitForSelector("text=Karim");
     check("conversation with a person shows 'with support' and can go back to the bot", (await adm.textContent("table")).includes("مع الدعم"));
     await shot(adm, "H02-sales-contacts-ar", "Sales: conversations (source, last message, handed to support)");
-    await adm.click(`tr:has-text("Karim") >> text=رجّعه للبوت`);
-    await adm.waitForFunction(() => ![...document.querySelectorAll("tr")].some((tr) => tr.textContent.includes("Karim") && tr.textContent.includes("مع الدعم")));
+    // This run's Karim (#C<id>): the test database keeps contacts from earlier runs.
+    await adm.click(`tr:has-text("#C${b.id}") >> text=رجّعه للبوت`);
+    await adm.waitForFunction((tag) => ![...document.querySelectorAll("tr")].some((tr) => tr.textContent.includes(tag) && tr.textContent.includes("مع الدعم")), `#C${b.id}`);
     await adm.click("text=التحويلات");
     await adm.waitForSelector("text=مش موثوق");
     await shot(adm, "H03-sales-payments-ar", "Sales: payment notifications (matched, untrusted sender)");

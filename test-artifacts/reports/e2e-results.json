@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-09T22:54:15.109Z",
+  "generated": "2026-10-10T15:25:07.692Z",
   "host": "SIMULATED Photoshop host in Chromium (not Adobe Photoshop, not UXP)",
   "backend": "REAL local Postgres + PostgREST with the Elzoz migrations; Auth is a local stub",
   "scenarios": [
@@ -106,7 +106,7 @@
           "ok": true,
           "detail": [
             {
-              "id": "c262c1d6-072b-4f79-ab6e-dd324e52457d",
+              "id": "a7465f40-2554-43a5-85d6-f3cb68edf0d3",
               "status": "completed",
               "planned_items": 8,
               "reserved_total": "8",
@@ -122,11 +122,11 @@
         {
           "name": "recording SIMULATED-scenario-A-design-batch.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x720 10.5 s"
+          "detail": "h264 320x720 10.4 s"
         }
       ],
       "error": null,
-      "ms": 10910
+      "ms": 10892
     },
     {
       "id": "B",
@@ -178,15 +178,15 @@
         {
           "name": "recording SIMULATED-scenario-B-missing-asset-recovery.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x720 6.9 s"
+          "detail": "h264 320x720 7.5 s"
         }
       ],
       "error": null,
-      "ms": 7152
+      "ms": 8093
     },
     {
       "id": "C",
-      "title": "Video: 3 reels, 2 s @ 24 fps, real MOV files",
+      "title": "Video: 3 reels, 2 s @ 24 fps, real MP4 (H.264) files",
       "checks": [
         {
           "name": "preview time set to 1 s",
@@ -194,20 +194,20 @@
           "detail": "1"
         },
         {
-          "name": "3 MOV files",
+          "name": "3 MP4 files (the default video format)",
           "ok": true,
           "detail": [
-            "elzoz_1.mov",
-            "elzoz_2.mov",
-            "elzoz_3.mov"
+            "elzoz_1.mp4",
+            "elzoz_2.mp4",
+            "elzoz_3.mp4"
           ]
         },
         {
-          "name": "elzoz_1.mov: ffprobe mjpeg 1080x1920, 48 frames, 24 fps, 2.0 s",
+          "name": "elzoz_1.mp4: ffprobe h264 1080x1920, 48 frames, 24 fps, 2.0 s (encoded by the plugin)",
           "ok": true,
           "detail": {
             "container": "mov,mp4,m4a,3gp,3g2,mj2",
-            "codec": "mjpeg",
+            "codec": "h264",
             "width": 1080,
             "height": 1920,
             "fps": "24/1",
@@ -216,11 +216,11 @@
           }
         },
         {
-          "name": "elzoz_2.mov: ffprobe mjpeg 1080x1920, 48 frames, 24 fps, 2.0 s",
+          "name": "elzoz_2.mp4: ffprobe h264 1080x1920, 48 frames, 24 fps, 2.0 s (encoded by the plugin)",
           "ok": true,
           "detail": {
             "container": "mov,mp4,m4a,3gp,3g2,mj2",
-            "codec": "mjpeg",
+            "codec": "h264",
             "width": 1080,
             "height": 1920,
             "fps": "24/1",
@@ -229,17 +229,22 @@
           }
         },
         {
-          "name": "elzoz_3.mov: ffprobe mjpeg 1080x1920, 48 frames, 24 fps, 2.0 s",
+          "name": "elzoz_3.mp4: ffprobe h264 1080x1920, 48 frames, 24 fps, 2.0 s (encoded by the plugin)",
           "ok": true,
           "detail": {
             "container": "mov,mp4,m4a,3gp,3g2,mj2",
-            "codec": "mjpeg",
+            "codec": "h264",
             "width": 1080,
             "height": 1920,
             "fps": "24/1",
             "frames": 48,
             "durationSec": 2
           }
+        },
+        {
+          "name": "the MP4 decodes cleanly (ffmpeg reports no errors)",
+          "ok": true,
+          "detail": ""
         },
         {
           "name": "3 videos x 1 unit charged",
@@ -253,11 +258,11 @@
         {
           "name": "recording SIMULATED-scenario-C-video.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x720 18.7 s"
+          "detail": "h264 320x720 69.6 s"
         }
       ],
       "error": null,
-      "ms": 18428
+      "ms": 72778
     },
     {
       "id": "D",
@@ -313,7 +318,7 @@
         }
       ],
       "error": null,
-      "ms": 18414,
+      "ms": 19111,
       "faultsInjected": true
     },
     {
@@ -338,11 +343,11 @@
         {
           "name": "recording SIMULATED-scenario-E-responsive-walkthrough.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 520x700 12.6 s"
+          "detail": "h264 520x700 12.8 s"
         }
       ],
       "error": null,
-      "ms": 43973,
+      "ms": 47104,
       "faultsInjected": false
     },
     {
@@ -352,7 +357,7 @@
         {
           "name": "dashboard shows a generated password once",
           "ok": true,
-          "detail": "CfZb-8N7m-MCJJ"
+          "detail": "WbEi-9SgQ-CAv5"
         },
         {
           "name": "client detail shows 50 available",
@@ -381,7 +386,7 @@
         {
           "name": "refresh keeps the client page open (URL hash)",
           "ok": true,
-          "detail": "http://127.0.0.1:54340/admin/#/clients/c58033b1-b2e0-41c1-835e-d937f8057b88"
+          "detail": "http://127.0.0.1:54340/admin/#/clients/dd1ba4ce-7149-4e86-86b9-0283d6e25345"
         },
         {
           "name": "dashboard sees the 3 charges",
@@ -395,12 +400,12 @@
             {
               "amount": "50",
               "remaining": "47",
-              "expires_at": "2026-11-08T22:55:55.924Z"
+              "expires_at": "2026-11-09T15:27:47.332Z"
             },
             {
               "amount": "100",
               "remaining": "100",
-              "expires_at": "2026-12-08T22:56:02.843Z"
+              "expires_at": "2026-12-09T15:27:54.745Z"
             }
           ]
         },
@@ -429,7 +434,7 @@
         {
           "name": "recording SIMULATED-scenario-F-admin-dashboard.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 1280x800 12.9 s"
+          "detail": "h264 1280x800 14.0 s"
         },
         {
           "name": "dashboard fits a 390 px phone without horizontal scrolling",
@@ -443,7 +448,7 @@
         }
       ],
       "error": null,
-      "ms": 15862,
+      "ms": 17333,
       "faultsInjected": false
     },
     {
@@ -535,11 +540,810 @@
         {
           "name": "recording SIMULATED-scenario-G-designer-features.mp4 plays (ffprobe + full decode)",
           "ok": true,
-          "detail": "h264 320x760 8.4 s"
+          "detail": "h264 320x760 9.0 s"
         }
       ],
       "error": null,
-      "ms": 8618
+      "ms": 9373
+    },
+    {
+      "id": "H",
+      "title": "WhatsApp sales bot in the dashboard: orders, approval, conversations, transfers, packages, bot settings",
+      "checks": [
+        {
+          "name": "orders list shows the open order with its unique amount",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "auto-matched order is delivered or being delivered",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "an order with a receipt is flagged",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "owner approval from the dashboard marks the order paid",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "conversation with a person shows 'with support' and can go back to the bot",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "package price saved",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "bot settings show the InstaPay address",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "pause toggles the bot",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "sales page fits a 390 px phone without horizontal scrolling",
+          "ok": true,
+          "detail": null
+        }
+      ],
+      "error": null,
+      "ms": 3943
+    },
+    {
+      "id": "I",
+      "title": "Features 1-15: smart prices, formatting (more added per feature)",
+      "checks": [
+        {
+          "name": "smart columns guess Old/New price and preview row 1",
+          "ok": true,
+          "detail": [
+            "Row 1: -13%",
+            "Row 1: yes",
+            "Row 1: 1,299 ج.م"
+          ]
+        },
+        {
+          "name": "the data preview shows the smart columns",
+          "ok": true,
+          "detail": [
+            "#",
+            "Name",
+            "Old price",
+            "New price",
+            "Description",
+            "Photo",
+            "Logo",
+            "Ends",
+            "Phone",
+            "Color",
+            "SKU",
+            "Image URL",
+            "Key",
+            "✦ Discount",
+            "✦ Has discount",
+            "✦ Price"
+          ]
+        },
+        {
+          "name": "formatting previews row 1 live",
+          "ok": true,
+          "detail": [
+            "Row 1: 01012345678 → +20 10 1234 5678",
+            "Row 1: Thin, light, all-day battery. → ✓ Thin, light, all-day battery.",
+            "Row 1:   aurora   laptop 14  → Aurora Laptop 14"
+          ]
+        },
+        {
+          "name": "Check reports nothing blocking for the smart columns",
+          "ok": true,
+          "detail": [
+            "2 layers are named \"Name\". Check the group path shown in Map.Fix",
+            "Ready to generate"
+          ]
+        },
+        {
+          "name": "row 1: name tidied, discount, phone, description prefix (psd-tools)",
+          "ok": true,
+          "detail": {
+            "Background@Root": "pixel",
+            "Media@Root": "group",
+            "Photo@Media": "laptop.jpg",
+            "Logo@Media": "elzoz-logo.png",
+            "Card@Root": "group",
+            "Badge@Card": "pixel",
+            "Text@Card": "group",
+            "Name@Text": "Aurora Laptop 14",
+            "Price@Text": "-13%",
+            "Description@Text": "✓ Thin, light, all-day battery.",
+            "Footer@Root": "group",
+            "Name@Footer": "+20 10 1234 5678"
+          }
+        },
+        {
+          "name": "Badge hidden on the row without a discount (row 3), shown on the others",
+          "ok": true,
+          "detail": {
+            "elzoz_1.psd": true,
+            "elzoz_2.psd": true,
+            "elzoz_3.psd": false,
+            "elzoz_4.psd": true,
+            "elzoz_5.psd": true
+          }
+        },
+        {
+          "name": "Arabic prices with Arabic digits are understood (row 5: -17%)",
+          "ok": true,
+          "detail": {
+            "Background@Root": "pixel",
+            "Media@Root": "group",
+            "Photo@Media": "speaker.webp",
+            "Logo@Media": "nova.png",
+            "Card@Root": "group",
+            "Badge@Card": "pixel",
+            "Text@Card": "group",
+            "Name@Text": "سماعة لاسلكية",
+            "Price@Text": "-17%",
+            "Description@Text": "✓ صوت نقي وبطارية تدوم طويلًا.",
+            "Footer@Root": "group",
+            "Name@Footer": "+20 15 5566 6777"
+          }
+        },
+        {
+          "name": "5 rows charged",
+          "ok": true,
+          "detail": {
+            "balance": "75",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "brand kit saved with its value",
+          "ok": true,
+          "detail": "Brand kit— no brand kit —Nova Store · 1 valuesDelete kitA brand kit is a client's fixed values (colors, phone, website, logo file name). Choose one to fill those columns for every row.Save the fixed values as a brand kitSaved “Nova Store” with 1 values."
+        },
+        {
+          "name": "color samples show row 1 and the brand color",
+          "ok": true,
+          "detail": [
+            "Row 1: #0B5FFF → #0B5FFF",
+            "Row 1: #E30613 → #E30613",
+            "Row 1: #E30613 → #E30613"
+          ]
+        },
+        {
+          "name": "Check warns once that row 5 has no valid color and will be skipped",
+          "ok": true,
+          "detail": [
+            "\"Color\" isn't a color (use #E30613, #F00, rgb(227,6,19) or a color name) in 1 row(s); those rows will be skipped.Rows 5Fix"
+          ]
+        },
+        {
+          "name": "row colors written: Accent and Name from Color, Badge Shape from the brand kit (psd-tools)",
+          "ok": true,
+          "detail": {
+            "A1_aurora laptop 14.psd": {
+              "Accent": "#E30613",
+              "Badge Shape": "#0B5FFF",
+              "Name": "#E30613"
+            },
+            "A2_pulse phone x.psd": {
+              "Accent": "#0B5FFF",
+              "Badge Shape": "#0B5FFF",
+              "Name": "#0B5FFF"
+            },
+            "A3_echo headphones.psd": {
+              "Accent": "#1DB954",
+              "Badge Shape": "#0B5FFF",
+              "Name": "#1DB954"
+            },
+            "A5_سماعة لاسلكية.psd": {
+              "Accent": "#FF8800",
+              "Badge Shape": "#0B5FFF",
+              "Name": "#FF8800"
+            },
+            "elzoz_1.psd": {
+              "Name": "#9696A0"
+            },
+            "elzoz_2.psd": {
+              "Name": "#9696A0"
+            },
+            "elzoz_3.psd": {
+              "Name": "#9696A0"
+            },
+            "elzoz_4.psd": {
+              "Name": "#9696A0"
+            },
+            "elzoz_5.psd": {
+              "Name": "#9696A0"
+            }
+          }
+        },
+        {
+          "name": "the row with an invalid color was not generated",
+          "ok": true,
+          "detail": [
+            "A1_aurora laptop 14.psd",
+            "A2_pulse phone x.psd",
+            "A3_echo headphones.psd",
+            "A5_سماعة لاسلكية.psd",
+            "elzoz_1.psd",
+            "elzoz_2.psd",
+            "elzoz_3.psd",
+            "elzoz_4.psd",
+            "elzoz_5.psd"
+          ]
+        },
+        {
+          "name": "4 more rows charged (75 → 71)",
+          "ok": true,
+          "detail": {
+            "balance": "71",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "the key column is guessed (SKU)",
+          "ok": true,
+          "detail": "SKU"
+        },
+        {
+          "name": "project saved; the 4 rows just generated are marked done",
+          "ok": true,
+          "detail": "Saved \"Weekly offers – Nova\". The 4 row(s) you just generated are marked as done."
+        },
+        {
+          "name": "the header shows the open project",
+          "ok": true,
+          "detail": "Weekly offers – Nova"
+        },
+        {
+          "name": "the project opens on Check with everything in place (no file pickers)",
+          "ok": true,
+          "detail": "Project opened with everything in place. Review and generate.✕Project: Weekly offers – NovaKey column (identifies each row)No key columnNameOld priceNew priceDescriptionPhotoLogoEndsPhoneColorSKUImage"
+        },
+        {
+          "name": "only the new rows are planned: 4 skipped, 2 new of 6",
+          "ok": true,
+          "detail": "4 row(s) were generated before (same SKU) and are skipped. 2 new of 6.Rows 2, 3, 4, 6"
+        },
+        {
+          "name": "only the new row was generated (A6), with the project's naming and PSD",
+          "ok": true,
+          "detail": [
+            "elzoz_1.jpg",
+            "elzoz_1.psd",
+            "elzoz_2.jpg",
+            "elzoz_2.psd",
+            "elzoz_3.jpg",
+            "elzoz_3.psd",
+            "elzoz_4.jpg",
+            "elzoz_4.psd",
+            "elzoz_5.jpg",
+            "elzoz_5.psd",
+            "A1_aurora laptop 14.jpg",
+            "A1_aurora laptop 14.psd",
+            "A2_pulse phone x.jpg",
+            "A2_pulse phone x.psd",
+            "A3_echo headphones.jpg",
+            "A3_echo headphones.psd",
+            "A5_سماعة لاسلكية.jpg",
+            "A5_سماعة لاسلكية.psd",
+            "A6_nova speaker mini.jpg",
+            "A6_nova speaker mini.psd"
+          ]
+        },
+        {
+          "name": "1 more row charged (71 → 70)",
+          "ok": true,
+          "detail": {
+            "balance": "70",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "the project keeps its name and remembers 5 generated rows",
+          "ok": true,
+          "detail": "Weekly offers – Novaoffers.xlsx · offer-card-1080x1350.psdUpdated Oct 10, 2026 · 5 row(s) generated · key: SKUOpenForget generated rowsDelete"
+        },
+        {
+          "name": "a moved template is named and the user lands on the Template step",
+          "ok": true,
+          "detail": "Project opened. Pick these again (they were moved or renamed): the template✕"
+        },
+        {
+          "name": "after re-picking the template the project's mapping is kept",
+          "ok": true,
+          "detail": "✦ Discount"
+        },
+        {
+          "name": "approval sheet made: 5 designs on 2 pages, no credits",
+          "ok": true,
+          "detail": "Approval sheet ready: Approval sheet 2026-10-10 15.28.pdf5 design(s) on 2 page(s). No credits used.Proof images: folder “Proofs 2026-10-10 15.28”."
+        },
+        {
+          "name": "the approval sheet is free (balance still 70)",
+          "ok": true,
+          "detail": {
+            "balance": "70",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "approval PDF: 2 A4 pages, 4 + 1 numbered designs (pypdf)",
+          "ok": true,
+          "detail": [
+            {
+              "media": [
+                0,
+                0,
+                595,
+                842
+              ],
+              "images": 4,
+              "text": "APPROVAL SHEET\n2026-10-10  |  5 designs\n#1 A1_aurora laptop 14\n #2 A2_pulse phone x\n#3 A3_echo headphones\n #4 row 6\nReply with the numbers that need changes, or OK to approve them all. 1 / 2"
+            },
+            {
+              "media": [
+                0,
+                0,
+                595,
+                842
+              ],
+              "images": 1,
+              "text": "APPROVAL SHEET\n2026-10-10  |  5 designs\n#5 A6_nova speaker mini\nReply with the numbers that need changes, or OK to approve them all. 2 / 2"
+            }
+          ]
+        },
+        {
+          "name": "5 small proof JPGs (640 × 845: 800 px design + label strip)",
+          "ok": true,
+          "detail": {
+            "proofJpgs": [
+              "01_A1_aurora laptop 14.jpg",
+              "02_A2_pulse phone x.jpg",
+              "03_A3_echo headphones.jpg",
+              "04_A5_سماعة لاسلكية.jpg",
+              "05_A6_nova speaker mini.jpg"
+            ],
+            "proofSize": [
+              640,
+              845
+            ]
+          }
+        },
+        {
+          "name": "print size is explained (91.4 × 114.3 mm at 300 dpi)",
+          "ok": true,
+          "detail": "Print (PDF)Also make a print-ready PDF of all designsLayoutOne design per pageSeveral designs per sheet (imposition)Print resolutiondpiEach design prints at 91.4 × 114.3 mm (after trimming). The template itself is set to 72 dpi.Bleed inside the design (per side)mmIf your template has extra area arou"
+        },
+        {
+          "name": "imposition summary: 4 per A4 sheet, 3 sheets for 5 designs × 2",
+          "ok": true,
+          "detail": "4 per sheet (2 × 2)Portrait3 sheet(s) for 5 design(s) × 2"
+        },
+        {
+          "name": "invalid copies block the job with a clear message",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "results show the print PDF: 3 pages, 5 designs",
+          "ok": true,
+          "detail": "Print PDF ready: Print 2026-10-10 15.28.pdf3 page(s), 5 design(s)."
+        },
+        {
+          "name": "the print PDF costs nothing extra (5 designs: 70 → 65)",
+          "ok": true,
+          "detail": {
+            "balance": "65",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "print PDF: 3 A4 sheets, cut-mark slug, images embedded at full size (pypdf)",
+          "ok": true,
+          "detail": [
+            {
+              "media": [
+                0,
+                0,
+                595,
+                842
+              ],
+              "images": 2,
+              "text": "Elzoz  |  sheet 1/3  |  A4  |  4-up  |  300 dpi"
+            },
+            {
+              "media": [
+                0,
+                0,
+                595,
+                842
+              ],
+              "images": 2,
+              "text": "Elzoz  |  sheet 2/3  |  A4  |  4-up  |  300 dpi"
+            },
+            {
+              "media": [
+                0,
+                0,
+                595,
+                842
+              ],
+              "images": 1,
+              "text": "Elzoz  |  sheet 3/3  |  A4  |  4-up  |  300 dpi"
+            }
+          ]
+        },
+        {
+          "name": "smart columns from the old file that can't work here are removed and named",
+          "ok": true,
+          "detail": "Smart columns removed because this spreadsheet doesn't have the columns they use: Discount, Has discount, Price✕"
+        },
+        {
+          "name": "the Shopify export is recognised",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "prepared: 5 products, 1 extra row merged, 3 on sale",
+          "ok": true,
+          "detail": "5 product(s) with Name, Price, Old price, Photo, SKU, Description and Category columns. 1 extra row(s) merged into their product. 3 on sale."
+        },
+        {
+          "name": "design-ready columns added (Name, Price, Old price, Photo, SKU, Description)",
+          "ok": true,
+          "detail": [
+            "#",
+            "Handle",
+            "Title",
+            "Body (HTML)",
+            "Vendor",
+            "Type",
+            "Published",
+            "Variant SKU",
+            "Variant Price",
+            "Variant Compare At Price",
+            "Image Src",
+            "Image Position",
+            "Name",
+            "Price",
+            "Old price",
+            "Photo",
+            "SKU",
+            "Description",
+            "Category",
+            "✦ Primary"
+          ]
+        },
+        {
+          "name": "the Photo column of links switches the layer to 'links' (no folder to pick)",
+          "ok": true,
+          "detail": {
+            "source": "link",
+            "linkInfo": "5 image link(s) in 5 row(s).https://images.example.test/laptop.jpgImages download in the Check step. Google Drive and Dropbox share links work; links that need a login don't."
+          }
+        },
+        {
+          "name": "links downloaded automatically: 3 of 5, 2 failed",
+          "ok": true,
+          "detail": "3 of 5 image(s) downloaded · 2 failed (see the warnings below)"
+        },
+        {
+          "name": "each failed link says why (404, a web page instead of an image)",
+          "ok": true,
+          "detail": [
+            "The image link in \"Photo\" couldn't be used (Nothing at this link (404).) in 1 row(s); those rows will be skipped.Rows 5Fix",
+            "The image link in \"Photo\" couldn't be used (The link opens a web page, not an image. Use the image's own address (right-click the image → Copy image address).) in 1 row(s); those rows will be skipped.Rows 6Fix"
+          ]
+        },
+        {
+          "name": "retry asks only for the 2 failed links (downloaded images are reused)",
+          "ok": true,
+          "detail": 2
+        },
+        {
+          "name": "Shopify rows designed with downloaded photos, sale price and old price (psd-tools)",
+          "ok": true,
+          "detail": {
+            "SH-001_Aurora Laptop 14.psd": {
+              "photo": "link-1sft8q1gbhcme.jpg",
+              "price": "1299.00",
+              "old": "1500.00"
+            },
+            "SH-002_Pulse Phone X.psd": {
+              "photo": "link-19vejeo1fttjb0.jpg",
+              "price": "799.00",
+              "old": ""
+            },
+            "SH-005_سماعة لاسلكية.psd": {
+              "photo": "link-zjdmws1l9pew2.webp",
+              "price": "249.00",
+              "old": "300.00"
+            }
+          }
+        },
+        {
+          "name": "only the 3 designed rows charged (65 → 62)",
+          "ok": true,
+          "detail": {
+            "balance": "62",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "a link that isn't Google Sheets is caught before loading",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "a private sheet says exactly how to share it",
+          "ok": true,
+          "detail": "This sheet is private (Google asked for a login). In Google Sheets: Share → General access → \"Anyone with the link\" → Viewer, then try again."
+        },
+        {
+          "name": "the shared sheet loads with its title, rows and a Reload button",
+          "ok": true,
+          "detail": "SpreadsheetEach row becomes one design or video.عروض الأسبوعGoogle Sheets · 5 rows · 12 columnsChangeReload from Google SheetsGets the latest rows; your setting"
+        },
+        {
+          "name": "the QR layer previews row 1's code",
+          "ok": true,
+          "detail": "Row 1: ELZ-0001Links, phone numbers, text (Arabic too). Made as a sharp black-on-white image with a quiet zone, so it scans."
+        },
+        {
+          "name": "codes are made by themselves in Check (10: 5 QR + 5 barcodes)",
+          "ok": true,
+          "detail": "10 code(s) ready."
+        },
+        {
+          "name": "the final design's QR code and barcode both scan to the row's SKU (zxing-cpp on the JPG)",
+          "ok": true,
+          "detail": [
+            [
+              "Code128",
+              "ELZ-0001"
+            ],
+            [
+              "QRCode",
+              "ELZ-0001"
+            ]
+          ]
+        },
+        {
+          "name": "5 rows charged (62 → 57)",
+          "ok": true,
+          "detail": {
+            "balance": "57",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "smart crop and remove background explain themselves (and the failure choice)",
+          "ok": true,
+          "detail": "SPhotoMedia— not used —NameOld priceNew priceDescriptionPhotoLogoEndsPhoneColorSKUImage URLKey✦ PrimaryRow 1: laptop.jpgImages come fromA folder (file names)Image links (auto-download)QR code from the"
+        },
+        {
+          "name": "smart crop moves the photo towards its subject without uncovering the frame (psd-tools)",
+          "ok": true,
+          "detail": {
+            "subject_ELZ-0001.psd": [
+              -52,
+              150,
+              -52,
+              150
+            ],
+            "subject_ELZ-0005.psd": [
+              75,
+              150,
+              75,
+              150
+            ]
+          }
+        },
+        {
+          "name": "Select Subject and Remove Background ran once per row",
+          "ok": true,
+          "detail": [
+            "autoCutout",
+            "removeBackground",
+            "autoCutout",
+            "removeBackground"
+          ]
+        },
+        {
+          "name": "2 rows charged (57 → 55)",
+          "ok": true,
+          "detail": {
+            "balance": "55",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "the template's artboards are listed with their sizes",
+          "ok": true,
+          "detail": "Post (1080 × 1080) · Story (1080 × 1920) · Banner (1200 × 628)"
+        },
+        {
+          "name": "Map explains that only the first artboard is mapped",
+          "ok": true,
+          "detail": "Mapping the artboard “Post”Layers with the same name and group in Story, Banner get the same columns automatically."
+        },
+        {
+          "name": "each layer is shown once, not once per artboard (Name: text + colors = 2, not 6)",
+          "ok": true,
+          "detail": 2
+        },
+        {
+          "name": "Check shows rows × sizes = designs (2 × 2 = 4, Story off)",
+          "ok": true,
+          "detail": "2 row(s) × 2 size(s) = 4 design(s)"
+        },
+        {
+          "name": "each design is exported at its artboard's size, in a folder per size (PIL)",
+          "ok": true,
+          "detail": {
+            "Post/ELZ-0001.jpg": [
+              1080,
+              1080
+            ],
+            "Post/ELZ-0002.jpg": [
+              1080,
+              1080
+            ],
+            "Banner/ELZ-0001.jpg": [
+              1200,
+              628
+            ],
+            "Banner/ELZ-0002.jpg": [
+              1200,
+              628
+            ]
+          }
+        },
+        {
+          "name": "4 designs charged (55 → 51)",
+          "ok": true,
+          "detail": {
+            "balance": "51",
+            "reserved": "0",
+            "disabled": false
+          }
+        },
+        {
+          "name": "recording SIMULATED-scenario-I-features.mp4 plays (ffprobe + full decode)",
+          "ok": true,
+          "detail": "h264 320x820 54.8 s"
+        }
+      ],
+      "error": null,
+      "ms": 56272
+    },
+    {
+      "id": "J",
+      "title": "Features 1, 2, 4: forced update, computers per account, expiring credits reminders (plugin + dashboard)",
+      "checks": [
+        {
+          "name": "dashboard: a wrong version is flagged and Save is disabled before anything is sent",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "dashboard saved the plugin settings",
+          "ok": true,
+          "detail": {
+            "device_limit": 2,
+            "device_switch_days": 7,
+            "require_device_id": false,
+            "min_plugin_version": "1.1.0",
+            "latest_plugin_version": "1.2.0",
+            "update_url": "https://example.com/elzoz-1.2.0.ccx",
+            "update_message": "فلتر جديد للصور وتصدير أسرع"
+          }
+        },
+        {
+          "name": "plugin below the minimum version shows the update screen with the download button",
+          "ok": true,
+          "detail": "Elzoz.Update Elzoz to continueThis version (1.0.0-e2e) is no longer supported. Version 1.1.0 or newer is needed to gener"
+        },
+        {
+          "name": "an optional update shows a banner and the plugin keeps working",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "dashboard lists the computer the client signed in from",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "limit saved for this client only",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "a second computer over the limit sees which computers use the account",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "moving the account opens the app on the new computer",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "the least recently used computer was unlinked (by the client's move)",
+          "ok": true,
+          "detail": [
+            "switch",
+            null
+          ]
+        },
+        {
+          "name": "dashboard shows the moved account and when it can move again",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "top-up form offers the bot's packages as one-click presets",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "a preset fills credits, days and note",
+          "ok": true,
+          "detail": "20"
+        },
+        {
+          "name": "expiring tab lists the client with the credits about to expire",
+          "ok": true,
+          "detail": null
+        },
+        {
+          "name": "wa.me button opens WhatsApp with a ready message",
+          "ok": true,
+          "detail": "https://wa.me/201046158838?text=%D8%A3%D"
+        },
+        {
+          "name": "the reminder is queued for the bot to send",
+          "ok": true,
+          "detail": [
+            {
+              "kind": "expiry_reminder",
+              "data": {
+                "credits": 40,
+                "expires_at": "2026-10-12T15:29:18.829608+00:00"
+              },
+              "actor": "admin:devices-owner-mv2jpkjc@e2e.test"
+            }
+          ]
+        },
+        {
+          "name": "automatic reminder days saved from the bot settings",
+          "ok": true,
+          "detail": 5
+        }
+      ],
+      "error": null,
+      "ms": 7695
     }
   ],
   "screenshots": [
@@ -805,7 +1609,7 @@
     },
     {
       "file": "C08-video-frames-contact-sheet.png",
-      "title": "Frames 0/0.5/1/1.5 s decoded from the rendered MOV by ffmpeg",
+      "title": "Frames 0/0.5/1/1.5 s decoded from the plugin's MP4 by ffmpeg",
       "scenario": "C",
       "width": null,
       "theme": null,
@@ -1289,6 +2093,462 @@
       "theme": "dark",
       "lang": "en",
       "layoutProblems": []
+    },
+    {
+      "file": "H01-sales-orders-ar.png",
+      "title": "Sales: bot status + orders (receipt waiting, auto-paid)",
+      "scenario": "H",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "H02-sales-contacts-ar.png",
+      "title": "Sales: conversations (source, last message, handed to support)",
+      "scenario": "H",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "H03-sales-payments-ar.png",
+      "title": "Sales: payment notifications (matched, untrusted sender)",
+      "scenario": "H",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "H04-sales-package-edit-ar.png",
+      "title": "Sales: edit a package price",
+      "scenario": "H",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "H05-sales-bot-settings-ar.png",
+      "title": "Sales: bot settings (payment details, hours, FAQ)",
+      "scenario": "H",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "H06-sales-orders-mobile-ar.png",
+      "title": "Sales orders on a phone (390 px)",
+      "scenario": "H",
+      "width": 390,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "I01-data-smart-columns-320-dark.png",
+      "title": "Data: smart columns (discount, has discount, formatted price) previewed on row 1",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I02-map-formatting-320-dark.png",
+      "title": "Map: title case + trim on Name, international phone, prefix on Description",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I03-map-badge-has-discount-320-dark.png",
+      "title": "Map: Badge shown only when the row has a discount",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I04-results-offers-320-dark.png",
+      "title": "Results: 5 offer cards",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I05-data-brand-kit-320-dark.png",
+      "title": "Data: brand kit “Nova Store” applied (fixed Primary color)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I06-map-colors-320-dark.png",
+      "title": "Map: Accent and Name colored from the Color column, Badge Shape from the brand kit",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I07-check-invalid-color-320-dark.png",
+      "title": "Check: the row with “zzz” as a color is skipped (not charged)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I08-results-colors-320-dark.png",
+      "title": "Results: 4 recolored offer cards",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I09-projects-saved-320-dark.png",
+      "title": "Projects: the job saved as “Weekly offers – Nova” (key column SKU, 4 rows remembered)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I10-projects-list-320-dark.png",
+      "title": "Projects: the saved project, ready to open in one click",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I11-check-only-new-rows-320-dark.png",
+      "title": "Check: project “Weekly offers – Nova”, only new rows (the invalid-color row is still skipped)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I12-project-moved-template-320-dark.png",
+      "title": "Project opened: the template was moved, so only it has to be picked again",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I13-check-approval-sheet-320-dark.png",
+      "title": "Check: client approval sheet (free): 4 per page, proof JPGs for WhatsApp",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I14-results-approval-sheet-320-dark.png",
+      "title": "Results: approval sheet PDF + proof images, 0 credits",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I15-approval-sheet-page1-1.png",
+      "title": "Approval sheet PDF page 1 (rendered by pdftoppm)",
+      "scenario": "I",
+      "width": 0,
+      "lang": "en",
+      "theme": "pdf",
+      "layoutProblems": []
+    },
+    {
+      "file": "I16-check-print-imposition-320-dark.png",
+      "title": "Check: print PDF, 4 per A4 sheet with crop marks, 2 copies each (diagram to scale)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I17-results-print-pdf-320-dark.png",
+      "title": "Results: 5 designs + one print PDF (3 A4 sheets)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I18-print-sheet-page1-1.png",
+      "title": "Print PDF sheet 1: 2 designs × 2 copies with crop marks (rendered by pdftoppm)",
+      "scenario": "I",
+      "width": 0,
+      "lang": "en",
+      "theme": "pdf",
+      "layoutProblems": []
+    },
+    {
+      "file": "I19-data-shopify-detected-320-dark.png",
+      "title": "Data: Shopify export recognised, one click to prepare it",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I20-map-images-from-links-320-dark.png",
+      "title": "Map: Photo from links (downloaded automatically)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I21-check-links-downloaded-320-dark.png",
+      "title": "Check: 3 of 5 images downloaded; the 404 and the web-page link are explained and skipped",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I22-results-links-320-dark.png",
+      "title": "Results: 3 designs from the Shopify export (2 rows skipped, not charged)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I23-data-google-sheets-private-320-dark.png",
+      "title": "Data: a private Google Sheet: what to change in Sharing",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I24-data-google-sheets-320-dark.png",
+      "title": "Data: loaded from a Google Sheets link (all tabs), with Reload",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I25-map-qr-barcode-320-dark.png",
+      "title": "Map: QR code and Code 128 barcode made from the SKU column (live preview)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I26-results-codes-320-dark.png",
+      "title": "Results: 5 offer cards from Google Sheets with QR + barcode",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I27-map-smart-crop-remove-bg-320-dark.png",
+      "title": "Map: Photo fills the frame centred on the subject, background removed",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I28-results-subject-320-dark.png",
+      "title": "Results: 2 designs with smart crop + background removed (simulated)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I29-template-artboards-320-dark.png",
+      "title": "Template: 3 artboards found (Post, Story, Banner)",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I30-map-artboards-320-dark.png",
+      "title": "Map: the Post artboard is mapped; Story and Banner follow",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I31-check-sizes-320-dark.png",
+      "title": "Check: sizes to export (Story turned off), 2 rows × 2 sizes = 4 designs",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "I32-results-artboards-320-dark.png",
+      "title": "Results: 4 designs, 2 sizes per row",
+      "scenario": "I",
+      "width": 320,
+      "height": 820,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "J01-admin-plugin-settings-ar.png",
+      "title": "Settings: minimum version (forced update), latest version, download link, computers per account",
+      "scenario": "J",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "J02-plugin-update-required-320-dark.png",
+      "title": "Plugin: forced update screen (version below the minimum)",
+      "scenario": "J",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "J03-plugin-update-banner-320-dark.png",
+      "title": "Plugin: \"update available\" banner (not forced)",
+      "scenario": "J",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "J04-plugin-device-limit-320-dark.png",
+      "title": "Plugin: account in use on another computer, with the option to move it here",
+      "scenario": "J",
+      "width": 320,
+      "height": 720,
+      "theme": "dark",
+      "lang": "en",
+      "layoutProblems": []
+    },
+    {
+      "file": "J05-admin-client-devices-ar.png",
+      "title": "Client detail: computers, per-client limit, unlink, history of moves",
+      "scenario": "J",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "J06-admin-topup-presets-ar.png",
+      "title": "Top-up: one click on a package fills credits, validity and note",
+      "scenario": "J",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "J07-admin-expiring-ar.png",
+      "title": "Expiring credits: who, how many, when; remind through the bot or open WhatsApp",
+      "scenario": "J",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "J08-admin-expiring-reminded-ar.png",
+      "title": "After reminding: queued for the bot, the last-reminder date is filled in",
+      "scenario": "J",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
+    },
+    {
+      "file": "J09-admin-bot-reminder-settings-ar.png",
+      "title": "Bot settings: automatic reminder N days before expiry, approved template name",
+      "scenario": "J",
+      "width": 1280,
+      "theme": "system-light",
+      "lang": "ar",
+      "layoutProblems": []
     }
   ],
   "recordings": [
@@ -1298,8 +2558,8 @@
       "codec": "h264",
       "width": 320,
       "height": 720,
-      "durationSec": 10.52,
-      "bytes": 188750,
+      "durationSec": 10.44,
+      "bytes": 201937,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -1309,19 +2569,19 @@
       "codec": "h264",
       "width": 320,
       "height": 720,
-      "durationSec": 6.88,
-      "bytes": 176470,
+      "durationSec": 7.48,
+      "bytes": 187177,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
     {
       "file": "SIMULATED-scenario-C-video.mp4",
-      "title": "Scenario C: video mode (simulated host, real MOV output, real credits)",
+      "title": "Scenario C: video mode (simulated host, real MP4 output, real credits)",
       "codec": "h264",
       "width": 320,
       "height": 720,
-      "durationSec": 18.68,
-      "bytes": 189607,
+      "durationSec": 69.64,
+      "bytes": 284928,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -1331,8 +2591,8 @@
       "codec": "h264",
       "width": 520,
       "height": 700,
-      "durationSec": 12.6,
-      "bytes": 552716,
+      "durationSec": 12.84,
+      "bytes": 592988,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -1342,8 +2602,8 @@
       "codec": "h264",
       "width": 1280,
       "height": 800,
-      "durationSec": 12.88,
-      "bytes": 553723,
+      "durationSec": 14.04,
+      "bytes": 473570,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     },
@@ -1353,8 +2613,19 @@
       "codec": "h264",
       "width": 320,
       "height": 760,
-      "durationSec": 8.44,
-      "bytes": 229423,
+      "durationSec": 8.96,
+      "bytes": 259249,
+      "decodesCleanly": true,
+      "label": "SIMULATION — simulated Photoshop host in Chromium"
+    },
+    {
+      "file": "SIMULATED-scenario-I-features.mp4",
+      "title": "Scenario I: new features 1-15 (simulated host)",
+      "codec": "h264",
+      "width": 320,
+      "height": 820,
+      "durationSec": 54.76,
+      "bytes": 1370793,
       "decodesCleanly": true,
       "label": "SIMULATION — simulated Photoshop host in Chromium"
     }
@@ -1406,9 +2677,9 @@
   ],
   "layout": [],
   "summary": {
-    "scenarios": 7,
+    "scenarios": 10,
     "failedScenarios": 0,
-    "checks": 57,
+    "checks": 145,
     "failedChecks": 0,
     "consoleOrPageErrors": 0,
     "screenshotsWithLayoutProblems": 0

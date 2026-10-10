@@ -470,6 +470,8 @@ body {
     .ez-brand { margin-right: var(--ez-s2); }
 }
 @media (max-width: 279px) {
+    /* Very narrow panel: the logo makes room for the mode switch, projects and credits. */
+    .ez-header .ez-brand { display: none; }
     .ez-step-current .ez-step-label { display: none; }
     .ez-chip-label { display: none; }
     .ez-layer-main { flex-wrap: wrap; }
