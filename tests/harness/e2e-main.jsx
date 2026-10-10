@@ -35,7 +35,12 @@ document.body.dataset.theme = params.get("theme") || "dark";
 const pixelStore = createPixelStore();
 const templateBytes = new Map(); // nativePath -> bytes
 const allFiles = new Map(); // file name -> FakeFile (latest wins), for the renderer and PSD writer
-const fileBytes = (name) => (allFiles.get(name) || {}).bytes || null;
+// Files written by the plugin into the temporary folder (images downloaded from links) render too.
+const tempFile = (name) => {
+    const walk = (folder) => folder.files.get(name) || [...(folder.folders ? folder.folders.values() : [])].map(walk).find(Boolean) || null;
+    return host && host.env.tempRoot ? walk(host.env.tempRoot) : null;
+};
+const fileBytes = (name) => (allFiles.get(name) || tempFile(name) || {}).bytes || null;
 
 const host = createFakeHost({
     version: params.get("ps") || "26.11.0",
@@ -164,4 +169,21 @@ window.__harness = {
 const banner = document.getElementById("sim-banner");
 banner.textContent = `SIMULATED Photoshop host · Chromium, not UXP · theme: ${document.body.dataset.theme} · credits: local test server`;
 
-ReactDOM.render(<App services={createServices({ photoshop: host.photoshop, uxp: host.uxp })} />, document.getElementById("root"));
+// Simulated internet for images from links: images.example.test serves the fixture product images;
+// "/page" is a web page (not an image) and anything else is a 404.
+const internet = { requests: [] };
+async function simulatedFetch(url) {
+    internet.requests.push(url);
+    const u = new URL(url);
+    const reply = (status, bytes, type) => ({ ok: status >= 200 && status < 300, status, headers: { get: (h) => (h.toLowerCase() === "content-type" ? type : null) }, arrayBuffer: async () => bytes.buffer.slice(0) });
+    await new Promise((r) => setTimeout(r, 120)); // network latency, so progress is visible
+    if (u.hostname !== "images.example.test") throw new Error("getaddrinfo ENOTFOUND " + u.hostname);
+    if (u.pathname === "/page") return reply(200, new TextEncoder().encode("<!doctype html><html><body>Product page</body></html>"), "text/html");
+    internet.files = internet.files || (await (await fetch("/fixtures-list/images/products")).json());
+    const name = decodeURIComponent(u.pathname.slice(1));
+    if (!internet.files.includes(name)) return reply(404, new Uint8Array(0), "text/html");
+    return reply(200, await fetchBytes(`images/products/${name}`), "image/*");
+}
+window.__harness.internet = internet;
+
+ReactDOM.render(<App services={createServices({ photoshop: host.photoshop, uxp: host.uxp, fetch: simulatedFetch })} />, document.getElementById("root"));

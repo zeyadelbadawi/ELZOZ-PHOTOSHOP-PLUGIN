@@ -548,3 +548,7 @@ body {
     opacity: 0.75;
     outline: 1px solid rgba(0, 0, 0, 0.35);
 }
+
+/* ---------- store exports ---------- */
+.ez-list { margin: 0 0 var(--ez-s2); padding-left: 18px; }
+[dir="rtl"] .ez-list { padding-left: 0; padding-right: 18px; }

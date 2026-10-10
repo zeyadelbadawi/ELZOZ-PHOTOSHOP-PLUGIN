@@ -217,3 +217,19 @@ describe("end to end in preflight and app state", () => {
         expect(recallMemory(storage, template, { headers: [{ key: "Name" }], rows: [], issues: [] })).toBeNull();
     });
 });
+
+describe("a new spreadsheet and existing smart columns", () => {
+    it("removes smart columns whose columns are gone (and names them), keeps fixed values and unfinished ones", () => {
+        const data = (headers) => ({ fileName: "x.xlsx", table: { headers: headers.map((k) => ({ key: k, label: k })), issues: [], rows: [] } });
+        const discount = { ...newDerived("discount"), label: "Off", oldColumn: "Old", newColumn: "New" };
+        const fixed = { ...newDerived("constant"), label: "Primary", value: "#000" };
+        const unfinished = { ...newDerived("discount"), label: "Draft" };
+        let s = reducer(initialState(), { type: "data", data: data(["Old", "New"]) });
+        s = reducer(s, { type: "derived", derived: [discount, fixed, unfinished] });
+        s = reducer(s, { type: "data", data: data(["Title", "Price"]) });
+        expect(s.derived.map((d) => d.label)).toEqual(["Primary", "Draft"]);
+        expect(s.derivedDropped).toEqual(["Off"]);
+        expect(reducer(s, { type: "derived-dropped-seen" }).derivedDropped).toBeNull();
+    });
+});
+

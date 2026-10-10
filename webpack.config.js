@@ -103,7 +103,9 @@ module.exports = (env, argv) => {
                             if (!file.endsWith("manifest.json")) return content;
                             const manifest = JSON.parse(content.toString());
                             const perms = manifest.requiredPermissions;
-                            perms.network.domains = supabaseUrl ? [new URL(supabaseUrl).origin] : [];
+                            // "all": images from links (feature 8) and Google Sheets (feature 6) can be on any site.
+                            // Only GET downloads of what the user's spreadsheet points to; credentials go only to Supabase.
+                            perms.network.domains = "all";
                             perms.allowCodeGenerationFromStrings = !isProd; // eval-based dev source maps only
                             return JSON.stringify(manifest, null, 2);
                         }

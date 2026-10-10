@@ -71,3 +71,19 @@ function write(file, w, h, children, linkedFiles, composite) {
     ];
     write(path.join(PSD, "offer-card-1080x1350.psd"), 1080, 1350, children, linked, bg);
 }
+
+// Feature 8: a Shopify product export (documented CSV headers) whose images are links.
+// images.example.test is served by the e2e harness's simulated internet.
+const csvCell = (v) => (/[",\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+const shopify = [
+    ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Published", "Variant SKU", "Variant Price", "Variant Compare At Price", "Image Src", "Image Position"],
+    ["aurora-laptop", "Aurora Laptop 14", "<p>Thin &amp; light, <strong>all-day</strong> battery.</p>", "Nova", "Laptops", "TRUE", "SH-001", "1299.00", "1500.00", "https://images.example.test/laptop.jpg", "1"],
+    ["aurora-laptop", "", "", "", "", "", "SH-001-B", "1299.00", "", "https://images.example.test/laptop-side.jpg", "2"],
+    ["pulse-phone", "Pulse Phone X", "<p>Bright display.</p>", "Nova", "Phones", "TRUE", "SH-002", "799.00", "", "https://images.example.test/phone.jpg", "1"],
+    ["orbit-watch", "Orbit Watch", "<p>Fitness tracking.</p>", "Nova", "Watches", "TRUE", "SH-003", "249.00", "350.00", "https://images.example.test/missing.jpg", "1"],
+    ["echo-headphones", "Echo Headphones", "<p>Noise cancelling.</p>", "Nova", "Audio", "TRUE", "SH-004", "199.00", "", "https://images.example.test/page", "1"],
+    ["wireless-speaker", "سماعة لاسلكية", "<p>صوت نقي.</p>", "Nova", "Audio", "TRUE", "SH-005", "249.00", "300.00", "https://images.example.test/speaker.webp", "1"]
+];
+fs.mkdirSync(path.join(OUT, "spreadsheets"), { recursive: true });
+fs.writeFileSync(path.join(OUT, "spreadsheets", "shopify-products.csv"), "﻿" + shopify.map((r) => r.map(csvCell).join(",")).join("\r\n") + "\r\n");
+console.log("wrote spreadsheets/shopify-products.csv");

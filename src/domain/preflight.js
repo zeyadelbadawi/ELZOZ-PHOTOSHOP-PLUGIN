@@ -10,6 +10,7 @@ import { parseRowSelection, rowSelected } from "./rows.js";
 import { visibilityFor } from "./visibility.js";
 import { formatValue } from "./transforms.js";
 import { partitionDone, rowKey } from "./projects.js";
+import { directLink, LINK_FOLDER_KEY, linksNeeded } from "./linkImages.js";
 
 export const FORMATS = ["jpg", "png", "psd"];
 
@@ -42,6 +43,21 @@ export function resolveRow(row, mapping, folders) {
         const value = row.values[rule.column] ?? "";
         if (String(value).trim() === "") {
             if (rule.emptyPolicy === "skipRow") problems.push({ code: "empty_image", column: rule.column, layerId: rule.layerId });
+            continue;
+        }
+        if (rule.source === "link") {
+            // Images from links: downloaded before the job into the links folder.
+            const url = directLink(value);
+            if (!url) {
+                problems.push({ code: "not_a_link", column: rule.column, layerId: rule.layerId, value: String(value).trim() });
+                continue;
+            }
+            const d = ((folders[LINK_FOLDER_KEY] || {}).downloads || {})[url];
+            if (!d || !d.file) {
+                problems.push({ code: d && d.error ? "link_failed" : "link_pending", column: rule.column, layerId: rule.layerId, value: url, reason: d && d.error });
+                continue;
+            }
+            images.push({ layerId: rule.layerId, folderKey: LINK_FOLDER_KEY, file: d.file, fit: rule.fit });
             continue;
         }
         const folder = folders[rule.folderKey];
@@ -84,7 +100,10 @@ const PROBLEM_TEXT = {
     image_not_found: (p) => `Image not found for "${p.column}"`,
     image_path_not_allowed: (p) => `"${p.column}" contains a path; use a file name only`,
     image_unsupported_type: (p) => `Unsupported image type in "${p.column}"`,
-    bad_color: (p) => `"${p.column}" isn't a color (use #E30613, #F00, rgb(227,6,19) or a color name)`
+    bad_color: (p) => `"${p.column}" isn't a color (use #E30613, #F00, rgb(227,6,19) or a color name)`,
+    not_a_link: (p) => `"${p.column}" should contain an image link (https://...)`,
+    link_failed: (p) => `The image link in "${p.column}" couldn't be used (${p.reason})`,
+    link_pending: (p) => `The image link in "${p.column}" isn't downloaded yet`
 };
 
 /**
@@ -149,7 +168,7 @@ export function runPreflight(input) {
         if (!layer) blocking.push(issue("error", "layer_missing", `A mapped image layer no longer exists in the template.`, { fix: { step: "map", layerId: rule.layerId } }));
         else if (!isImageLayer(layer)) blocking.push(issue("error", "not_image", `"${displayPath(layer)}" can't receive images (Smart Object or pixel layer required).`, { fix: { step: "map", layerId: rule.layerId } }));
         if (!columns.has(rule.column)) blocking.push(issue("error", "column_missing", `Column "${rule.column}" is not in the spreadsheet.`, { fix: { step: "map", layerId: rule.layerId } }));
-        if (!rule.folderKey || !folders[rule.folderKey]) blocking.push(issue("error", "folder_missing", `Choose an image folder for "${layer ? displayPath(layer) : rule.column}".`, { fix: { step: "map", layerId: rule.layerId } }));
+        if (rule.source !== "link" && (!rule.folderKey || !folders[rule.folderKey])) blocking.push(issue("error", "folder_missing", `Choose an image folder for "${layer ? displayPath(layer) : rule.column}".`, { fix: { step: "map", layerId: rule.layerId } }));
     }
     for (const rule of Object.values(mapping.colors || {})) {
         const layer = findLayer(layers, rule.layerId);
@@ -168,6 +187,10 @@ export function runPreflight(input) {
             warnings.push(issue("warning", "duplicate_layer_name", `${dup.layers.length} layers are named "${dup.name}". Check the group path shown in Map.`, { fix: { step: "map" } }));
         }
     }
+    // Images from links must be downloaded first (the Check step does it automatically).
+    const linkDownloads = (folders[LINK_FOLDER_KEY] || {}).downloads || {};
+    const pendingLinks = linksNeeded(table.rows, mapping).filter((u) => !linkDownloads[u]);
+    if (pendingLinks.length) blocking.push(issue("error", "links_pending", `${pendingLinks.length} image(s) from links still need to be downloaded.`, { count: pendingLinks.length, fix: { step: "check" } }));
     if (blocking.length) return { ok: false, blocking, warnings, items: [], skipped: [], units: 0, cost: 0 };
 
     // --- Rows --------------------------------------------------------------
@@ -213,7 +236,7 @@ export function runPreflight(input) {
         if (res.problems.length) {
             skipped.push({ index: row.index, sourceRow: row.sourceRow, problems: res.problems });
             for (const p of res.problems) {
-                const k = `${p.code}|${p.column}`;
+                const k = `${p.code}|${p.column}|${p.reason || ""}`; // failed links: one warning per reason
                 const g = grouped.get(k) || { problem: p, rows: [] };
                 // Two layers fed by the same column report the same row once.
                 if (g.rows[g.rows.length - 1] !== row.sourceRow) g.rows.push(row.sourceRow);

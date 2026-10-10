@@ -5,6 +5,7 @@ import { runPreflight } from "../domain/preflight.js";
 import { runVideoPreflight } from "../domain/video/preflight.js";
 import { buildTimeline } from "../domain/video/timeline.js";
 import { applyDerived, validateDerived } from "../domain/derived.js";
+import { linkShare } from "../domain/linkImages.js";
 
 export const DESIGN_STEPS = ["data", "template", "map", "check", "generate"];
 export const VIDEO_STEPS = ["data", "template", "map", "animate", "check", "generate"];
@@ -48,10 +49,23 @@ export function reducer(state, action) {
         case "go":
             return { ...state, step: action.step };
         case "data": {
-            const next = { ...state, data: action.data };
+            // Smart columns that read columns this spreadsheet doesn't have are removed (and named once),
+            // instead of blocking the job; ones still being filled in are kept.
+            let derived = state.derived || [];
+            let derivedDropped = null;
+            if (action.data && derived.length) {
+                const gone = derived.filter((d) => validateDerived(d, action.data.table.headers).includes("missing_columns"));
+                if (gone.length) {
+                    derived = derived.filter((d) => !gone.includes(d));
+                    derivedDropped = gone.map((d) => d.label);
+                }
+            }
+            const next = { ...state, data: action.data, derived, derivedDropped };
             const mapping = state.template && action.data ? pruneMapping(state.mapping, effectiveTable(next).headers, state.template.layers) : state.mapping;
             return { ...next, mapping, settings: { ...state.settings, rowSelection: "" }, run: idleRun() };
         }
+        case "derived-dropped-seen":
+            return { ...state, derivedDropped: null };
         case "project":
             return { ...state, project: action.project ? { ...(state.project || {}), ...action.project } : null };
         case "project-loaded": {
@@ -174,7 +188,7 @@ export function computePlan(state, { balance = null, pricing = {} } = {}) {
         table: effectiveTable(state),
         layers: state.template ? state.template.layers : [],
         mapping: state.mapping,
-        folders: Object.fromEntries(Object.entries(state.folders).map(([k, f]) => [k, { name: f.name, index: f.index }])),
+        folders: Object.fromEntries(Object.entries(state.folders).map(([k, f]) => [k, { name: f.name, index: f.index, downloads: f.downloads }])),
         output: state.output ? { name: state.output.name, existingFileNames: state.output.existingFileNames } : null,
         formats: state.settings.formats,
         namePattern: state.settings.namePattern,
@@ -314,6 +328,15 @@ export function recallMemory(storage, template, table) {
     if (!saved) return null;
     const derived = (saved.derived || []).filter((d) => validateDerived(d, table.headers).length === 0);
     const headers = derived.length ? applyDerived({ ...table, rows: [] }, derived).headers : table.headers;
-    const mapping = pruneMapping({ text: saved.text || {}, images: saved.images || {}, visibility: saved.visibility || {}, colors: saved.colors || {} }, headers, template.layers);
+    const pruned = pruneMapping({ text: saved.text || {}, images: saved.images || {}, visibility: saved.visibility || {}, colors: saved.colors || {} }, headers, template.layers);
+    // Folder or links follows what this spreadsheet's column holds now.
+    const images = Object.fromEntries(
+        Object.entries(pruned.images).map(([id, r]) => {
+            const links = linkShare(table.rows || [], r.column) >= 0.6;
+            const { source, ...rest } = r;
+            return [id, links ? { ...rest, source: "link" } : rest];
+        })
+    );
+    const mapping = { ...pruned, images };
     return mappedCount(mapping) > 0 ? { mapping, derived } : null;
 }

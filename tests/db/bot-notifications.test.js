@@ -10,6 +10,8 @@ d("bot notifications (database)", () => {
     let admin;
     beforeAll(async () => {
         db = await connect();
+        // Notices left open by earlier runs (other test files, e2e users) must not fill the claim batches.
+        await db.query("update public.bot_notifications set status = 'skipped' where status in ('pending', 'sending', 'waiting')");
         admin = await createUser(db);
         await db.query("insert into private.admins (user_id) values ($1)", [admin]);
     });

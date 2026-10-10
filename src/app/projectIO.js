@@ -2,6 +2,8 @@
 // and the pure project store; the screens only call these two functions.
 import { getProject, markDone, newProjectId, putProject, rowKey } from "../domain/projects.js";
 import { JOB_ONLY_SETTINGS } from "./state.js";
+import { LINK_FOLDER_KEY } from "../domain/linkImages.js";
+import { detectStore, prepareStoreTable } from "../domain/stores.js";
 
 const stripSettings = (settings) => Object.fromEntries(Object.entries(settings).filter(([k]) => !JOB_ONLY_SETTINGS.includes(k)));
 
@@ -16,7 +18,8 @@ export async function saveProject({ storage, services, state, name, keyColumn, o
     const data = state.data;
     const tpl = state.template;
     const folders = {};
-    for (const [key, f] of Object.entries(state.folders || {})) folders[key] = { name: f.name, token: await tokenFor(f.entry) };
+    // Downloaded link images live in a temporary folder: they are downloaded again next time.
+    for (const [key, f] of Object.entries(state.folders || {})) if (key !== LINK_FOLDER_KEY) folders[key] = { name: f.name, token: await tokenFor(f.entry) };
     const prev = state.project ? getProject(storage, state.project.id) : null;
     const project = {
         id: (state.project && state.project.id) || newProjectId(now),
@@ -26,7 +29,7 @@ export async function saveProject({ storage, services, state, name, keyColumn, o
         onlyNew: onlyNew ?? (state.project ? state.project.onlyNew : true),
         done: markDone((state.project && state.project.done) || (prev && prev.done) || {}, justGenerated || []),
         sources: {
-            data: data ? { token: await tokenFor(data.entry), fileName: data.fileName, sheetName: data.sheetName, headerRow: data.headerRow } : null,
+            data: data ? { token: await tokenFor(data.entry), fileName: data.fileName, sheetName: data.sheetName, headerRow: data.headerRow, store: data.store || null } : null,
             template: tpl ? { token: await tokenFor(tpl.entry), title: tpl.title, fromOpenDocument: !tpl.entry } : null,
             folders,
             output: state.output ? { token: await tokenFor(state.output.entry), name: state.output.name } : null
@@ -81,6 +84,12 @@ export async function openProject({ storage, services, id }) {
             const sheetName = picked.sheetNames.includes(src.data.sheetName) ? src.data.sheetName : picked.sheetNames[0];
             const headerRow = src.data.headerRow || 1;
             data = { ...picked, sheetName, headerRow, table: services.readSheet(picked.workbook, sheetName, headerRow) };
+            // A store export prepared last time is prepared again (new products included).
+            const store = src.data.store ? detectStore(data.table.headers) : null;
+            if (store && store.id === src.data.store) {
+                const prepared = prepareStoreTable(data.table, store);
+                data = { ...data, rawTable: data.table, table: prepared.table, store: store.id, storeNote: prepared.note };
+            }
         }
     }
     let template = null;

@@ -3,6 +3,7 @@
 // duplicate layer names are unambiguous.
 import { isImageLayer, isTextLayer } from "./layers.js";
 import { IMAGE_EXTENSIONS, extensionOf } from "./imageFiles.js";
+import { linkShare } from "./linkImages.js";
 
 export const EMPTY_POLICIES = ["blank", "keepTemplate", "skipRow"];
 export const FIT_MODES = ["fit", "fill", "none"];
@@ -55,7 +56,8 @@ export function setImageMapping(mapping, layerId, rule) {
             fit: rule.fit || "fit",
             emptyPolicy: rule.emptyPolicy || "keepTemplate",
             ignoreCase: rule.ignoreCase !== false,
-            addExtension: rule.addExtension !== false
+            addExtension: rule.addExtension !== false,
+            ...(rule.source === "link" ? { source: "link" } : {}) // images downloaded from links in the column
         };
     }
     return { ...mapping, images };
@@ -80,7 +82,10 @@ export function autoMap(mapping, headers, layers, rows = null) {
         const column = byNorm.get(normalize(layer.name));
         if (!column) continue;
         if (isTextLayer(layer) && !next.text[layer.id]) next = setTextMapping(next, layer.id, column);
-        else if (isImageLayer(layer) && !next.images[layer.id] && holdsFiles(column)) next = setImageMapping(next, layer.id, { column });
+        else if (isImageLayer(layer) && !next.images[layer.id]) {
+            if (rows && linkShare(rows, column) >= 0.6) next = setImageMapping(next, layer.id, { column, source: "link" });
+            else if (holdsFiles(column)) next = setImageMapping(next, layer.id, { column });
+        }
     }
     return next;
 }

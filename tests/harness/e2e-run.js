@@ -69,6 +69,7 @@ let browser;
 async function open({ width = 320, height = 720, theme = "dark", lang = "en", ps, record } = {}) {
     const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2, ...(record ? { recordVideo: { dir: path.join(RECS, ".raw"), size: { width, height } } } : {}) });
     const page = await ctx.newPage();
+    if (current) current.page = page; // for the failure screenshot
     page.on("pageerror", (e) => report.errors.push({ scenario: current && current.id, width, kind: "pageerror", message: e.message }));
     page.on("console", (m) => {
         if (m.type() !== "error") return;
@@ -1109,6 +1110,67 @@ scenario("I", "Features 1-15: smart prices, formatting (more added per feature)"
     check("print PDF: 3 A4 sheets, cut-mark slug, images embedded at full size (pypdf)", printPages.length === 3 && printPages[0].media.join() === "0,0,595,842" && printPages[0].text.includes("sheet 1/3") && printPages[0].images === 2, printPages.map((x) => ({ ...x, text: x.text.slice(0, 60) })));
     execFileSync("pdftoppm", ["-r", "40", "-f", "1", "-l", "1", "-png", path.join(dir4, printPdf), path.join(SHOTS, "I18-print-sheet-page1")]);
     report.screenshots.push({ file: "I18-print-sheet-page1-1.png", title: "Print PDF sheet 1: 2 designs × 2 copies with crop marks (rendered by pdftoppm)", scenario: "I", width: 0, lang: "en", theme: "pdf", layoutProblems: [] });
+
+    // ---- F8: a Shopify export with image links; images download by themselves
+    await click(p, "New job");
+    await queue(p, { file: "spreadsheets/shopify-products.csv" });
+    await click(p, "Choose file");
+    const dropped = await p.locator(".ez-alert").filter({ hasText: "Smart columns removed" }).textContent();
+    check("smart columns from the old file that can't work here are removed and named", /Discount/.test(dropped) && !/Primary/.test(dropped), dropped);
+    const storeCard = sel(p, "Shopify product export detected");
+    check("the Shopify export is recognised", (await storeCard.count()) === 1);
+    await storeCard.scrollIntoViewIfNeeded();
+    await shot(p, "I19-data-shopify-detected-320-dark", "Data: Shopify export recognised, one click to prepare it", { scroll: null });
+    await storeCard.locator('sp-button:has-text("Prepare for designs")').click();
+    await p.waitForTimeout(200);
+    const storeNote = await p.locator('[data-testid="store-note"]').textContent();
+    check("prepared: 5 products, 1 extra row merged, 3 on sale", /5 product\(s\)/.test(storeNote) && /1 extra row\(s\) merged/.test(storeNote) && /3 on sale/.test(storeNote), storeNote);
+    const storeHead = await p.locator(".ez-table-head .ez-cell").allTextContents();
+    check("design-ready columns added (Name, Price, Old price, Photo, SKU, Description)", ["Name", "Price", "Old price", "Photo", "SKU", "Description"].every((k) => storeHead.includes(k)), storeHead);
+    await click(p, "Next");
+    await queue(p, { file: "templates/offer-card-1080x1350.psd" });
+    await click(p, "Choose PSD");
+    await page_wait(p);
+    await click(p, "Next");
+    await click(p, "Auto-map by name");
+    const photoRow = layerRow(p, "Photo");
+    if ((await photoRow.locator("select").first().inputValue()) !== "Photo") await photoRow.locator("select").first().selectOption("Photo");
+    await p.waitForTimeout(150);
+    const source = await (await fieldIn(photoRow, "Images come from")).inputValue();
+    const linkInfo = await photoRow.locator('[data-testid="link-info"]').textContent();
+    check("the Photo column of links switches the layer to 'links' (no folder to pick)", source === "link" && /5 image link\(s\) in 5 row\(s\)/.test(linkInfo), { source, linkInfo });
+    await photoRow.scrollIntoViewIfNeeded();
+    await shot(p, "I20-map-images-from-links-320-dark", "Map: Photo from links (downloaded automatically)", { scroll: null });
+    await click(p, "Next");
+    const printBox = p.locator('label:has-text("Also make a print-ready PDF") input');
+    if (await printBox.isChecked()) await printBox.uncheck();
+    await field(p, "File names").fill("{SKU}_{Name}");
+    await p.waitForFunction(() => /of 5 image\(s\) downloaded/.test((document.querySelector('[data-testid="links-summary"]') || {}).textContent || ""), null, { timeout: 30000 });
+    await p.waitForTimeout(200);
+    const linkSummary = await p.locator('[data-testid="links-summary"]').textContent();
+    check("links downloaded automatically: 3 of 5, 2 failed", /3 of 5 image\(s\) downloaded/.test(linkSummary) && /2 failed/.test(linkSummary), linkSummary);
+    const linkWarn = (await p.locator(".ez-alert").allTextContents()).filter((x) => /image link/.test(x));
+    check("each failed link says why (404, a web page instead of an image)", linkWarn.some((x) => /Nothing at this link \(404\)/.test(x)) && linkWarn.some((x) => /web page, not an image/.test(x)), linkWarn);
+    await sel(p, "Images from links").scrollIntoViewIfNeeded();
+    await shot(p, "I21-check-links-downloaded-320-dark", "Check: 3 of 5 images downloaded; the 404 and the web-page link are explained and skipped", { scroll: null });
+    const requestsBefore = await p.evaluate(() => window.__harness.internet.requests.length);
+    await sel(p, "Images from links").locator('sp-button:has-text("Try the failed links again")').click();
+    await p.waitForFunction(() => /of 5 image\(s\) downloaded/.test((document.querySelector('[data-testid="links-summary"]') || {}).textContent || ""), null, { timeout: 30000 });
+    const retried = (await p.evaluate(() => window.__harness.internet.requests.length)) - requestsBefore;
+    check("retry asks only for the 2 failed links (downloaded images are reused)", retried === 2, retried);
+    await click(p, "Next");
+    await btn(p, "Generate 3").click();
+    await waitForResults(p);
+    const dir5 = path.join(OUTS, "scenario-i-links");
+    await saveOutputs(p, "Elzoz output I", dir5);
+    const shop = psdSummary(dir5);
+    const aurora = shop["SH-001_Aurora Laptop 14.psd"];
+    check("Shopify rows designed with downloaded photos, sale price and old price (psd-tools)",
+        aurora && /^link-.*\.jpg$/.test(aurora.layers["Photo@Media"]) && aurora.layers["Price@Text"] === "1299.00" && aurora.layers["Old price@Text"] === "1500.00" && Object.keys(shop).some((n) => n.startsWith("SH-005_")) && !Object.keys(shop).some((n) => n.startsWith("SH-003_") || n.startsWith("SH-004_")),
+        Object.fromEntries(Object.entries(shop).filter(([n]) => n.startsWith("SH-")).map(([n, v]) => [n, { photo: v.layers["Photo@Media"], price: v.layers["Price@Text"], old: v.layers["Old price@Text"] }])));
+    await shot(p, "I22-results-links-320-dark", "Results: 3 designs from the Shopify export (2 rows skipped, not charged)");
+    acct = await account(email);
+    check("only the 3 designed rows charged (65 → 62)", Number(acct.balance.balance) === 62, acct.balance);
     await finishRecording(p, "SIMULATED-scenario-I-features", "Scenario I: new features 1-15 (simulated host)");
 });
 
@@ -1131,8 +1193,14 @@ async function page_wait(p) {
         } catch (e) {
             current.error = e.stack || String(e);
             console.log(`  ✗ ERROR ${e.message}`);
+            if (current.page) {
+                const file = path.join(ART, `FAILED-scenario-${s.id}.png`);
+                await current.page.screenshot({ path: file }).catch(() => {});
+                console.log(`    screenshot: ${path.relative(process.cwd(), file)}`);
+            }
         }
         current.ms = Date.now() - t0;
+        delete current.page;
         if (current.error || current.checks.some((c) => !c.ok)) failed++;
     }
     await browser.close();

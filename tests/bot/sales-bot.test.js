@@ -172,6 +172,7 @@ d("sales bot journeys (real database, fake WhatsApp/Telegram/AI)", () => {
         await pgc.query("update public.bot_settings set value = 'false' where key = 'paused'");
         // Payments match open orders by amount: orders left open by earlier runs must not compete.
         await pgc.query("update public.bot_orders set status = 'cancelled', note = 'test reset' where status = 'awaiting_payment'");
+        await pgc.query("update public.bot_notifications set status = 'skipped' where status in ('pending', 'sending', 'waiting')");
 
         const restFetch = (url, opts) => fetch(url.replace(`${env.rest}/rest/v1`, env.rest), opts);
         const db = supabaseClient({ url: env.rest, key: signJwt({ role: "service_role" }, env.secret, 3600), fetch: restFetch });

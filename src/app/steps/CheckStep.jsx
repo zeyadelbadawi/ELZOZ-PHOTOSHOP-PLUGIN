@@ -5,6 +5,7 @@ import { Alert, Button, Card, Checkbox, Field, FileField, NumberInput, Section, 
 import { computePlan, effectiveTable, previewPlan } from "../state.js";
 import { putProject, getProject } from "../../domain/projects.js";
 import { PrintCard, ProofCard } from "./PrintProof.jsx";
+import LinkDownloads from "./LinkDownloads.jsx";
 
 const projectStorage = () => {
     try {
@@ -85,6 +86,7 @@ export default function CheckStep() {
     return (
         <>
             {state.project && <ProjectCard />}
+            <LinkDownloads />
             <Section title={t("check.output")}>
                 <Card>
                     <Field label={t("check.folder")}>

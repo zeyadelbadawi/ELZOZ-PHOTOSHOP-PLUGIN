@@ -1,0 +1,7 @@
+﻿Handle,Title,Body (HTML),Vendor,Type,Published,Variant SKU,Variant Price,Variant Compare At Price,Image Src,Image Position
+aurora-laptop,Aurora Laptop 14,"<p>Thin &amp; light, <strong>all-day</strong> battery.</p>",Nova,Laptops,TRUE,SH-001,1299.00,1500.00,https://images.example.test/laptop.jpg,1
+aurora-laptop,,,,,,SH-001-B,1299.00,,https://images.example.test/laptop-side.jpg,2
+pulse-phone,Pulse Phone X,<p>Bright display.</p>,Nova,Phones,TRUE,SH-002,799.00,,https://images.example.test/phone.jpg,1
+orbit-watch,Orbit Watch,<p>Fitness tracking.</p>,Nova,Watches,TRUE,SH-003,249.00,350.00,https://images.example.test/missing.jpg,1
+echo-headphones,Echo Headphones,<p>Noise cancelling.</p>,Nova,Audio,TRUE,SH-004,199.00,,https://images.example.test/page,1
+wireless-speaker,سماعة لاسلكية,<p>صوت نقي.</p>,Nova,Audio,TRUE,SH-005,249.00,300.00,https://images.example.test/speaker.webp,1

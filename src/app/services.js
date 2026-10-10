@@ -9,6 +9,8 @@ import { supabaseConfig } from "../config/supabase-config.js";
 import { readWorkbook, readTable } from "../domain/excel.js";
 import { buildFolderIndex } from "../domain/imageFiles.js";
 import { frameState } from "../domain/video/timeline.js";
+import { LINK_FOLDER_KEY } from "../domain/linkImages.js";
+import { downloadLinks } from "./linkDownloader.js";
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 export function base64(bytes) {
@@ -26,7 +28,7 @@ export function base64(bytes) {
 
 export const PREVIEW_MAX = 640;
 
-export function createServices({ photoshop, uxp }) {
+export function createServices({ photoshop, uxp, fetch: fetchImpl = typeof fetch === "function" ? fetch.bind(globalThis) : null }) {
     const port = createPhotoshopPort({ photoshop, uxp });
     const fs = uxp.storage.localFileSystem;
     const binary = uxp.storage.formats.binary;
@@ -103,6 +105,24 @@ export function createServices({ photoshop, uxp }) {
             } catch (e) {
                 return null;
             }
+        },
+
+        /**
+         * Download images from links into a temporary folder (cached for the session).
+         * Returns the folder to store under LINK_FOLDER_KEY: { name, entry, index, downloads }.
+         */
+        async downloadLinks(urls, { known = {}, onProgress, signal } = {}) {
+            if (!fetchImpl) throw new Error("Downloads aren't available in this Photoshop version.");
+            const temp = await fs.getTemporaryFolder();
+            let folder;
+            try {
+                folder = await temp.getEntry("elzoz-links");
+            } catch (e) {
+                folder = await temp.createFolder("elzoz-links");
+            }
+            const results = await downloadLinks({ urls, folder, fetch: fetchImpl, known, onProgress, signal });
+            const downloads = { ...known, ...results };
+            return { key: LINK_FOLDER_KEY, folder: { name: "Images from links", entry: folder, path: folder.nativePath, index: buildFolderIndex(await listFileNames(folder)), downloads } };
         },
 
         readSheet(workbook, sheetName, headerRow) {

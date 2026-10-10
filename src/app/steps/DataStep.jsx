@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
-import { Alert, Field, FileField, NumberInput, Section, Select } from "../../ui/components.jsx";
+import { Alert, Button, Card, Field, FileField, NumberInput, Section, Select } from "../../ui/components.jsx";
+import { detectStore, prepareStoreTable } from "../../domain/stores.js";
 import { effectiveTable } from "../state.js";
 import SmartColumns from "./SmartColumns.jsx";
 
@@ -94,6 +95,12 @@ export default function DataStep() {
                             {i.message}
                         </Alert>
                     ))}
+                    {state.derivedDropped && (
+                        <Alert tone="info" action={<span className="ez-link" onClick={() => dispatch({ type: "derived-dropped-seen" })}>✕</span>}>
+                            {t("derived.dropped", { list: state.derivedDropped.join(", ") })}
+                        </Alert>
+                    )}
+                    <StoreCard />
                     {data.table.headers.length > 0 && (
                         <Section title={t("data.preview")}>
                             <Preview table={effectiveTable(state)} />
@@ -103,5 +110,54 @@ export default function DataStep() {
                 </>
             )}
         </>
+    );
+}
+
+/** A Shopify / WooCommerce / Salla / Zid product export: one click to make it design-ready. */
+function StoreCard() {
+    const { state, dispatch } = useApp();
+    const { t } = useI18n();
+    const data = state.data;
+    if (data.store) {
+        const n = data.storeNote;
+        return (
+            <Alert
+                tone="success"
+                title={t("store.prepared", { store: n.store })}
+                action={
+                    <Button quiet onClick={() => dispatch({ type: "data", data: { ...data, table: data.rawTable, rawTable: undefined, store: undefined, storeNote: undefined } })}>
+                        {t("store.undo")}
+                    </Button>
+                }
+            >
+                <div data-testid="store-note">
+                    {t("store.preparedInfo", { products: n.products })}
+                    {n.merged > 0 && ` ${t("store.merged", { n: n.merged })}`}
+                    {n.sale > 0 && ` ${t("store.sale", { n: n.sale })}`}
+                </div>
+            </Alert>
+        );
+    }
+    const store = detectStore(data.table.headers);
+    if (!store) return null;
+    const prepare = () => {
+        const { table, note } = prepareStoreTable(data.table, store);
+        dispatch({ type: "data", data: { ...data, rawTable: data.table, table, store: store.id, storeNote: note } });
+    };
+    return (
+        <Section title={t("store.title", { store: store.label })}>
+            <Card className="ez-kit">
+                <div className="ez-small ez-mb2">{t("store.about")}</div>
+                <ul className="ez-small ez-muted ez-list">
+                    <li>{t("store.one")}</li>
+                    <li>{t("store.two")}</li>
+                    <li>{t("store.three")}</li>
+                    <li>{t("store.four")}</li>
+                </ul>
+                <Button variant="primary" onClick={prepare}>
+                    {t("store.prepare")}
+                </Button>
+            </Card>
+        </Section>
     );
 }

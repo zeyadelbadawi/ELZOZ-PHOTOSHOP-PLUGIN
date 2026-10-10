@@ -48,6 +48,11 @@ class FakeFile {
         next.set(add, prev.length);
         this.bytes = next;
         this.size = next.length;
+        try {
+            this.image = imageInfo(next) || this.image; // a written image can be placed, like a real file
+        } catch (e) {
+            /* not an image */
+        }
         this.folder.files.set(this.name, this);
         return add.length;
     }

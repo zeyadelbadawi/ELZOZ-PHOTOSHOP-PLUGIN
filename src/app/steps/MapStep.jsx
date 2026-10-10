@@ -6,6 +6,7 @@ import { isColorLayer, isImageLayer, isTextLayer } from "../../domain/layers.js"
 import { parseColor, toHex } from "../../domain/colors.js";
 import { autoMap, createMapping, mappedCount, setColorMapping, setImageMapping, setTextMapping, setTextOptions, setVisibilityMapping } from "../../domain/mapping.js";
 import { VISIBILITY_EMPTY } from "../../domain/visibility.js";
+import { directLink, linkShare } from "../../domain/linkImages.js";
 import { effectiveTable } from "../state.js";
 import TextFormat from "./TextFormat.jsx";
 
@@ -116,24 +117,50 @@ export default function MapStep() {
                             const folder = rule && rule.folderKey ? state.folders[rule.folderKey] : null;
                             const update = (patch) => set(setImageMapping(mapping, layer.id, { ...rule, ...patch }));
                             return (
-                                <LayerRow key={layer.id} layer={layer} rule={rule} columns={columns} firstRow={firstRow} onColumn={(c) => set(setImageMapping(mapping, layer.id, c ? { ...(rule || {}), column: c } : null))}>
-                                    <Field label={t("map.folder")}>
-                                        <FileField
-                                            name={folder && folder.name}
-                                            meta={folder && t("map.folderMeta", { n: folder.index.count })}
-                                            emptyLabel={t("map.folderEmpty")}
-                                            actionLabel={t("map.folderPick")}
-                                            onPick={() => pickFolder(layer.id, rule)}
+                                <LayerRow
+                                    key={layer.id}
+                                    layer={layer}
+                                    rule={rule}
+                                    columns={columns}
+                                    firstRow={firstRow}
+                                    // A column of links switches the layer to "download from links" by itself.
+                                    onColumn={(c) => set(setImageMapping(mapping, layer.id, c ? { ...(rule || {}), column: c, source: linkShare(table.rows, c) >= 0.6 ? "link" : "folder" } : null))}
+                                >
+                                    <Field label={t("map.source")}>
+                                        <Select
+                                            value={rule && rule.source === "link" ? "link" : "folder"}
+                                            options={[
+                                                { value: "folder", label: t("map.source.folder") },
+                                                { value: "link", label: t("map.source.link") }
+                                            ]}
+                                            onChange={(v) => update({ source: v })}
                                         />
                                     </Field>
+                                    {rule && rule.source === "link" ? (
+                                        <LinkInfo rows={table.rows} column={rule.column} />
+                                    ) : (
+                                        <Field label={t("map.folder")}>
+                                            <FileField
+                                                name={folder && folder.name}
+                                                meta={folder && t("map.folderMeta", { n: folder.index.count })}
+                                                emptyLabel={t("map.folderEmpty")}
+                                                actionLabel={t("map.folderPick")}
+                                                onPick={() => pickFolder(layer.id, rule)}
+                                            />
+                                        </Field>
+                                    )}
                                     <Field label={t("map.fit")}>
                                         <Select value={rule && rule.fit} onChange={(v) => update({ fit: v })} options={["fit", "fill", "none"].map((v) => ({ value: v, label: t(`map.fit.${v}`) }))} />
                                     </Field>
                                     <Field label={t("map.empty")}>
                                         <Select value={rule && rule.emptyPolicy} options={imageEmptyOptions} onChange={(v) => update({ emptyPolicy: v })} />
                                     </Field>
-                                    <Checkbox checked={rule && rule.ignoreCase} onChange={(v) => update({ ignoreCase: v })} label={t("map.ignoreCase")} />
-                                    <Checkbox checked={rule && rule.addExtension} onChange={(v) => update({ addExtension: v })} label={t("map.addExtension")} />
+                                    {!(rule && rule.source === "link") && (
+                                        <>
+                                            <Checkbox checked={rule && rule.ignoreCase} onChange={(v) => update({ ignoreCase: v })} label={t("map.ignoreCase")} />
+                                            <Checkbox checked={rule && rule.addExtension} onChange={(v) => update({ addExtension: v })} label={t("map.addExtension")} />
+                                        </>
+                                    )}
                                 </LayerRow>
                             );
                         })}
@@ -145,6 +172,22 @@ export default function MapStep() {
 
             <VisibilitySection layers={template.layers} mapping={mapping} columns={columns} set={set} />
         </>
+    );
+}
+
+/** What "download from links" will do for this column. */
+function LinkInfo({ rows, column }) {
+    const { t } = useI18n();
+    const values = rows.filter((r) => !r.isEmpty).map((r) => String(r.values[column] ?? "").trim()).filter(Boolean);
+    const links = values.filter((v) => directLink(v));
+    const share = values.length ? links.length / values.length : 0;
+    return (
+        <div className="ez-small ez-mb2" data-testid="link-info">
+            <div>{t("map.link.count", { n: new Set(links.map(directLink)).size, rows: links.length })}</div>
+            {links[0] && <div className="ez-muted ez-ellipsis" title={links[0]}>{links[0]}</div>}
+            {share < 1 && values.length > 0 && <div className="ez-warn">{t("map.link.notLinks", { n: values.length - links.length })}</div>}
+            <div className="ez-muted">{t("map.link.hint")}</div>
+        </div>
     );
 }
 
