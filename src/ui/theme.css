@@ -552,3 +552,5 @@ body {
 /* ---------- store exports ---------- */
 .ez-list { margin: 0 0 var(--ez-s2); padding-left: 18px; }
 [dir="rtl"] .ez-list { padding-left: 0; padding-right: 18px; }
+.ez-code-preview { width: 96px; height: auto; background: #fff; padding: 4px; margin-bottom: var(--ez-s1); image-rendering: pixelated; }
+.ez-gsheet { margin-top: var(--ez-s3); }

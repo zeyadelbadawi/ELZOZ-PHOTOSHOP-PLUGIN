@@ -11,6 +11,7 @@ import { visibilityFor } from "./visibility.js";
 import { formatValue } from "./transforms.js";
 import { partitionDone, rowKey } from "./projects.js";
 import { directLink, LINK_FOLDER_KEY, linksNeeded } from "./linkImages.js";
+import { CODE_FOLDER_KEY, CODE_KINDS, codeKey, codesNeeded, codeValue } from "./codes.js";
 
 export const FORMATS = ["jpg", "png", "psd"];
 
@@ -43,6 +44,21 @@ export function resolveRow(row, mapping, folders) {
         const value = row.values[rule.column] ?? "";
         if (String(value).trim() === "") {
             if (rule.emptyPolicy === "skipRow") problems.push({ code: "empty_image", column: rule.column, layerId: rule.layerId });
+            continue;
+        }
+        if (CODE_KINDS.includes(rule.source)) {
+            // QR code / barcode made from the cell (generated before the job).
+            const cv = codeValue(rule.source, value);
+            if (cv.problem) {
+                problems.push({ code: "bad_code", column: rule.column, layerId: rule.layerId, value: String(value).trim(), reason: cv.problem });
+                continue;
+            }
+            const made = ((folders[CODE_FOLDER_KEY] || {}).downloads || {})[codeKey(rule.source, cv.value, rule.aspect)];
+            if (!made || !made.file) {
+                problems.push({ code: "code_pending", column: rule.column, layerId: rule.layerId, value: cv.value });
+                continue;
+            }
+            images.push({ layerId: rule.layerId, folderKey: CODE_FOLDER_KEY, file: made.file, fit: rule.fit });
             continue;
         }
         if (rule.source === "link") {
@@ -103,7 +119,9 @@ const PROBLEM_TEXT = {
     bad_color: (p) => `"${p.column}" isn't a color (use #E30613, #F00, rgb(227,6,19) or a color name)`,
     not_a_link: (p) => `"${p.column}" should contain an image link (https://...)`,
     link_failed: (p) => `The image link in "${p.column}" couldn't be used (${p.reason})`,
-    link_pending: (p) => `The image link in "${p.column}" isn't downloaded yet`
+    link_pending: (p) => `The image link in "${p.column}" isn't downloaded yet`,
+    bad_code: (p) => `"${p.column}" can't be made into a code (${p.reason})`,
+    code_pending: (p) => `The code for "${p.column}" isn't made yet`
 };
 
 /**
@@ -168,7 +186,7 @@ export function runPreflight(input) {
         if (!layer) blocking.push(issue("error", "layer_missing", `A mapped image layer no longer exists in the template.`, { fix: { step: "map", layerId: rule.layerId } }));
         else if (!isImageLayer(layer)) blocking.push(issue("error", "not_image", `"${displayPath(layer)}" can't receive images (Smart Object or pixel layer required).`, { fix: { step: "map", layerId: rule.layerId } }));
         if (!columns.has(rule.column)) blocking.push(issue("error", "column_missing", `Column "${rule.column}" is not in the spreadsheet.`, { fix: { step: "map", layerId: rule.layerId } }));
-        if (rule.source !== "link" && (!rule.folderKey || !folders[rule.folderKey])) blocking.push(issue("error", "folder_missing", `Choose an image folder for "${layer ? displayPath(layer) : rule.column}".`, { fix: { step: "map", layerId: rule.layerId } }));
+        if (rule.source !== "link" && !CODE_KINDS.includes(rule.source) && (!rule.folderKey || !folders[rule.folderKey])) blocking.push(issue("error", "folder_missing", `Choose an image folder for "${layer ? displayPath(layer) : rule.column}".`, { fix: { step: "map", layerId: rule.layerId } }));
     }
     for (const rule of Object.values(mapping.colors || {})) {
         const layer = findLayer(layers, rule.layerId);
@@ -190,6 +208,9 @@ export function runPreflight(input) {
     // Images from links must be downloaded first (the Check step does it automatically).
     const linkDownloads = (folders[LINK_FOLDER_KEY] || {}).downloads || {};
     const pendingLinks = linksNeeded(table.rows, mapping).filter((u) => !linkDownloads[u]);
+    const madeCodes = (folders[CODE_FOLDER_KEY] || {}).downloads || {};
+    const pendingCodes = codesNeeded(table.rows, mapping).filter((c) => !madeCodes[c.key]);
+    if (pendingCodes.length) blocking.push(issue("error", "codes_pending", `${pendingCodes.length} QR code(s) / barcode(s) still need to be made.`, { count: pendingCodes.length, fix: { step: "check" } }));
     if (pendingLinks.length) blocking.push(issue("error", "links_pending", `${pendingLinks.length} image(s) from links still need to be downloaded.`, { count: pendingLinks.length, fix: { step: "check" } }));
     if (blocking.length) return { ok: false, blocking, warnings, items: [], skipped: [], units: 0, cost: 0 };
 

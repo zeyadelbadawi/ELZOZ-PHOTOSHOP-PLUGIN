@@ -1171,6 +1171,59 @@ scenario("I", "Features 1-15: smart prices, formatting (more added per feature)"
     await shot(p, "I22-results-links-320-dark", "Results: 3 designs from the Shopify export (2 rows skipped, not charged)");
     acct = await account(email);
     check("only the 3 designed rows charged (65 → 62)", Number(acct.balance.balance) === 62, acct.balance);
+
+    // ---- F6: Google Sheets as the source; QR code and barcode from the SKU column
+    await click(p, "New job");
+    const gs = p.locator('[data-testid="gsheet"]');
+    await gs.locator("input").fill("https://example.com/my-sheet");
+    await p.waitForTimeout(100);
+    check("a link that isn't Google Sheets is caught before loading", /isn't a Google Sheets link/.test(await gs.textContent()) && (await gs.locator("sp-button").getAttribute("disabled")) !== null);
+    await gs.locator("input").fill("https://docs.google.com/spreadsheets/d/PRIVATE0123456789abcdefghij/edit#gid=0");
+    await gs.locator('sp-button:has-text("Load")').click();
+    await p.waitForSelector(".ez-alert", { timeout: 10000 });
+    const privateMsg = await p.locator(".ez-alert").first().textContent();
+    check("a private sheet says exactly how to share it", /private.*Anyone with the link.*Viewer/.test(privateMsg), privateMsg);
+    await shot(p, "I23-data-google-sheets-private-320-dark", "Data: a private Google Sheet: what to change in Sharing");
+    await gs.locator("input").fill("https://docs.google.com/spreadsheets/d/OFFERS0123456789abcdefghij/edit#gid=0");
+    await gs.locator('sp-button:has-text("Load")').click();
+    await p.waitForFunction(() => /Google Sheets · 5 rows/.test(document.querySelector(".ez-content").textContent), null, { timeout: 10000 });
+    const gsName = await p.locator(".ez-content").textContent();
+    check("the shared sheet loads with its title, rows and a Reload button", gsName.includes("عروض الأسبوع") && /Google Sheets · 5 rows · 12 columns/.test(gsName) && (await btn(p, "Reload from Google Sheets").count()) === 1, gsName.slice(0, 160));
+    await shot(p, "I24-data-google-sheets-320-dark", "Data: loaded from a Google Sheets link (all tabs), with Reload");
+    await click(p, "Next");
+    await queue(p, { file: "templates/offer-card-1080x1350.psd" });
+    await click(p, "Choose PSD");
+    await page_wait(p);
+    await click(p, "Next");
+    await click(p, "Auto-map by name");
+    await pickLayerFolder(p, "Photo", "images/products");
+    await pickLayerFolder(p, "Logo", "images/logos");
+    for (const [layer, kind] of [["QR", "qr"], ["Barcode", "code128"]]) {
+        const r = layerRow(p, layer);
+        await r.locator("select").first().selectOption("SKU");
+        await p.waitForTimeout(100);
+        await (await fieldIn(r, "Images come from")).selectOption(kind);
+        await p.waitForTimeout(150);
+    }
+    const qrInfo = await layerRow(p, "QR").locator('[data-testid="code-info"]').textContent();
+    check("the QR layer previews row 1's code", /Row 1: ELZ-0001/.test(qrInfo) && (await layerRow(p, "QR").locator("img.ez-code-preview").count()) === 1, qrInfo);
+    await layerRow(p, "QR").scrollIntoViewIfNeeded();
+    await shot(p, "I25-map-qr-barcode-320-dark", "Map: QR code and Code 128 barcode made from the SKU column (live preview)", { scroll: null });
+    await click(p, "Next");
+    await field(p, "File names").fill("{SKU}");
+    await p.waitForFunction(() => /5 code\(s\) ready|code\(s\) ready/.test((document.querySelector('[data-testid="codes-summary"]') || {}).textContent || ""), null, { timeout: 15000 });
+    const codesReady = await p.locator('[data-testid="codes-summary"]').textContent();
+    check("codes are made by themselves in Check (10: 5 QR + 5 barcodes)", /10 code\(s\) ready/.test(codesReady), codesReady);
+    await click(p, "Next");
+    await btn(p, "Generate 5").click();
+    await waitForResults(p);
+    const dir6 = path.join(OUTS, "scenario-i-codes");
+    await saveOutputs(p, "Elzoz output I", dir6);
+    const scanned = JSON.parse(execFileSync("python3", ["-c", "import zxingcpp,sys,json\nfrom PIL import Image\nim=Image.open(sys.argv[1]).convert('L')\nprint(json.dumps(sorted([(r.format.name, r.text) for r in zxingcpp.read_barcodes(im)])))", path.join(dir6, "ELZ-0001.jpg")]).toString());
+    check("the final design's QR code and barcode both scan to the row's SKU (zxing-cpp on the JPG)", JSON.stringify(scanned) === JSON.stringify([["Code128", "ELZ-0001"], ["QRCode", "ELZ-0001"]]), scanned);
+    await shot(p, "I26-results-codes-320-dark", "Results: 5 offer cards from Google Sheets with QR + barcode");
+    acct = await account(email);
+    check("5 rows charged (62 → 57)", Number(acct.balance.balance) === 57, acct.balance);
     await finishRecording(p, "SIMULATED-scenario-I-features", "Scenario I: new features 1-15 (simulated host)");
 });
 

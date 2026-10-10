@@ -40,6 +40,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "qrcode-generator": "2.0.4",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
     "xlsx": "npm:@e965/xlsx@0.20.3"

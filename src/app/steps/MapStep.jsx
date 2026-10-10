@@ -7,6 +7,8 @@ import { parseColor, toHex } from "../../domain/colors.js";
 import { autoMap, createMapping, mappedCount, setColorMapping, setImageMapping, setTextMapping, setTextOptions, setVisibilityMapping } from "../../domain/mapping.js";
 import { VISIBILITY_EMPTY } from "../../domain/visibility.js";
 import { directLink, linkShare } from "../../domain/linkImages.js";
+import { CODE_KINDS, codePng, codeValue, frameAspect } from "../../domain/codes.js";
+import { base64 } from "../services.js";
 import { effectiveTable } from "../state.js";
 import TextFormat from "./TextFormat.jsx";
 
@@ -124,20 +126,19 @@ export default function MapStep() {
                                     columns={columns}
                                     firstRow={firstRow}
                                     // A column of links switches the layer to "download from links" by itself.
-                                    onColumn={(c) => set(setImageMapping(mapping, layer.id, c ? { ...(rule || {}), column: c, source: linkShare(table.rows, c) >= 0.6 ? "link" : "folder" } : null))}
+                                    onColumn={(c) => set(setImageMapping(mapping, layer.id, c ? { ...(rule || {}), column: c, source: rule && CODE_KINDS.includes(rule.source) ? rule.source : linkShare(table.rows, c) >= 0.6 ? "link" : "folder", aspect: frameAspect(layer) } : null))}
                                 >
                                     <Field label={t("map.source")}>
                                         <Select
-                                            value={rule && rule.source === "link" ? "link" : "folder"}
-                                            options={[
-                                                { value: "folder", label: t("map.source.folder") },
-                                                { value: "link", label: t("map.source.link") }
-                                            ]}
-                                            onChange={(v) => update({ source: v })}
+                                            value={(rule && rule.source) || "folder"}
+                                            options={["folder", "link", "qr", "ean13", "code128"].map((v) => ({ value: v, label: t(`map.source.${v}`) }))}
+                                            onChange={(v) => update({ source: v, aspect: frameAspect(layer) })}
                                         />
                                     </Field>
                                     {rule && rule.source === "link" ? (
                                         <LinkInfo rows={table.rows} column={rule.column} />
+                                    ) : rule && CODE_KINDS.includes(rule.source) ? (
+                                        <CodeInfo rows={table.rows} column={rule.column} kind={rule.source} aspect={rule.aspect} />
                                     ) : (
                                         <Field label={t("map.folder")}>
                                             <FileField
@@ -155,7 +156,7 @@ export default function MapStep() {
                                     <Field label={t("map.empty")}>
                                         <Select value={rule && rule.emptyPolicy} options={imageEmptyOptions} onChange={(v) => update({ emptyPolicy: v })} />
                                     </Field>
-                                    {!(rule && rule.source === "link") && (
+                                    {!(rule && rule.source && rule.source !== "folder") && (
                                         <>
                                             <Checkbox checked={rule && rule.ignoreCase} onChange={(v) => update({ ignoreCase: v })} label={t("map.ignoreCase")} />
                                             <Checkbox checked={rule && rule.addExtension} onChange={(v) => update({ addExtension: v })} label={t("map.addExtension")} />
@@ -172,6 +173,31 @@ export default function MapStep() {
 
             <VisibilitySection layers={template.layers} mapping={mapping} columns={columns} set={set} />
         </>
+    );
+}
+
+/** A QR code / barcode made from each row's cell: row 1's code, and how many cells can't be encoded. */
+function CodeInfo({ rows, column, kind, aspect }) {
+    const { t } = useI18n();
+    const filled = rows.filter((r) => !r.isEmpty && String(r.values[column] ?? "").trim());
+    const bad = filled.filter((r) => codeValue(kind, r.values[column]).problem);
+    const first = filled[0] ? codeValue(kind, filled[0].values[column]) : null;
+    const src = React.useMemo(() => {
+        if (!first || !first.value) return null;
+        try {
+            return `data:image/png;base64,${base64(codePng(kind, first.value, 240, aspect).bytes)}`;
+        } catch (e) {
+            return null;
+        }
+    }, [kind, aspect, first && first.value]); // eslint-disable-line react-hooks/exhaustive-deps
+    return (
+        <div className="ez-small ez-mb2" data-testid="code-info">
+            {src && <img className="ez-code-preview" src={src} alt="" />}
+            {first && first.value && <div className="ez-muted ez-ellipsis">{t("map.code.row1", { value: first.value })}</div>}
+            {first && first.problem && <div className="ez-warn">{t("map.code.row1Bad", { problem: first.problem })}</div>}
+            {bad.length > 0 && <div className="ez-warn">{t("map.code.bad", { n: bad.length })}</div>}
+            <div className="ez-muted">{t(kind === "qr" ? "map.code.hintQr" : "map.code.hintBar")}</div>
+        </div>
     );
 }
 

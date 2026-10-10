@@ -57,7 +57,9 @@ export function setImageMapping(mapping, layerId, rule) {
             emptyPolicy: rule.emptyPolicy || "keepTemplate",
             ignoreCase: rule.ignoreCase !== false,
             addExtension: rule.addExtension !== false,
-            ...(rule.source === "link" ? { source: "link" } : {}) // images downloaded from links in the column
+            // images downloaded from links, or QR codes / barcodes made from the cell
+            ...(["link", "qr", "ean13", "code128"].includes(rule.source) ? { source: rule.source } : {}),
+            ...(rule.aspect ? { aspect: rule.aspect } : {}) // frame height / width, for barcodes
         };
     }
     return { ...mapping, images };

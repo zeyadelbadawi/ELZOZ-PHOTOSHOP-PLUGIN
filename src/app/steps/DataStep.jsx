@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useApp } from "../AppContext.jsx";
 import { useI18n } from "../i18n.jsx";
-import { Alert, Button, Card, Field, FileField, NumberInput, Section, Select } from "../../ui/components.jsx";
+import { Alert, Button, Card, Field, FileField, NumberInput, Section, Select, TextInput } from "../../ui/components.jsx";
+import { parseSheetLink } from "../../domain/googleSheets.js";
 import { detectStore, prepareStoreTable } from "../../domain/stores.js";
 import { effectiveTable } from "../state.js";
 import SmartColumns from "./SmartColumns.jsx";
@@ -58,6 +59,34 @@ export default function DataStep() {
         }
     };
 
+    const [sheetUrl, setSheetUrl] = useState("");
+    const sheetLinkOk = !sheetUrl.trim() || !!parseSheetLink(sheetUrl);
+    const loadSheet = async (url, keep = null) => {
+        setBusy(true);
+        setError(null);
+        try {
+            const picked = await services.loadGoogleSheet(url);
+            if (keep && picked.sheetNames.includes(keep.sheetName)) {
+                // Reload: same tab and header row; a prepared store export is prepared again.
+                let table = services.readSheet(picked.workbook, keep.sheetName, keep.headerRow);
+                let extra = {};
+                const store = keep.store ? detectStore(table.headers) : null;
+                if (store && store.id === keep.store) {
+                    const prepared = prepareStoreTable(table, store);
+                    extra = { rawTable: table, store: store.id, storeNote: prepared.note };
+                    table = prepared.table;
+                }
+                dispatch({ type: "data", data: { ...picked, sheetName: keep.sheetName, headerRow: keep.headerRow, table, ...extra } });
+            } else load(picked, picked.sheetNames[0], 1);
+            setSheetUrl("");
+        } catch (e) {
+            setError(e.code === "unreadable_workbook" ? t("data.unreadable") : e.message);
+        } finally {
+            setBusy(false);
+        }
+    };
+    const fromSheet = data && data.source && data.source.kind === "gsheet";
+
     const dataRows = data ? data.table.rows.filter((r) => !r.isEmpty).length : 0;
     return (
         <>
@@ -67,12 +96,33 @@ export default function DataStep() {
             <Section>
                 <FileField
                     name={data && data.fileName}
-                    meta={data && t("data.meta", { rows: dataRows, cols: data.table.headers.length })}
+                    meta={data && (fromSheet ? t("gsheet.meta", { rows: dataRows, cols: data.table.headers.length }) : t("data.meta", { rows: dataRows, cols: data.table.headers.length }))}
                     emptyLabel={t("data.empty")}
                     actionLabel={data ? t("data.change") : t("data.pick")}
                     onPick={pick}
                     busy={busy}
                 />
+                {fromSheet && (
+                    <div className="ez-row ez-mt2">
+                        <Button quiet disabled={busy} onClick={() => loadSheet(data.source.url, data)}>
+                            {t("gsheet.reload")}
+                        </Button>
+                        <div className="ez-small ez-muted ez-ml2">{t("gsheet.reloadHint")}</div>
+                    </div>
+                )}
+                <div className="ez-gsheet" data-testid="gsheet">
+                    <Field label={t("gsheet.label")} hint={sheetLinkOk ? t("gsheet.hint") : t("gsheet.notLink")}>
+                        <div className="ez-row">
+                            <div className="ez-grow">
+                                <TextInput value={sheetUrl} placeholder="https://docs.google.com/spreadsheets/d/…" onChange={setSheetUrl} />
+                            </div>
+                            <div className="ez-mr2" />
+                            <Button disabled={busy || !sheetUrl.trim() || !sheetLinkOk} onClick={() => loadSheet(sheetUrl)}>
+                                {t("gsheet.load")}
+                            </Button>
+                        </div>
+                    </Field>
+                </div>
             </Section>
             {data && (
                 <>

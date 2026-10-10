@@ -177,6 +177,15 @@ async function simulatedFetch(url) {
     const u = new URL(url);
     const reply = (status, bytes, type) => ({ ok: status >= 200 && status < 300, status, headers: { get: (h) => (h.toLowerCase() === "content-type" ? type : null) }, arrayBuffer: async () => bytes.buffer.slice(0) });
     await new Promise((r) => setTimeout(r, 120)); // network latency, so progress is visible
+    if (u.hostname === "docs.google.com") {
+        // Google Sheets export: "OFFERS…" is shared (the offers fixture), anything else asks for a login (HTML).
+        const m = u.pathname.match(/^\/spreadsheets\/d\/([\w-]+)\/export$/);
+        if (m && m[1].startsWith("OFFERS")) {
+            const bytes = await fetchBytes("spreadsheets/offers.xlsx");
+            return { ok: true, status: 200, headers: { get: (h) => (h.toLowerCase() === "content-disposition" ? `attachment; filename="Weekly offers.xlsx"; filename*=UTF-8''${encodeURIComponent("عروض الأسبوع")}.xlsx` : null) }, arrayBuffer: async () => bytes.buffer.slice(0) };
+        }
+        return reply(200, new TextEncoder().encode("<!doctype html><title>Sign in - Google Accounts</title>"), "text/html");
+    }
     if (u.hostname !== "images.example.test") throw new Error("getaddrinfo ENOTFOUND " + u.hostname);
     if (u.pathname === "/page") return reply(200, new TextEncoder().encode("<!doctype html><html><body>Product page</body></html>"), "text/html");
     internet.files = internet.files || (await (await fetch("/fixtures-list/images/products")).json());

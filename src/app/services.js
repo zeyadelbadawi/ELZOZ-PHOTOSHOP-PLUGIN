@@ -9,7 +9,9 @@ import { supabaseConfig } from "../config/supabase-config.js";
 import { readWorkbook, readTable } from "../domain/excel.js";
 import { buildFolderIndex } from "../domain/imageFiles.js";
 import { frameState } from "../domain/video/timeline.js";
-import { LINK_FOLDER_KEY } from "../domain/linkImages.js";
+import { LINK_FOLDER_KEY, linkFileStem } from "../domain/linkImages.js";
+import { CODE_FOLDER_KEY, codePng } from "../domain/codes.js";
+import { exportUrl, parseSheetLink, sheetProblem, titleFromDisposition } from "../domain/googleSheets.js";
 import { downloadLinks } from "./linkDownloader.js";
 
 const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -48,6 +50,26 @@ export function createServices({ photoshop, uxp, fetch: fetchImpl = typeof fetch
         const { workbook, sheetNames } = readWorkbook(bytes);
         return { entry, fileName: entry.name, workbook, sheetNames };
     };
+    /** A shared Google Sheet, downloaded as .xlsx (all tabs). Same shape as loadSpreadsheet, without a file entry. */
+    const loadGoogleSheet = async (url) => {
+        const link = parseSheetLink(url);
+        if (!link) throw new Error("That isn't a Google Sheets link. Copy it from the browser's address bar (docs.google.com/spreadsheets/...).");
+        if (!fetchImpl) throw new Error("Downloads aren't available in this Photoshop version.");
+        let res;
+        let bytes = null;
+        try {
+            res = await fetchImpl(exportUrl(link), { method: "GET", redirect: "follow", credentials: "omit" });
+            if (res.ok) bytes = new Uint8Array(await res.arrayBuffer());
+        } catch (e) {
+            const problem = sheetProblem({ error: e.message || "network error" });
+            throw new Error(problem);
+        }
+        const problem = sheetProblem({ status: res.status, bytes });
+        if (problem) throw new Error(problem);
+        const { workbook, sheetNames } = readWorkbook(bytes);
+        const title = titleFromDisposition(res.headers && res.headers.get && res.headers.get("content-disposition")) || "Google Sheet";
+        return { entry: null, source: { kind: "gsheet", url: String(url).trim() }, fileName: title, workbook, sheetNames, loadedAt: Date.now() };
+    };
     const loadTemplate = async (entry) => ({ entry, ...(await port.inspectTemplate({ entry })) });
     const loadImageFolder = async (entry) => ({ entry, name: entry.name, path: entry.nativePath, index: buildFolderIndex(await listFileNames(entry)) });
     const loadOutputFolder = async (entry) => ({ entry, name: entry.name, path: entry.nativePath, existingFileNames: await listFileNames(entry) });
@@ -80,6 +102,7 @@ export function createServices({ photoshop, uxp, fetch: fetchImpl = typeof fetch
             return loadSpreadsheet(entry);
         },
         loadSpreadsheet,
+        loadGoogleSheet,
         loadTemplate,
         loadImageFolder,
         loadOutputFolder,
@@ -123,6 +146,31 @@ export function createServices({ photoshop, uxp, fetch: fetchImpl = typeof fetch
             const results = await downloadLinks({ urls, folder, fetch: fetchImpl, known, onProgress, signal });
             const downloads = { ...known, ...results };
             return { key: LINK_FOLDER_KEY, folder: { name: "Images from links", entry: folder, path: folder.nativePath, index: buildFolderIndex(await listFileNames(folder)), downloads } };
+        },
+
+        /** Make QR codes / barcodes as PNGs in a temporary folder. Returns the folder for CODE_FOLDER_KEY. */
+        async makeCodes(codes, { known = {} } = {}) {
+            const temp = await fs.getTemporaryFolder();
+            let folder;
+            try {
+                folder = await temp.getEntry("elzoz-codes");
+            } catch (e) {
+                folder = await temp.createFolder("elzoz-codes");
+            }
+            const downloads = { ...known };
+            for (const c of codes) {
+                if (downloads[c.key] && downloads[c.key].file) continue;
+                try {
+                    const png = codePng(c.kind, c.value, 1200, c.aspect);
+                    const name = `${c.kind}-${linkFileStem(c.key)}.png`;
+                    const file = await folder.createFile(name, { overwrite: true });
+                    await file.write(png.bytes.buffer);
+                    downloads[c.key] = { file: name };
+                } catch (e) {
+                    downloads[c.key] = { error: e.message || String(e) };
+                }
+            }
+            return { key: CODE_FOLDER_KEY, folder: { name: "QR codes and barcodes", entry: folder, path: folder.nativePath, index: buildFolderIndex(await listFileNames(folder)), downloads } };
         },
 
         readSheet(workbook, sheetName, headerRow) {
